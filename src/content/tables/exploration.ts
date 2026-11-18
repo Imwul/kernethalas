@@ -1,12 +1,13 @@
 import type { OracleTable, TableRow } from '../schema';
 import { core, req, opt, cond } from '../helpers';
 
+const ROOM_SHAPE_EXITS = [2,4,1,3,2,4,6,2,2,2,2,1,2,4,3,2,2,2,3,3,3,4,2,2,5,2,4,4,8,2,1,2,2,4,1,2,4,1,2,1,2,3,1,3,2,2,2,2,5,2,8,4,1,1,2,2,2,2,2,1,2,3,3,4,3,2,2,2,5,6,8,2,1,2,2,2,1,1,3,2,2,2,4,1,1,2,1,2,1,1,4,3,2,2,2,1,2,1,3,3];
 const r = (min: number, max: number, ko: string, label?: string, extra?: Partial<TableRow>): TableRow => ({ min, max, ko, label, ...extra });
 const n = (id: string, note?: string) => ({ id, note });
 
 /** 1..N single rows with a page pointer — for flavor tables shipped as local-only */
 const localRows = (count: number, page: string): TableRow[] =>
-  Array.from({ length: count }, (_, i) => r(i + 1, i + 1, `원문 ${page} 참조`));
+  Array.from({ length: count }, (_, i) => r(i + 1, i + 1, `분위기 묘사 — 규칙 효과 없음(묘사 원문 ${page})`));
 
 const CREATURES_A = ['Abyssal Vexator', 'Amalgam', 'Armor Construct', 'Astral Beast', 'Bladewings', 'Bloodstalker', 'Bone Golem', 'Bone Spiders', 'Cavebound Leech', 'Corpse Ants', 'Death Sage', 'Desiccated Cryptguards', 'Dwerax', 'Fangvine', 'Flayed Knight', 'Fleshmelt Slime', 'Giant Spider', 'Hive Larvae', 'Hive Warrior', 'Hollow Shambler'];
 const CREATURES_B = ['Living Moss', 'Necropede', 'Netherfiend', 'Plaguebringer', 'Pyreborn', 'Ratkin Marauders', 'Razorjaw', 'Reanimated Homunculus', 'Rotwalkers', 'Stone Warden', 'Swarmer', 'Tomb Crawler', 'Umbra Fiend', 'Unfettered Familiar', 'Vaelorian Magus', 'Vinekin', 'Voidweaver', 'Vorleg', 'Wraithskull', 'Wrath Elemental'];
@@ -66,15 +67,19 @@ export const explorationTables: OracleTable[] = [
     aliases: ['room shape', 'corridor shape', 'geomorph', '방 모양', '통로 모양', '지도 타일'],
     dice: 'D100',
     group: 'exploration',
-    usage: '새 방·통로에 들어설 때. 결과 번호의 도형을 원본 97쪽(또는 Room & Corridor Shape 시트)에서 찾아 지도에 붙인다.',
+    usage: '새 방·통로에 들어설 때. 1–25 통로, 26–100 방. 출입구 수만큼 갈림길이 생긴다(들어온 문 포함). 모양은 자유롭게 그려도 된다.',
     mode: 'summary',
-    rows: [
-      r(1, 25, '통로 — 결과 번호의 도형을 원본 97쪽에서 확인.', 'Corridor', { next: [n('t-corridor-description', '선택: 분위기')] }),
-      r(26, 100, '방 — 결과 번호의 도형을 원본 97쪽에서 확인.', 'Room', { next: [n('t-room-description', '선택: 분위기')] }),
-    ],
+    rows: ROOM_SHAPE_EXITS.map((x, i) => {
+      const corridor = i < 25;
+      const dead = x === 1;
+      return r(i + 1, i + 1, `${corridor ? '통로' : '방'} · 출입구 ${x}개${dead ? ' — 막다른 곳(들어온 문뿐)' : ''}`, undefined, {
+        next: [n(corridor ? 't-corridor-description' : 't-room-description', '선택: 분위기')],
+      });
+    }),
     notes: [
-      { type: 'clarification', text: '도형 그림 자체는 저작물이므로 수록하지 않는다. 결과 번호(01–100)와 방/통로 구분만 제공.' },
-      { type: 'clarification', text: '도메인에 더 갈 곳이 없어지는 결과면, 입구가 둘 이상인 방·통로가 나올 때까지 재굴림.' },
+      { type: 'clarification', text: '책은 모양이 중요하지 않으며 원하는 대로(사각형·원이라도) 그려도 된다고 한다(96쪽). 그래서 도형 그림은 싣지 않고 결과마다 종류와 출입구 수만 담았다. 출입구 수는 97쪽 도형의 문 표시와 타일 가장자리까지 열린 통로 끝을 센 값이다.' },
+      { type: 'clarification', text: '이 결과로 도메인에 더 갈 곳이 없어지면(출입구 1개 = 들어온 문뿐), 출입구가 둘 이상인 결과가 나올 때까지 다시 굴린다.' },
+      { type: 'clarification', text: '공식 지도 타일은 문 위치를 표시하므로 문 존재 여부 표(Is There a Door?)는 굴리지 않아도 된다. 직접 그린 지도라면 출입구마다 그 표를 굴려도 된다(99쪽).' },
     ],
     related: [req('room-shape')],
     source: [core(97, 98)],
