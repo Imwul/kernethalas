@@ -19,8 +19,7 @@
   font: 21px/1.2 var(--f-ko-display);
 }
 
-.creature-combat-head span,
-.creature-combat-traits {
+.creature-combat-head span {
   color: var(--ink-2);
   font: 14px/1.55 var(--f-ui);
 }
@@ -47,9 +46,6 @@
   margin: 0;
   font: 16px/1.5 var(--f-ko);
 }
-
-.creature-combat-traits { margin: 0; }
-.creature-combat-traits .xref { margin-inline-end: var(--s2); }
 
 .creature-defenses {
   padding: var(--s2) var(--s3);
@@ -82,9 +78,10 @@
   gap: var(--s2);
 }
 
-.creature-roll-tools > .seg { justify-self: start; }
+.creature-roll-tools > .seg { justify-self: start; flex-wrap: wrap; }
 .creature-roll-tools .seg button { min-height: 44px; }
 .creature-roll-tools .oracle-body { margin: 0; }
+.creature-action-check { min-height: 44px; margin-top: var(--s2); }
 .creature-fixed-hit { margin: 0; padding: var(--s3); background: var(--paper); }
 
 .creature-reactions,

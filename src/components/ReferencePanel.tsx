@@ -2,10 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import { entryById, hrefOf, procById, rulingById, tableById, titleOf } from '../content';
 import { Link } from '../lib/router';
 import { OracleBody } from '../views/Oracle';
+import { CheckCalculator } from './CheckCalculator';
 import { BenchButton, Cite, Notes, PinButton, VChip, XRef } from './bits';
 import { EntryBody } from './EntryBody';
 import { IClose } from './icons';
 import { RulingMatrix } from './RulingMatrix';
+import { TensionTool } from './TensionTool';
 
 export interface ReferenceFrame {
   key: number;
@@ -119,6 +121,8 @@ function PreviewBody({ frame, onValue }: { frame: ReferenceFrame; onValue: (valu
     <article className="preview-detail">
       <div className="marks"><VChip v={procedure.verification} /> <Cite source={procedure.source} /></div>
       <p className="summary">{procedure.summary}</p>
+      {id === 'p-attack' && <CheckCalculator attackOnly />}
+      {id === 'p-tension' && <TensionTool />}
       <ol className="steps">
         {[...procedure.nodes].sort((a, b) => a.row - b.row || a.col - b.col).map((node) => (
           <li key={node.id}>

@@ -1,12 +1,13 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { tables, tableById, TABLE_GROUP_LABEL } from '../content';
 import type { OracleTable } from '../content/schema';
 import { Link, navigate, useLocation } from '../lib/router';
 import { TableView } from '../components/TableView';
+import { CheckCalculator } from '../components/CheckCalculator';
 import { Roller } from '../components/Roller';
 import { BenchButton, Cite, Notes, PinButton, Relations, VChip, useVisit } from '../components/bits';
 import { IDie, IPin, ISearch } from '../components/icons';
-import { d100FromValue, resolveAttack, resolveCheck, resolveOpposed, roll, tableSides, type Edge } from '../lib/dice';
+import { roll, tableSides } from '../lib/dice';
 import { automaticRollSides, quickRollHref, readOracleValue } from '../lib/oracle';
 import { docs, search as searchContent } from '../lib/search';
 import { nav, useNav } from '../lib/store';
@@ -96,7 +97,7 @@ export function OracleIndex() {
         </div>
         <div className="oracle-tools">
           <DiceTray />
-          <CheckCalc />
+          <CheckCalculator />
         </div>
       </section>
     </div>
@@ -199,105 +200,6 @@ function DiceTray() {
             <span>예: D6, 2D6+2, 3D4</span>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface SideState {
-  skill: string;
-  rollv: string;
-  edge: Edge;
-}
-
-function readAdjustedSkill(raw: string): number | null {
-  const value = raw.trim();
-  const parsed = Number(value);
-  return /^[+-]?\d+$/.test(value) && Number.isSafeInteger(parsed) ? parsed : null;
-}
-
-function Side({ label, s, set }: { label: string; s: SideState; set: (v: SideState) => void }) {
-  const id = useId();
-  const invalidSkill = s.skill !== '' && readAdjustedSkill(s.skill) === null;
-  const invalid = s.rollv !== '' && readOracleValue(s.rollv.trim(), 100) === null;
-  return (
-    <div className="row">
-      <div className="field">
-        <label htmlFor={`${id}-skill`}>{label} Skill(보정 적용 후)</label>
-        <input id={`${id}-skill`} value={s.skill} placeholder="예: 50, -20"
-          aria-invalid={invalidSkill || undefined} aria-describedby={invalidSkill ? `${id}-skill-error` : undefined}
-          onChange={(e) => set({ ...s, skill: e.target.value })} />
-        {invalidSkill && <p className="field-err" id={`${id}-skill-error`}>보정한 Skill을 정수로 입력하세요.</p>}
-      </div>
-      <div className="field">
-        <label htmlFor={`${id}-roll`}>{label} D100</label>
-        <input id={`${id}-roll`} inputMode="numeric" value={s.rollv} placeholder="1–100 또는 00"
-          aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-roll-error` : undefined}
-          onChange={(e) => set({ ...s, rollv: e.target.value })} />
-        {invalid && <p className="field-err" id={`${id}-roll-error`}>1–100 사이의 정수 또는 00을 입력하세요.</p>}
-      </div>
-      <div className="field">
-        <label htmlFor={`${id}-edge`}>{label} 이점</label>
-        <select id={`${id}-edge`} value={s.edge} onChange={(e) => set({ ...s, edge: e.target.value as Edge })}>
-          <option value="none">없음</option>
-          <option value="advantage">Advantage</option>
-          <option value="disadvantage">Disadvantage</option>
-        </select>
-      </div>
-    </div>
-  );
-}
-
-/** Verified-rule calculator: user supplies every number; nothing is stored. */
-function CheckCalc() {
-  const [mode, setMode] = useState<'single' | 'attack' | 'opposed'>('attack');
-  const [a, setA] = useState<SideState>({ skill: '60', rollv: '', edge: 'none' });
-  const [b, setB] = useState<SideState>({ skill: '50', rollv: '', edge: 'none' });
-  const aRoll = readOracleValue(a.rollv.trim(), 100);
-  const bRoll = readOracleValue(b.rollv.trim(), 100);
-  const aSkill = readAdjustedSkill(a.skill);
-  const bSkill = readAdjustedSkill(b.skill);
-  const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, a.edge);
-  const cb = bRoll === null || bSkill === null ? null : resolveCheck(d100FromValue(bRoll), bSkill, b.edge);
-  const OUT: Record<string, string> = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패(펌블)' };
-  let verdict: { t: string; d: string } | null = null;
-  if (mode === 'single' && ca) verdict = { t: OUT[ca.outcome], d: `읽은 값 ${ca.read.value}${ca.flippedRead ? ' (뒤집음)' : ''} / Skill ${ca.skill}` };
-  if (mode === 'attack' && ca && cb) {
-    const r = resolveAttack(ca, cb);
-    const T = { hit: '공격자 명중', 'critical-hit': 'Critical Strike', defended: '방어 성공 → Defensive Move', 'both-failed': '양쪽 실패 → 방어자 1 피해', reroll: '다시 굴림' } as const;
-    verdict = { t: T[r.outcome], d: r.reason + (r.attackerFumble ? ' · 공격자 펌블: Fumbles 표도 굴림' : '') };
-  }
-  if (mode === 'opposed' && ca && cb) {
-    const r = resolveOpposed(ca, cb);
-    verdict = { t: r.winner === 'A' ? 'A 승리' : r.winner === 'B' ? 'B 승리' : r.winner === 'reroll' ? '다시 굴림' : '규칙 미정', d: r.reason };
-  }
-  return (
-    <div className="roller checkcalc">
-      <span className="kicker">판정 해석기</span>
-      <div className="seg" role="group" aria-label="판정 종류">
-        {(
-          [
-            ['single', '단일 판정'],
-            ['attack', '공격 판정'],
-            ['opposed', '대항 판정'],
-          ] as const
-        ).map(([k, l]) => (
-          <button key={k} aria-pressed={mode === k} onClick={() => setMode(k)}>
-            {l}
-          </button>
-        ))}
-      </div>
-      <Side label={mode === 'attack' ? '공격자' : 'A'} s={a} set={setA} />
-      {mode !== 'single' && <Side label={mode === 'attack' ? '방어자' : 'B'} s={b} set={setB} />}
-      <div className="verdict" aria-live="polite">
-        {verdict ? (
-          <>
-            <b>{verdict.t}</b>
-            {verdict.d}
-          </>
-        ) : (
-          <span className="muted">직접 굴린 값을 넣으면 Core p.69–71·75 규칙대로 해석합니다. 공격자 +10·Speed 등 보정은 Skill에 미리 반영하세요.</span>
-        )}
       </div>
     </div>
   );

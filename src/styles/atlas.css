@@ -139,25 +139,6 @@
   border-bottom: 1px solid var(--rule-soft);
 }
 
-.atlas-tension-rolls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1);
-}
-
-.atlas-tension-rolls button {
-  min-height: 44px;
-  min-width: 44px;
-  justify-content: center;
-}
-
-.atlas-tension-result:not(:empty) {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s2);
-  padding-top: var(--s2);
-}
-
 @container (min-width: 620px) {
   .atlas-quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

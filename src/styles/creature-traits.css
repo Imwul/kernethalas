@@ -1,0 +1,27 @@
+.creature-traits {
+  padding-inline: var(--s3);
+  font: 14px/1.45 var(--f-ui);
+}
+
+.creature-traits h3 {
+  margin: 0 0 var(--s1);
+  color: var(--ink-2);
+  font: inherit;
+  font-weight: 700;
+}
+
+.creature-traits ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.creature-traits li {
+  display: grid;
+  grid-template-columns: minmax(0, 7.25rem) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--s2);
+  padding-block: 2px;
+}
+
+.creature-traits .xref { justify-self: start; }

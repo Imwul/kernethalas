@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { BOOK_LABEL, entryById, procedures, procById, rulingById, tableById } from '../content';
 import type { ProcEdge, ProcNode, Procedure } from '../content/schema';
-import { rollDie } from '../lib/dice';
 import { Link, navigate, useLocation } from '../lib/router';
+import { CheckCalculator } from '../components/CheckCalculator';
 import { Plan, KIND_KO } from '../components/Plan';
 import { ContextLink } from '../components/ReferenceContext';
 import { RulingMatrix } from '../components/RulingMatrix';
+import { TensionTool } from '../components/TensionTool';
 import { BenchButton, Cite, Notes, PinButton, VChip, XRef, useVisit } from '../components/bits';
 import { NotFound } from './NotFound';
 import '../styles/atlas.css';
@@ -109,6 +110,7 @@ export function AtlasPage({ id }: { id: string }) {
       </header>
       <p className="summary atlas-summary">{p.summary}</p>
       {p.id === 'p-explore-room' && <ExplorationTools />}
+      {p.id === 'p-tension' && <TensionTool />}
       {p.id === 'p-attack' && <AttackComparison />}
       <div className="atlas-controls">
         <div className="seg" role="group" aria-label="절차 보기">
@@ -160,7 +162,6 @@ function ExplorationTable({ id, label, condition }: { id: string; label: string;
 
 function ExplorationTools() {
   const [showTension, setShowTension] = useState(false);
-  const [tension, setTension] = useState<{ sides: number; value: number } | null>(null);
   return (
     <section className="atlas-quick-tools" aria-labelledby="atlas-quick-title">
       <h2 id="atlas-quick-title">탐험 바로가기</h2>
@@ -173,20 +174,7 @@ function ExplorationTools() {
         <ExplorationTable id="t-events" label="이벤트" condition="조우가 없는 새 방" />
       </div>
       <div id="atlas-tension-tool" className="atlas-tension-tool" hidden={!showTension}>
-        <div className="atlas-tension-rolls" role="group" aria-label="긴장 주사위 굴리기">
-          {[8, 6, 4].map((sides) => (
-            <button key={sides} type="button" className="btn ghost" aria-label={`D${sides} 굴리기`} onClick={() => setTension({ sides, value: rollDie(sides) })}>
-              D{sides}
-            </button>
-          ))}
-        </div>
-        <div className="atlas-tension-result" role="status">
-          {tension && <><span className="atlas-quick-die">D{tension.sides} 결과</span> <span className="readout">{tension.value}</span></>}
-        </div>
-        <div className="atlas-refs">
-          <XRef id="tension-die">긴장 주사위 규칙</XRef>
-          <XRef id="t-growing-darkness">짙어지는 어둠 (D4에서 1–2)</XRef>
-        </div>
+        <TensionTool />
       </div>
       <div className="atlas-refs atlas-quick-related">
         <XRef id="lair-check">은신처 판정 (미발견)</XRef>
@@ -203,6 +191,10 @@ function AttackComparison() {
   if (!ruling?.matrix || !attack) return null;
   return (
     <div className="atlas-attack">
+      <details className="atlas-details">
+        <summary>공격 판정 해석기</summary>
+        <CheckCalculator attackOnly />
+      </details>
       <div className="atlas-attack-links">
         {['multiple-targets', 'defense-reaction-penalty', 'damage-pool', 'armor'].map((id) => <XRef key={id} id={id} />)}
       </div>

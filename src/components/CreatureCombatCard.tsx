@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { titleOf } from '../content';
 import { creatureDefenses } from '../content/creature-defenses';
 import { armorKo, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
@@ -8,16 +8,25 @@ import { creatureActionTable, creatureHitTable, creatureSpoilsTables } from '../
 import { creatureActionSource } from '../lib/overlay';
 import { OracleBody } from '../views/Oracle';
 import { XRef } from './bits';
+import { CheckCalculator } from './CheckCalculator';
 import { CreatureAdaptation } from './CreatureAdaptation';
+import { CreatureTraitSummary } from './CreatureTraitSummary';
 import '../styles/creature-combat.css';
 
 export function CreatureCombatCard({ creature, entry }: { creature: CreatureRecord; entry: Entry }) {
   const [levelText, setLevelText] = useState('');
-  const [mode, setMode] = useState<'action' | 'hit'>('action');
+  const [mode, setMode] = useState<'action' | 'hit' | 'check'>('action');
+  const [enemyAttacking, setEnemyAttacking] = useState(false);
   const [actionValue, setActionValue] = useState<number | null>(null);
   const [hitValue, setHitValue] = useState<number | null>(null);
+  const hitTab = useRef<HTMLButtonElement>(null);
+  const checkTab = useRef<HTMLButtonElement>(null);
   const adjustment = calculateCreatureAdaptation(creature, readCreatureLevel(levelText));
+  const { value: combatSkill, unknown: unknownCS } = adjustment.stats.combatSkill;
   const action = creatureActionTable(creature, entry);
+  const physicalAction = actionValue !== null && creature.actions.some(
+    ({ min, max, tag }) => min <= actionValue && actionValue <= max && tag === 'Physical',
+  );
   const hit = creatureHitTable(creature, entry, adjustment.armorBonuses);
   const spoils = creatureSpoilsTables(creature);
   const kind = creature.group === 'overseer' ? 'Overseer' : creature.group === 'overseer-summon' ? 'Overseer 소환수' : creature.group === 'minion' ? 'Mastery 소환수' : '일반 생물';
@@ -38,19 +47,38 @@ export function CreatureCombatCard({ creature, entry }: { creature: CreatureReco
         {ruthlessness && <div><dt>라운드당 턴</dt><dd>{Number(ruthlessness[1]) + 1} <XRef id="ruthlessness">{ruthlessness[0]}</XRef></dd></div>}
       </dl>
       <CreatureDefenseSummary defenses={defenses} />
-      {defenses.otherTraits.length > 0 && <p className="creature-combat-traits"><XRef id="creature-traits">특성</XRef> {defenses.otherTraits.join(' · ')}</p>}
+      <CreatureTraitSummary traits={defenses.otherTraits} />
       <div className="creature-roll-tools">
         <div className="seg" role="group" aria-label="전투 도구">
           <button type="button" aria-pressed={mode === 'action'} onClick={() => setMode('action')}>행동 {action.dice}</button>
-          <button type="button" aria-pressed={mode === 'hit'} onClick={() => setMode('hit')}>명중 부위{hit ? ` ${hit.dice}` : ''}</button>
+          <button type="button" ref={hitTab} aria-pressed={mode === 'hit'} onClick={() => setMode('hit')}>명중 부위{hit ? ` ${hit.dice}` : ''}</button>
+          <button type="button" ref={checkTab} aria-pressed={mode === 'check'} onClick={() => setMode('check')}>공격 판정</button>
         </div>
         <div hidden={mode !== 'action'}>
           <OracleBody t={action} value={actionValue} onValue={setActionValue} compact collapseTableBeforeRoll
             rollLabel={`${action.dice} 굴리기`} sourceForRow={(row) => row.label ? creatureActionSource(creature.id, row.label) : undefined} />
+          {physicalAction && (
+            <button type="button" className="btn ghost creature-action-check" onClick={() => {
+              setEnemyAttacking(true);
+              setMode('check');
+              checkTab.current?.focus();
+            }}>적 공격 판정</button>
+          )}
         </div>
         <div hidden={mode !== 'hit'}>
           {hit ? <OracleBody t={hit} value={hitValue} onValue={setHitValue} compact collapseTableBeforeRoll rollLabel={`${hit.dice} 굴리기`} />
             : <p className="creature-fixed-hit">{entry.stats?.['Hit Location']}</p>}
+        </div>
+        <div hidden={mode !== 'check'}>
+          <CheckCalculator attackOnly creature={{
+            combatSkill: unknownCS ? null : combatSkill,
+            attacking: enemyAttacking,
+            onChangeAttacker: setEnemyAttacking,
+            onHitLocation: () => {
+              setMode('hit');
+              hitTab.current?.focus();
+            },
+          }} />
         </div>
       </div>
       <section className="creature-reactions" aria-label="방어 동작과 펌블">

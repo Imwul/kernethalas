@@ -1,15 +1,45 @@
 import { useEffect, useState } from 'react';
 import { entryById, tableById, procById, rulingById, hrefOf, titleOf, kindOf } from '../content';
 import { Link } from '../lib/router';
-import { nav, useNav } from '../lib/store';
+import { nav, OPEN_MAX, useNav } from '../lib/store';
+import { CheckCalculator } from '../components/CheckCalculator';
 import { EntryBody } from '../components/EntryBody';
 import { IClose, IDown, IUp } from '../components/icons';
 import { KIND_KO } from '../components/Plan';
-import { XRef } from '../components/bits';
+import { TensionTool } from '../components/TensionTool';
+import { Notes, XRef } from '../components/bits';
 import { LedgerItem } from './Home';
 import { OracleBody } from './Oracle';
+import '../styles/workbench.css';
 
 const KIND_SHORT: Record<string, string> = { entry: '항목', table: '표', procedure: '절차', ruling: '문답' };
+const PRESETS = [
+  { label: '전투', ids: ['p-attack', 'conditions'] },
+  { label: '탐험', ids: ['t-room-shape', 'p-tension', 't-encounter-general'] },
+] as const;
+
+function BenchPresets() {
+  const { open } = useNav();
+  const [feedback, setFeedback] = useState<{ open: string[]; text: string }>();
+
+  return (
+    <div className="bench-presets">
+      <div className="bench-preset-buttons" role="group" aria-label="작업대 프리셋">
+        {PRESETS.map(({ label, ids }) => (
+          <button className="btn ghost" key={label} type="button" onClick={() => {
+            const { added, missingSlots } = nav.openPreset(ids);
+            const text = missingSlots
+              ? `${label} 프리셋에 빈자리가 ${missingSlots}개 더 필요합니다. 펼친 항목을 닫아 주세요.`
+              : added ? `${label} 프리셋의 항목 ${added}개를 펼쳤습니다.`
+                : `${label} 프리셋의 항목이 이미 펼쳐져 있습니다.`;
+            setFeedback({ open: nav.get().open, text });
+          }}>{label} 프리셋 펼치기</button>
+        ))}
+      </div>
+      <p className="bench-preset-feedback" role="status">{feedback?.open === open && feedback.text}</p>
+    </div>
+  );
+}
 
 export function PaneBody({ id }: { id: string }) {
   const e = entryById.get(id);
@@ -17,27 +47,39 @@ export function PaneBody({ id }: { id: string }) {
   const t = tableById.get(id);
   if (t) return <TablePane id={id} />;
   const p = procById.get(id);
-  if (p)
+  if (p) {
+    const tool = id === 'p-attack' ? <CheckCalculator attackOnly /> : id === 'p-tension' ? <TensionTool /> : null;
+    const outline = (
+      <ol className="steps">
+        {[...p.nodes]
+          .sort((a, b) => a.row - b.row || a.col - b.col)
+          .map((n) => (
+            <li key={n.id}>
+              <b className="ko-display" style={{ fontWeight: 400 }}>
+                {n.title}
+              </b>{' '}
+              <span className="kicker">{KIND_KO[n.kind]}</span>
+              <div>{n.body}</div>
+            </li>
+          ))}
+      </ol>
+    );
     return (
-      <div style={{ display: 'grid', gap: 10 }}>
-        <p className="summary" style={{ margin: 0 }}>
-          {p.summary}
-        </p>
-        <ol className="steps">
-          {[...p.nodes]
-            .sort((a, b) => a.row - b.row || a.col - b.col)
-            .map((n) => (
-              <li key={n.id}>
-                <b className="ko-display" style={{ fontWeight: 400 }}>
-                  {n.title}
-                </b>{' '}
-                <span className="kicker">{KIND_KO[n.kind]}</span>
-                <div>{n.body}</div>
-              </li>
-            ))}
-        </ol>
+      <div className="bench-procedure">
+        <p className="summary">{p.summary}</p>
+        {tool ? (
+          <>
+            {tool}
+            <details className="fold bench-tool-outline">
+              <summary>절차 순서</summary>
+              {outline}
+              <Notes notes={p.notes} />
+            </details>
+          </>
+        ) : outline}
       </div>
     );
+  }
   const r = rulingById.get(id);
   if (r)
     return (
@@ -127,7 +169,7 @@ export function Workbench() {
 
       <section aria-labelledby="open-h">
         <div className="section-head">
-          <h2 id="open-h">펼친 항목 ({open.length}/8)</h2>
+          <h2 id="open-h">펼친 항목 ({open.length}/{OPEN_MAX})</h2>
           <span className="more bench-actions">
             <span className="seg" role="group" aria-label="배치">
               <button aria-pressed={layout === 'columns'} onClick={() => setLayout('columns')}>
@@ -144,6 +186,7 @@ export function Workbench() {
             )}
           </span>
         </div>
+        <BenchPresets />
         {open.length === 0 ? (
           <div className="empty">
             규칙·표·절차 페이지의 <b>작업대에 펼치기</b> 버튼이나 검색 창의 <kbd>Shift</kbd>+<kbd>Enter</kbd>로 항목을 펼치세요.
@@ -240,11 +283,14 @@ export function Dock() {
   const { open } = useNav();
   return (
     <aside className="dock" aria-label="작업대 도크">
-      <div className="section-head" style={{ marginBottom: 0 }}>
-        <h2 style={{ fontSize: 19 }}>펼친 항목</h2>
-        <Link to="/workbench" className="more">
-          작업대 →
-        </Link>
+      <div>
+        <div className="section-head" style={{ marginBottom: 0 }}>
+          <h2 style={{ fontSize: 19 }}>펼친 항목</h2>
+          <Link to="/workbench" className="more">
+            작업대 →
+          </Link>
+        </div>
+        <BenchPresets />
       </div>
       {open.length === 0 ? (
         <div className="empty">

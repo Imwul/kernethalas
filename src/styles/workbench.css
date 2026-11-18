@@ -1,0 +1,40 @@
+.bench-presets {
+  margin-block: var(--s2) var(--s4);
+}
+
+.dock .bench-presets {
+  margin-bottom: 0;
+}
+
+.bench-preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.bench-preset-buttons button {
+  min-height: 44px;
+}
+
+.bench-preset-feedback {
+  margin: var(--s1) 0 0;
+  color: var(--ink-2);
+  font: 14px/1.5 var(--f-ui);
+}
+
+.bench-preset-feedback:empty {
+  margin: 0;
+}
+
+.bench-procedure {
+  display: grid;
+  gap: var(--s3);
+}
+
+.bench-procedure > .summary {
+  margin: 0;
+}
+
+.bench-tool-outline > .steps {
+  margin: 0 var(--s3) var(--s3);
+}

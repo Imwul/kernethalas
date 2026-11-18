@@ -74,15 +74,32 @@ const HIT_TABLE: Record<string, string> = {
   Serpentoid: 't-hit-serpentoid',
 };
 
-const TRAIT_IDS: [RegExp, string][] = [
-  [/Frightening|Horrifying/, 'frightening-horrifying'],
-  [/Ruthlessness/, 'ruthlessness'],
-  [/Penetrating|Pack|Savage|Swift|Venomous|Alert/, 'creature-traits'],
+const TRAIT_RULES: { label: string; text: string; reference?: string }[] = [
+  { label: 'Alert', text: '이 생물은 기습당하지 않음. 항상 기습하는 능력·장비보다 우선.' },
+  { label: 'Frightening', text: '전투 시작 시 조우당 Resolve 1회. 실패하면 Sanity 2 손실(가장 큰 손실만 적용).', reference: 'frightening-horrifying' },
+  { label: 'Horrifying', text: '전투 시작 시 조우당 Resolve 1회. 실패하면 Sanity 4 손실(가장 큰 손실만 적용).', reference: 'frightening-horrifying' },
+  { label: 'Pack', text: '같은 방에 있는 같은 종류의 살아 있는 Pack 생물마다 Combat Skill +5(자신 제외).' },
+  { label: 'Penetrating (X)', text: '공격 시 Armor X 무시.' },
+  { label: 'Ruthlessness (X)', text: '라운드당 추가 턴 X. 행동 상실 상태는 중첩당 턴 1개를 잃게 한다.', reference: 'ruthlessness' },
+  { label: 'Savage', text: 'Parry 불가. Dodge로만 회피.' },
+  { label: 'Swift', text: '반응에 대한 모든 페널티 무시.' },
+  { label: 'Venomous', text: '이 생물의 명중으로 피해를 입으면 Endurance 판정. 실패하면 Poisoned (1).' },
 ];
+
+export function describeCreatureTrait(trait: string) {
+  const amount = /\((\d+)\)$/.exec(trait)?.[1];
+  const label = amount === undefined ? trait : trait.replace(/\(\d+\)$/, '(X)');
+  const rule = TRAIT_RULES.find((item) => item.label === label);
+  if (!rule) return undefined;
+  return {
+    text: amount === undefined ? rule.text : rule.text.replace(/\bX\b/g, amount),
+    reference: rule.reference ?? 'creature-traits',
+  };
+}
 
 function creatureEntry(c: CreatureRecord): Entry {
   const group = c.group === 'creature' ? '일반 생물' : c.group === 'minion' ? 'Mastery Minion' : 'Overseer';
-  const traitRel = c.traits.flatMap((t) => TRAIT_IDS.filter(([re]) => re.test(t)).map(([, id]) => id));
+  const traitRel = c.traits.map((trait) => describeCreatureTrait(trait)?.reference).filter((id) => id !== undefined);
   const hitTable = c.hitLocation ? HIT_TABLE[c.hitLocation] : undefined;
   const effects = creatureActionKo[c.id] ?? [];
   const sourcePages = [...new Set([c.page, c.statPage, ...(c.id === 'cr-infernal-archon' ? [189] : [])])];
@@ -209,16 +226,7 @@ export const creatureEntries: Entry[] = [
     ko: '생물 특성',
     aliases: ['traits', 'alert', 'pack', 'penetrating', 'ruthlessness', 'savage', 'swift', 'venomous', '경계', '무리', '관통', '무자비', '야만', '신속', '맹독'],
     summary: 'Alert, Frightening, Horrifying, Pack, Penetrating (X), Ruthlessness (X), Savage, Swift, Venomous.',
-    outcomes: [
-      { label: 'Alert', text: '어떤 방법으로도 기습할 수 없다(항상 기습하는 능력·장비보다 우선).' },
-      { label: 'Frightening / Horrifying', text: '전투 시작 Resolve, 실패 시 Sanity 2 / 4 손실. 무리여도 1회.' },
-      { label: 'Pack', text: '자신을 제외한 같은 종류의 Pack 생물 중 같은 방에 살아 있는 개체마다 Combat Skill +5.' },
-      { label: 'Penetrating (X)', text: '공격이 Armor X를 무시.' },
-      { label: 'Ruthlessness (X)', text: '라운드당 추가 턴 X. 행동 상실 상태는 중첩당 턴 1개를 잃게 한다.' },
-      { label: 'Savage', text: 'Parry 불가, Dodge로만 회피.' },
-      { label: 'Swift', text: '반응에 대한 모든 페널티를 무시.' },
-      { label: 'Venomous', text: '이 생물에게 피해를 입으면(명중 시에만) Endurance 실패 시 Poisoned (1).' },
-    ],
+    outcomes: TRAIT_RULES.map(({ label, text }) => ({ label, text })),
     related: [opt('frightening-horrifying'), opt('surprise'), opt('attack-check'), opt('poisoned'), opt('stunned'), ed('ruthlessness')],
     source: [core(132, 133), rr(23, 24)],
     verification: 'verified',

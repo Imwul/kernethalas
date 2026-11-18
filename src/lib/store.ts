@@ -16,7 +16,7 @@ export interface NavState {
 const KEY = 'kn-ossuary-nav-v1';
 const THEME_KEY = 'kn-ossuary-theme';
 const RECENT_MAX = 24;
-const OPEN_MAX = 8;
+export const OPEN_MAX = 8;
 
 function load(): NavState {
   const base: NavState = { pins: ['attack-check', 'prone', 't-defensive-move-pc', 'p-explore-room'], recent: [], open: [], active: null, theme: 'system' };
@@ -83,6 +83,15 @@ export const nav = {
   open(id: string) {
     const open = state.open.includes(id) ? state.open : [...state.open, id].slice(-OPEN_MAX);
     set({ open, active: id });
+  },
+  openPreset(ids: readonly string[]) {
+    const additions = [...new Set(ids)].filter((id) => !state.open.includes(id));
+    const missingSlots = Math.max(0, state.open.length + additions.length - OPEN_MAX);
+    if (missingSlots > 0) return { added: 0, missingSlots };
+    if (additions.length > 0) {
+      set({ open: [...state.open, ...additions], active: state.active ?? additions[0] });
+    }
+    return { added: additions.length, missingSlots: 0 };
   },
   close(id: string) {
     const open = state.open.filter((o) => o !== id);

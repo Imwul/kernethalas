@@ -1,0 +1,54 @@
+.tension-tool {
+  display: grid;
+  min-width: 0;
+}
+
+.tension-rolls,
+.tension-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s2);
+}
+
+.tension-rolls button {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.tension-result:not(:empty) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  margin-block-start: var(--s2);
+  padding: var(--s2);
+  border-block: 1px solid var(--rule-soft);
+}
+
+.tension-value,
+.tension-next {
+  display: grid;
+  gap: var(--s1);
+}
+
+.tension-value {
+  justify-items: center;
+  color: var(--ink-2);
+  font: 0.8rem var(--f-mono);
+}
+
+.tension-next {
+  justify-items: start;
+  font: 15px/1.45 var(--f-ui);
+}
+
+.tension-refs {
+  margin-block-start: var(--s1);
+}
+
+.tension-refs .xref,
+.tension-next .xref {
+  align-items: center;
+  min-height: 44px;
+}
