@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { pageMeta } from './lib/meta';
 import { Link, match, useLocation } from './lib/router';
 import { nav, useNav } from './lib/store';
 import { Palette } from './components/Palette';
@@ -41,8 +42,10 @@ function route(path: string, onSearch: (q?: string) => void) {
 
 function useTitle(path: string) {
   useEffect(() => {
-    const sec = SECTIONS.find((s) => path.startsWith(s.to));
-    document.title = sec ? `${sec.ko} — Ossuary Index` : 'Ossuary Index — Ker Nethalas';
+    // same title/description the static per-page HTML carries (src/lib/meta.ts)
+    const m = pageMeta(path);
+    document.title = m.title;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', m.description);
   }, [path]);
 }
 

@@ -12,6 +12,8 @@ writeFileSync(
   `${out}/vercel.json`,
   JSON.stringify(
     {
+      // /ref/prone → ref/prone.html (per-page titles and link previews); anything else → the SPA
+      cleanUrls: true,
       rewrites: [{ source: '/(.*)', destination: '/index.html' }],
       headers: [{ source: '/assets/(.*)', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] }],
     },
