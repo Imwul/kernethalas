@@ -42,8 +42,10 @@ export function pageMeta(path: string): PageMeta {
     const p = procById.get(id);
     if (p) return page(p.ko, `${p.situation} — ${p.summary}`);
   }
-  const sec = SECTION[`/${section}`];
-  return sec ?? { title: `페이지를 찾을 수 없습니다 — ${SITE_NAME}`, description: SITE_DESCRIPTION };
+  const missing = { title: `페이지를 찾을 수 없습니다 — ${SITE_NAME}`, description: SITE_DESCRIPTION };
+  // an id that matched nothing is a missing page, not the section index
+  if (id) return missing;
+  return SECTION[`/${section}`] ?? missing;
 }
 
 /** Every route worth a static file, for the build-time prerender. */
