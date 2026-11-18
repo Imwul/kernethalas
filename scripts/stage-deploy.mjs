@@ -15,7 +15,11 @@ writeFileSync(
       // /ref/prone → ref/prone.html (per-page titles and link previews); anything else → the SPA
       cleanUrls: true,
       rewrites: [{ source: '/(.*)', destination: '/index.html' }],
-      headers: [{ source: '/assets/(.*)', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] }],
+      headers: [
+        { source: '/assets/(.*)', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+        // the offline worker must always be re-checked so new deploys reach installed copies
+        { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+      ],
     },
     null,
     2,

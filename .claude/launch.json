@@ -1,6 +1,28 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "ossuary-dev", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--port", "5178", "--strictPort"], "port": 5178 }
+    {
+      "name": "ossuary-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5178",
+        "--strictPort"
+      ],
+      "port": 5178
+    },
+    {
+      "name": "ossuary-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "5179",
+        "--strictPort"
+      ],
+      "port": 5179
+    }
   ]
 }

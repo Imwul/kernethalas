@@ -1,0 +1,16 @@
+{
+  "name": "Ossuary Index — Ker Nethalas",
+  "short_name": "Ossuary",
+  "description": "Ker Nethalas: Gravebound Edition v1.2 비공식 한국어 규칙 레퍼런스",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#11181d",
+  "theme_color": "#11181d",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
