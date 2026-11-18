@@ -1,0 +1,13 @@
+node_modules
+dist
+# Copyrighted source material: never commit or deploy
+*.pdf
+.source-local/
+src/local/*.json
+!src/local/.gitkeep
+scripts/.overlay-manifest.json
+.deploy/
+.vercel/
+.DS_Store
+*.tsbuildinfo
+.env*

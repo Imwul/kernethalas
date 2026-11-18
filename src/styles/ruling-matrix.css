@@ -1,0 +1,83 @@
+.combat-matrix {
+  min-width: 0;
+  margin-block: var(--s2);
+}
+
+.combat-matrix .matrix {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+.combat-matrix .matrix caption {
+  text-align: left;
+  padding-block: 0 var(--s2);
+}
+
+.combat-matrix .matrix :is(th, td) {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  border: 1px solid var(--rule);
+  padding: var(--s2);
+  vertical-align: middle;
+}
+
+.combat-matrix .matrix :is(thead, tbody) th:first-child {
+  width: 17%;
+  white-space: normal;
+}
+
+.combat-matrix .matrix td {
+  padding: 0;
+  background: var(--paper);
+  position: relative;
+}
+
+.combat-matrix .matrix td button {
+  display: block;
+  border: 0;
+  text-align: left;
+  line-height: 1.35;
+  padding: var(--s2);
+  width: 100%;
+  min-height: 44px;
+  background: transparent;
+}
+
+.combat-matrix .matrix td:has(button[aria-pressed='true']),
+.combat-matrix .matrix th[data-highlighted] {
+  background: var(--copper-wash);
+  color: var(--copper-ink);
+}
+
+.combat-matrix .matrix td:has(button[aria-pressed='true']) {
+  box-shadow: inset 0 0 0 2px var(--copper-ink);
+}
+
+.combat-matrix .matrix button:hover {
+  color: var(--copper-ink);
+  text-decoration: underline;
+}
+
+.combat-matrix .matrix button:focus-visible {
+  outline-offset: -3px;
+}
+
+.combat-matrix-selection p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s3);
+  color: var(--ink);
+  border-left: 2px solid var(--copper-ink);
+  padding-inline-start: var(--s3);
+  margin: var(--s3) 0 0;
+}
+
+@media (max-width: 460px) {
+  .combat-matrix .matrix :is(th, td button) {
+    padding: 6px;
+    font-size: 0.875rem;
+  }
+}

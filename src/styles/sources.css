@@ -1,0 +1,63 @@
+.sources-page {
+  max-width: 960px;
+  margin-inline: auto;
+}
+.sources-section {
+  margin-block-start: clamp(28px, 4vw, 48px);
+  scroll-margin-top: calc(var(--header-h) + 16px);
+}
+.sources-section h2 {
+  margin: 0 0 8px;
+  font: clamp(21px, 3.5vw, 27px)/1.25 var(--f-ko-display);
+}
+.sources-section > p {
+  margin: 0 0 16px;
+  max-width: var(--measure);
+}
+.source-jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  font: 15px var(--f-ui);
+}
+.source-jumps a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--copper-ink);
+  text-underline-offset: .22em;
+}
+.source-search { max-width: 470px; margin-bottom: 12px; }
+.sources-section .source-count { color: var(--faded); font: 14px var(--f-ui); margin-block: 8px; }
+.source-register { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.source-register:empty { border: 0; }
+.source-register > li {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 7rem) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px 12px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.source-pages { min-inline-size: 0; color: var(--faded); font: 14px/1.4 var(--f-ui); font-variant-numeric: tabular-nums; }
+.source-line-content h3 { margin: 0; font: 18px/1.4 var(--f-ko-display); }
+.source-line-content h3:lang(en) { font-family: var(--f-display-i); }
+.source-refs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; }
+.source-refs .xref, .flagged-register .xref { min-height: 35px; padding-block: 7px; }
+.source-entry-note { margin-block: 3px; font: 14px/1.5 var(--f-ui); color: var(--faded); }
+.source-notes { margin-top: 14px; }
+.sources-section .cov { table-layout: fixed; }
+.sources-section .cov th { font: 14px/1.4 var(--f-ui); letter-spacing: normal; }
+.sources-section .cov th:first-child { width: 26%; }
+.sources-section .cov .n { text-align: end; font-variant-numeric: tabular-nums; }
+.sources-section .cov tbody th { border-color: var(--rule-soft); color: var(--ink); }
+.sources-section .cov tfoot { font-weight: bold; background: var(--bone-2); }
+@media (max-width: 520px) {
+  .source-register > li { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .flagged-register > li { grid-template-columns: minmax(0, 1fr); }
+  .sources-section .cov th, .sources-section .cov td { padding-inline: 3px; }
+  .sources-section .cov thead th { font-size: 12px; }
+}
+@media (pointer: coarse) {
+  .source-refs .xref, .flagged-register .xref { min-height: 44px; padding-block: 10px; }
+}

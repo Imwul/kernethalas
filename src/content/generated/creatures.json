@@ -1,0 +1,2874 @@
+[
+ {
+  "id": "cr-abyssal-vexator",
+  "name": "Abyssal Vexator",
+  "page": 136,
+  "statPage": 136,
+  "group": "creature",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "50",
+  "endurance": "40",
+  "body": "30",
+  "health": "8+4 per ⅃",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (Chest)",
+  "combatSkill": "40",
+  "magicResistance": "80",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": "After level 5: +D6 damage After level 10: +D8 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Chain Lash",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Tormenting Bind",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Abyssal Wither",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-amalgam",
+  "name": "Amalgam",
+  "page": 137,
+  "statPage": 137,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "20",
+  "endurance": "60",
+  "body": "60",
+  "health": "15",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +1 Armor (all Hit Locations except Chest) After level 10: +D8 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Gruesome Slam",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Necrotic Burst",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Dismembering Strike",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-armor-construct",
+  "name": "Armor Construct",
+  "page": 138,
+  "statPage": 138,
+  "group": "creature",
+  "types": [
+   "Construct"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "80",
+  "body": "60",
+  "health": "15",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (Chest, Head)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Penetrating (1)"
+  ],
+  "levelAdaptation": "After level 5: +D8 damage, +10 Combat Skill, +1 Armor (all Hit Locations) After level 10: +10 Health, +D10 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Crushing Fist",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Arcane Shield",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Rune Strike",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-astral-beast",
+  "name": "Astral Beast",
+  "page": 139,
+  "statPage": 139,
+  "group": "creature",
+  "types": [
+   "Animal",
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "50",
+  "endurance": "40",
+  "body": "50",
+  "health": "12",
+  "hitLocation": "Quadruped",
+  "weakSpot": "Head",
+  "armor": "2 (Forequarters)",
+  "combatSkill": "40",
+  "magicResistance": "70",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +8 Health, +D8 damage, +10 Combat Skill After level 10: +5 Health, +D10 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Celestial Surge",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Nebula Shield",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Astral Tempest",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-bladewings",
+  "name": "Bladewings",
+  "page": 140,
+  "statPage": 140,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "D4+1",
+  "mind": "70",
+  "endurance": "30",
+  "body": "10",
+  "health": "5",
+  "hitLocation": "Winged Biped",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "20",
+  "spoils": "Resources table",
+  "traits": [
+   "Swift"
+  ],
+  "levelAdaptation": "After level 5: +1 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Scythe Slash",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Shadow Dive",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Shrieking Assault",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-bloodstalker",
+  "name": "Bloodstalker",
+  "page": 141,
+  "statPage": 141,
+  "group": "creature",
+  "types": [
+   "Humanoid"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "50",
+  "body": "40",
+  "health": "5+2 per ⅃",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "60",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [
+   "Penetrating (1)"
+  ],
+  "levelAdaptation": "After level 5: +D6 damage, +10 Combat Skill After level 10: +D8 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Fang Strike",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Blood Frenzy",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 6,
+    "name": "Vampiric Drain",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-blightfang-rats",
+  "name": "Blightfang Rats",
+  "page": 142,
+  "statPage": 142,
+  "group": "creature",
+  "types": [
+   "Animal",
+   "Undead"
+  ],
+  "number": "3",
+  "mind": "60",
+  "endurance": "30",
+  "body": "40",
+  "health": "6",
+  "hitLocation": "Quadruped",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "30",
+  "magicResistance": "20",
+  "spoils": "Resources table",
+  "traits": [
+   "Pack"
+  ],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 5,
+    "name": "Scratch",
+    "tag": "Physical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Rally",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-bone-golem",
+  "name": "Bone Golem",
+  "page": 143,
+  "statPage": 143,
+  "group": "creature",
+  "types": [
+   "Construct",
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "60",
+  "body": "50",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "3 (Chest)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Penetrating (1)"
+  ],
+  "levelAdaptation": "After level 5: +8 Health, +D6 damage, +10 Combat Skill After level 10: +D8 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Crushing Slam",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Necrotic Grasp",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Rending Strike",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-bone-spiders",
+  "name": "Bone Spiders",
+  "page": 144,
+  "statPage": 144,
+  "group": "creature",
+  "types": [
+   "Construct",
+   "Undead"
+  ],
+  "number": "3",
+  "mind": "30",
+  "endurance": "40",
+  "body": "40",
+  "health": "6",
+  "hitLocation": "Arachnid",
+  "weakSpot": "Cephalothorax",
+  "armor": "2 (Abdomen)",
+  "combatSkill": "40",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +D8 damage, +1 Armor (all Hit Locations except Abdomen) After level 10: +10 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Venomous Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Skittering Assault",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Web Bind",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-cavebound-leech",
+  "name": "Cavebound Leech",
+  "page": 145,
+  "statPage": 145,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "60",
+  "body": "40",
+  "health": "10",
+  "hitLocation": "Serpentoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Locations)",
+  "combatSkill": "40",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [
+   "Penetrating (1)",
+   "Alert"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D4 damage, +10 Combat Skill After level 10: +5 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Constricting Grasp",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Razor Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Engulfing Devour",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-corpse-ants",
+  "name": "Corpse Ants",
+  "page": 146,
+  "statPage": 146,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "3",
+  "mind": "40",
+  "endurance": "60",
+  "body": "40",
+  "health": "8",
+  "hitLocation": "Insectoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Locations)",
+  "combatSkill": "30",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [
+   "Penetrating (1)",
+   "Pack"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D4 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Chitinous Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Acidic Spray",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Putrid Eruption",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-death-sage",
+  "name": "Death Sage",
+  "page": 147,
+  "statPage": 147,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "40",
+  "body": "20",
+  "health": "10",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "30",
+  "magicResistance": "60",
+  "spoils": "Resources table",
+  "traits": [
+   "Horrifying"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +10 Combat Skill After level 10: +D8 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Necrotic Bolt",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Crippling Curse",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Drain Life",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-desiccated-cryptguards",
+  "name": "Desiccated Cryptguards",
+  "page": 148,
+  "statPage": 148,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "2",
+  "mind": "40",
+  "endurance": "60",
+  "body": "20",
+  "health": "10",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +D6 damage, +10 Combat Skill, +1 Armor (all Hit Locations except Chest) After level 10: +10 Health, +D8 damage",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Rusting Slash",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Relentless Assault",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Tomb Guardian's Wrath",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-dwerax",
+  "name": "Dwerax",
+  "page": 149,
+  "statPage": 149,
+  "group": "creature",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "60",
+  "body": "60",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening",
+   "Alert"
+  ],
+  "levelAdaptation": "After level 5: +D6 damage, +10 Combat Skill After level 10: +10 Health, +D8 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Claw Grasp",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Abyssal Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Tremor Strike",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-fangvine",
+  "name": "Fangvine",
+  "page": 150,
+  "statPage": 150,
+  "group": "creature",
+  "types": [
+   "Plant"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "30",
+  "health": "8+2 per ⅃",
+  "hitLocation": "Serpentoid",
+  "weakSpot": "Head",
+  "armor": "2 (Body)",
+  "combatSkill": "50",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +D4 damage, +10 Combat Skill After level 10: +D6 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Ensnaring Grasp",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Thorned Assault",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Savage Grasp",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-flayed-knight",
+  "name": "Flayed Knight",
+  "page": 151,
+  "statPage": 151,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "60",
+  "body": "50",
+  "health": "16",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (all Hit Locations)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +5 Health, +1 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Spectral Strike",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Haunting Grasp",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Vengeful Cleave",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-flesh-eater",
+  "name": "Flesh Eater",
+  "page": 152,
+  "statPage": 152,
+  "group": "creature",
+  "types": [
+   "Humanoid",
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "30",
+  "body": "65",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "10",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Rancid Claw",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Grasp",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Slam",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-fleshmelt-slime",
+  "name": "Fleshmelt Slime",
+  "page": 153,
+  "statPage": 153,
+  "group": "creature",
+  "types": [
+   "Elemental",
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "20",
+  "endurance": "60",
+  "body": "40",
+  "health": "12",
+  "hitLocation": null,
+  "weakSpot": null,
+  "armor": "–",
+  "combatSkill": "50",
+  "magicResistance": "40",
+  "spoils": "Resources table",
+  "traits": [
+   "Elemental Affinity: Acid"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D4 damage, +10 Combat Skill After level 10: +4 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Corrosive Touch",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Putrid Eruption",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Devour Essence",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-giant-spider",
+  "name": "Giant Spider",
+  "page": 154,
+  "statPage": 154,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "40",
+  "body": "40",
+  "health": "10",
+  "hitLocation": "Arachnid",
+  "weakSpot": "Cephalothorax",
+  "armor": "1 (All Locations)",
+  "combatSkill": "50",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [
+   "Penetrating (1)",
+   "Alert"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Venomous Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Web Snare",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Terrifying Gaze",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-hive-larvae",
+  "name": "Hive Larvae",
+  "page": 155,
+  "statPage": 155,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "4",
+  "mind": "20",
+  "endurance": "20",
+  "body": "10",
+  "health": "2",
+  "hitLocation": null,
+  "weakSpot": null,
+  "armor": "–",
+  "combatSkill": "30",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [
+   "Penetrating (1)"
+  ],
+  "levelAdaptation": "After level 5: +D4 damage, +10 Combat Skill After level 10: +D6 damage, +20 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Swarm Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Luminescent Distraction",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Consume Essence",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-hive-warrior",
+  "name": "Hive Warrior",
+  "page": 156,
+  "statPage": 156,
+  "group": "creature",
+  "types": [
+   "Humanoid",
+   "Animal"
+  ],
+  "number": "2",
+  "mind": "30",
+  "endurance": "30",
+  "body": "45",
+  "health": "8",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +10 Combat Skill After level 10: +6 Health, +D6 damage, +20 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Rending Strike",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Venomous Spines",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Unyielding Charge",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-hollow-shambler",
+  "name": "Hollow Shambler",
+  "page": 157,
+  "statPage": 157,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "30",
+  "body": "45",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Chest",
+  "armor": "–",
+  "combatSkill": "50",
+  "magicResistance": "50",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +4 Health, +D4 damage, +10 Combat Skill After level 10: +4 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Soul Devour",
+    "tag": null
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Distorted Lurch",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Tormented Wail",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-living-moss",
+  "name": "Living Moss",
+  "page": 158,
+  "statPage": 158,
+  "group": "creature",
+  "types": [
+   "Undead",
+   "Plant"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "60",
+  "body": "45",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": "Resources table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +10 Combat Skill After level 10: +4 Health, +D6 damage, +20 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Necrotic Touch",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Ensnaring Vines",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "End Life",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-necropede",
+  "name": "Necropede",
+  "page": 159,
+  "statPage": 159,
+  "group": "creature",
+  "types": [
+   "Animal",
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "30",
+  "body": "25",
+  "health": "16",
+  "hitLocation": "Serpentoid",
+  "weakSpot": "Head",
+  "armor": "2 (Head)",
+  "combatSkill": "50",
+  "magicResistance": "40",
+  "spoils": "Resources table",
+  "traits": [
+   "Venomous"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +10 Combat Skill After level 10: +2 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Bone Slam",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Soul Drain",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Spinal Whip",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-netherfiend",
+  "name": "Netherfiend",
+  "page": 160,
+  "statPage": 160,
+  "group": "creature",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "40",
+  "health": "10",
+  "hitLocation": "Winged Biped",
+  "weakSpot": "Head",
+  "armor": "2 (Head)",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D4 damage, +20 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Infernal Claw",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Eldritch Flames",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Corrupting Bind",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-plaguebringer",
+  "name": "Plaguebringer",
+  "page": 161,
+  "statPage": 161,
+  "group": "creature",
+  "types": [
+   "Undead",
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "20",
+  "endurance": "60",
+  "body": "50",
+  "health": "16",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Head)",
+  "combatSkill": "50",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening",
+   "Venomous",
+   "Elemental Affinity: Necrotic"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D4 damage, +1 Armor (all Hit Locations except Chest) After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Corrosive Claws",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Virulent Cloud",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Disease Spew",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-pyreborn",
+  "name": "Pyreborn",
+  "page": 162,
+  "statPage": 162,
+  "group": "creature",
+  "types": [
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "60",
+  "health": "8",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Elemental Affinity: Fire",
+   "Vulnerable to Cold damage"
+  ],
+  "levelAdaptation": "After level 5: +12 Health, +D4 damage After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Ember Strike",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Inferno Burst",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Firestorm",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-ratkin-marauders",
+  "name": "Ratkin Marauders",
+  "page": 163,
+  "statPage": 163,
+  "group": "creature",
+  "types": [
+   "Humanoid"
+  ],
+  "number": "3",
+  "mind": "80",
+  "endurance": "50",
+  "body": "50",
+  "health": "6",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (Head)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +4 Health, +D4 damage, +1 Armor (all Hit Locations except Chest) After level 10: +D6 damage, +20 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Claw Slash",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Dirty Trick",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Alarm",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-razorjaw",
+  "name": "Razorjaw",
+  "page": 164,
+  "statPage": 164,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "1",
+  "mind": "70",
+  "endurance": "50",
+  "body": "60",
+  "health": "12",
+  "hitLocation": "Quadruped",
+  "weakSpot": "Head",
+  "armor": "1 (Forequarters)",
+  "combatSkill": "40",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Penetrating (2)"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D4 damage, +1 Armor (all Hit Locations except Forequarters) After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Vicious Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Claw Swipe",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Savage Pounce",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-reanimated-homunculus",
+  "name": "Reanimated Homunculus",
+  "page": 165,
+  "statPage": 165,
+  "group": "creature",
+  "types": [
+   "Undead",
+   "Construct"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "50",
+  "body": "20",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "30",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +1 Armor (all Hit Locations except Chest) After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Slam",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Necrotic Aura",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Unstable Detonation",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-rotwalkers",
+  "name": "Rotwalkers",
+  "page": 166,
+  "statPage": 166,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "3",
+  "mind": "20",
+  "endurance": "30",
+  "body": "20",
+  "health": "8",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "60",
+  "magicResistance": "40",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage After level 10: +4 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Grasping Claw",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Festering Aura",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Deathly Embrace",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-skeletal-horrors",
+  "name": "Skeletal Horrors",
+  "page": 167,
+  "statPage": 167,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "2",
+  "mind": "20",
+  "endurance": "20",
+  "body": "25",
+  "health": "8",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (Chest)",
+  "combatSkill": "40",
+  "magicResistance": "20",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Cursed Slash",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Ethereal Grasp",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Haunting Wail",
+    "tag": "Magical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Vengeful Onslaught",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-stone-warden",
+  "name": "Stone Warden",
+  "page": 168,
+  "statPage": 168,
+  "group": "creature",
+  "types": [
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "60",
+  "body": "80",
+  "health": "15",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Elemental Affinity: Force",
+   "Vulnerable to Psychic damage"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D4 damage After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Stone Spike",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Tremor Strike",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Landslide",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-swarmer",
+  "name": "Swarmer",
+  "page": 169,
+  "statPage": 169,
+  "group": "creature",
+  "types": [
+   "Animal",
+   "Construct"
+  ],
+  "number": "1",
+  "mind": "50",
+  "endurance": "40",
+  "body": "30",
+  "health": "12",
+  "hitLocation": null,
+  "weakSpot": null,
+  "armor": "–",
+  "combatSkill": "30",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [
+   "Penetrating (1)",
+   "Venomous"
+  ],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +10 Combat Skill After level 10: +D6 damage, +20 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Venomous Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Acid Spray",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Swarm Assault",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-tomb-crawler",
+  "name": "Tomb Crawler",
+  "page": 170,
+  "statPage": 170,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "40",
+  "body": "25",
+  "health": "16",
+  "hitLocation": "Serpentoid",
+  "weakSpot": "Head",
+  "armor": "2 (Body)",
+  "combatSkill": "50",
+  "magicResistance": "30",
+  "spoils": "Resources table",
+  "traits": [
+   "Venomous"
+  ],
+  "levelAdaptation": "After level 5: +D4 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Spine Strike",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Paralyzing Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Slash",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-umbra-fiend",
+  "name": "Umbra Fiend",
+  "page": 171,
+  "statPage": 171,
+  "group": "creature",
+  "types": [
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "50",
+  "endurance": "40",
+  "body": "25",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "40",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening",
+   "Resistant to all Physical, non-Magical damage"
+  ],
+  "levelAdaptation": "After level 5: +8 Health, +D4 damage, +10 Combat Skill After level 10: +D6 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Shadow Claw",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Darkness Pulse",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Evasive Shadows",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-unfettered-familiar",
+  "name": "Unfettered Familiar",
+  "page": 172,
+  "statPage": 172,
+  "group": "creature",
+  "types": [
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "70",
+  "endurance": "40",
+  "body": "20",
+  "health": "8",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [
+   "Resistant to all Physical, non-Magical damage"
+  ],
+  "levelAdaptation": "After level 5: +2 Health, +D4 damage, +10 Combat Skill After level 10: +2 Health, +D6 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Arcane Burst",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Ethereal Grasp",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Arcane Feedback",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-vaelorian-magus",
+  "name": "Vaelorian Magus",
+  "page": 173,
+  "statPage": 173,
+  "group": "creature",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "20",
+  "health": "16",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +4 Health, +D6 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Death Bolt",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Apparition Summoning",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Eldritch Enfeeblement",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-vinekin",
+  "name": "Vinekin",
+  "page": 174,
+  "statPage": 174,
+  "group": "creature",
+  "types": [
+   "Plant",
+   "Humanoid"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "30",
+  "health": "10",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +10 Combat Skill After level 10: +5 Health, +D8 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Thorn Lash",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Entangling Roots",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Brutal Slam",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-voidweaver",
+  "name": "Voidweaver",
+  "page": 175,
+  "statPage": 175,
+  "group": "creature",
+  "types": [
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "20",
+  "body": "20",
+  "health": "8",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [
+   "Resistant to all Physical, non-Magical damage"
+  ],
+  "levelAdaptation": "After level 5: +2 Health, +D4 damage, +10 Combat Skill After level 10: +2 Health, +D6 damage, +10 Magic Resistance",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Void Ray",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Cosmic Distortion",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Void Nova",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-vorleg",
+  "name": "Vorleg",
+  "page": 176,
+  "statPage": 176,
+  "group": "creature",
+  "types": [
+   "Animal"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "40",
+  "body": "40",
+  "health": "10",
+  "hitLocation": "Quadruped",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "Spoils table",
+  "traits": [
+   "Penetrating (1)",
+   "Alert",
+   "Venomous"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D4 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Venomous Bite",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Ensnaring Tentacles",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Paralyzing Grasp",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-wraithskull",
+  "name": "Wraithskull",
+  "page": 177,
+  "statPage": 177,
+  "group": "creature",
+  "types": [
+   "Undead",
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "20",
+  "body": "10",
+  "health": "10",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "30",
+  "magicResistance": "60",
+  "spoils": "Spoils table",
+  "traits": [
+   "Frightening"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +10 Combat Skill After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Soul Drain",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Ethereal Phantasm",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Wail of Torment",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-wrath-elemental",
+  "name": "Wrath Elemental",
+  "page": 178,
+  "statPage": 178,
+  "group": "creature",
+  "types": [
+   "Demon",
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "50",
+  "body": "40",
+  "health": "15",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "50",
+  "magicResistance": "50",
+  "spoils": "Spoils table",
+  "traits": [
+   "Swift",
+   "Elemental Affinity: Infernal"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +10 Magic Resistance After level 10: +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 2,
+    "name": "Elemental Fury",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 4,
+    "name": "Infernal Resilience",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Chaotic Eruption",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-carnage-devourer",
+  "name": "Carnage Devourer",
+  "page": 180,
+  "statPage": 181,
+  "group": "overseer",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "60",
+  "body": "80",
+  "health": "30",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Penetrating (2)",
+   "Savage",
+   "Ruthlessness (1)"
+  ],
+  "levelAdaptation": "After level 5: +D6+2 damage After level 10: +15 Health, +D10 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Rampaging Charge",
+    "tag": null
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Flamebrand Cleave",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Earthshaker Slam",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Rage Unleashed",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Annihilation Roar",
+    "tag": "Magical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Devouring Blaze",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-dreadlord",
+  "name": "Dreadlord",
+  "page": 182,
+  "statPage": 183,
+  "group": "overseer",
+  "types": [
+   "Demon",
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "30",
+  "health": "20",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "40",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Ruthlessness (1)"
+  ],
+  "levelAdaptation": "After level 5: +10 Health, +D6 damage, +10 Combat Skill After level 10: +10 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Shadow Reapers",
+    "tag": "Magical"
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Aura of Despair",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Ethereal Scythe",
+    "tag": "Physical"
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Shroud of Darkness",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Weakening Gaze",
+    "tag": "Magical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Abyssal Projectiles",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-glacial-burrower",
+  "name": "Glacial Burrower",
+  "page": 184,
+  "statPage": 185,
+  "group": "overseer",
+  "types": [
+   "Animal",
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "70",
+  "body": "80",
+  "health": "30",
+  "hitLocation": "Quadruped",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "60",
+  "magicResistance": "30",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Penetrating (2)",
+   "Ruthlessness (1)",
+   "Elemental Affinity: Cold"
+  ],
+  "levelAdaptation": "After level 5: +5 damage, +1 Armor (all Hit Locations) After level 10: 10 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Blizzard Gust",
+    "tag": "Magical"
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Bone-Chilling Strike",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Burrow Assault",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Icy Hailstones",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Frozen Rampage",
+    "tag": null
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Glacial Fury",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-gorehoof",
+  "name": "Gorehoof",
+  "page": 186,
+  "statPage": 187,
+  "group": "overseer",
+  "types": [
+   "Humanoid"
+  ],
+  "number": "1",
+  "mind": "30",
+  "endurance": "70",
+  "body": "80",
+  "health": "30",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "65",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Penetrating (2)",
+   "Ruthlessness (1)",
+   "Frightening"
+  ],
+  "levelAdaptation": "After level 5: +D10 damage, +1 Armor (all Hit Locations) After level 10: +10 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Cleaver Cleave",
+    "tag": null
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Savage Charge",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Bloodlust Frenzy",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Rallying Roar",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Endurance Surge",
+    "tag": null
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Dominating Presence",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-infernal-archon",
+  "name": "Infernal Archon",
+  "page": 188,
+  "statPage": 188,
+  "group": "overseer",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "50",
+  "endurance": "40",
+  "body": "50",
+  "health": "20",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "50",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Ruthlessness (1)"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +10 Combat Skill After level 10: +5 Health, +D8 damage, +10 Combat Skill",
+  "actionDice": null,
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Inferno Eruption",
+    "tag": "Magical"
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Shadow Veil",
+    "tag": null
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Demonic Conjuration",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Infernal Barrage",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Shadow Rift",
+    "tag": "Magical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Vortex of Annihilation",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-lesser-demon",
+  "name": "Lesser Demon",
+  "page": 189,
+  "statPage": 189,
+  "group": "overseer-summon",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "20",
+  "health": "2",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "30",
+  "spoils": "–",
+  "traits": [
+   "Restored by Fire damage"
+  ],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 6,
+    "name": "Demonic Slash",
+    "tag": "Physical"
+   }
+  ]
+ },
+ {
+  "id": "cr-infernal-tormentor",
+  "name": "Infernal Tormentor",
+  "page": 190,
+  "statPage": 191,
+  "group": "overseer",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "70",
+  "endurance": "50",
+  "body": "60",
+  "health": "30",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "60",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Penetrating (2)",
+   "Frightening",
+   "Ruthlessness (1)",
+   "Swift"
+  ],
+  "levelAdaptation": "After level 5: +D6 damage, +1 Armor (all Hit Locations) After level 10: +5 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Inferno Rain",
+    "tag": "Magical"
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Burning Grasp",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Infernal Shapechange",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Fiery Eruption",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Infernal Wrath",
+    "tag": "Physical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Hellfire Nova",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-pyroclasmic-possessor",
+  "name": "Pyroclasmic Possessor",
+  "page": 192,
+  "statPage": 193,
+  "group": "overseer",
+  "types": [
+   "Demon"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "40",
+  "health": "20",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "30",
+  "magicResistance": "60",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Ruthlessness (2)"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage, +10 Combat Skill After level 10: +5 Health, +D8 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Infernal Possession",
+    "tag": "Magical"
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Eruption of Flame",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Molten Projectiles",
+    "tag": "Magical"
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Possessed Blaze",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Burning Urge",
+    "tag": null
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Inferno's Grasp",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-veilshifter",
+  "name": "Veilshifter",
+  "page": 194,
+  "statPage": 195,
+  "group": "overseer",
+  "types": [
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "70",
+  "endurance": "40",
+  "body": "30",
+  "health": "25",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "40",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Ruthlessness (1)",
+   "Swift"
+  ],
+  "levelAdaptation": "After level 5: +5 Health, +D6 damage After level 10: +5 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Illusory Mirage",
+    "tag": null
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Ethereal Distortion",
+    "tag": "Magical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Reality Flux",
+    "tag": "Magical"
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Doppelganger Surge",
+    "tag": null
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Dreamscape Shift",
+    "tag": "Magical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Mystic Gaze",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-venomcloud-siren",
+  "name": "Venomcloud Siren",
+  "page": 196,
+  "statPage": 197,
+  "group": "overseer",
+  "types": [
+   "Demon",
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "50",
+  "endurance": "60",
+  "body": "40",
+  "health": "20",
+  "hitLocation": "Serpentoid",
+  "weakSpot": "Head",
+  "armor": "1 (All Hit Locations)",
+  "combatSkill": "40",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Penetrating (2)",
+   "Ruthlessness (1)",
+   "Elemental Affinity: Poison"
+  ],
+  "levelAdaptation": "After level 5: +D10 damage, +1 Armor (all Hit Locations) After level 10: +10 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Toxic Cloud",
+    "tag": null
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Serpentine Strike",
+    "tag": "Physical"
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Venomous Projectiles",
+    "tag": "Magical"
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Ensnaring Thorns",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Dreadful Siren Song",
+    "tag": "Magical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Toxic Infusion",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-zephyrous-shadow",
+  "name": "Zephyrous Shadow",
+  "page": 198,
+  "statPage": 199,
+  "group": "overseer",
+  "types": [
+   "Demon",
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "70",
+  "endurance": "50",
+  "body": "40",
+  "health": "20",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "50",
+  "magicResistance": "50",
+  "spoils": "1 roll on the Valuable table, 1 roll on the Precious table",
+  "traits": [
+   "Penetrating (2)",
+   "Savage",
+   "Ruthlessness (1)",
+   "Swift",
+   "Elemental Affinity: Lightning"
+  ],
+  "levelAdaptation": "After level 5: +D10 damage After level 10: +10 Health, +D6 damage, +10 Combat Skill",
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 1,
+    "name": "Thunderbolt Barrage",
+    "tag": "Magical"
+   },
+   {
+    "min": 2,
+    "max": 2,
+    "name": "Shadow Cloak",
+    "tag": null
+   },
+   {
+    "min": 3,
+    "max": 3,
+    "name": "Stormshroud",
+    "tag": null
+   },
+   {
+    "min": 4,
+    "max": 4,
+    "name": "Disruptive Curse",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 5,
+    "name": "Tempestuous Assault",
+    "tag": "Physical"
+   },
+   {
+    "min": 6,
+    "max": 6,
+    "name": "Galeforce Surge",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-arcane-companion",
+  "name": "Arcane Companion",
+  "page": 200,
+  "statPage": 200,
+  "group": "minion",
+  "types": [
+   "Astral"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "40",
+  "body": "30",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "80",
+  "spoils": null,
+  "traits": [],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 4,
+    "name": "Arcane Bolt",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Ethereal Surge",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-fire-elemental",
+  "name": "Fire Elemental",
+  "page": 201,
+  "statPage": 201,
+  "group": "minion",
+  "types": [
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "60",
+  "body": "40",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": null,
+  "traits": [],
+  "levelAdaptation": null,
+  "actionDice": null,
+  "actions": [
+   {
+    "min": 1,
+    "max": 4,
+    "name": "Ember Blast",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Firestorm",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-skeleton",
+  "name": "Skeleton",
+  "page": 202,
+  "statPage": 202,
+  "group": "minion",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "20",
+  "body": "20",
+  "health": "4",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "30",
+  "magicResistance": "20",
+  "spoils": null,
+  "traits": [],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 4,
+    "name": "Rabid Slash",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Ethereal Grasp",
+    "tag": "Magical"
+   }
+  ]
+ },
+ {
+  "id": "cr-wight",
+  "name": "Wight",
+  "page": 203,
+  "statPage": 203,
+  "group": "minion",
+  "types": [
+   "Undead"
+  ],
+  "number": "1",
+  "mind": "60",
+  "endurance": "10",
+  "body": "10",
+  "health": "10",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "2 (Chest)",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": null,
+  "traits": [],
+  "levelAdaptation": null,
+  "actionDice": "D6",
+  "actions": [
+   {
+    "min": 1,
+    "max": 4,
+    "name": "Deathly Slash",
+    "tag": "Physical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Embrace of Death",
+    "tag": null
+   }
+  ]
+ },
+ {
+  "id": "cr-frost-elemental",
+  "name": "Frost Elemental",
+  "page": 201,
+  "statPage": 201,
+  "group": "minion",
+  "types": [
+   "Elemental"
+  ],
+  "number": "1",
+  "mind": "40",
+  "endurance": "60",
+  "body": "40",
+  "health": "12",
+  "hitLocation": "Humanoid",
+  "weakSpot": "Head",
+  "armor": "–",
+  "combatSkill": "40",
+  "magicResistance": "60",
+  "spoils": null,
+  "traits": [],
+  "levelAdaptation": null,
+  "actionDice": null,
+  "actions": [
+   {
+    "min": 1,
+    "max": 4,
+    "name": "Frostbite",
+    "tag": "Magical"
+   },
+   {
+    "min": 5,
+    "max": 6,
+    "name": "Blizzard's Embrace",
+    "tag": "Magical"
+   }
+  ]
+ }
+]
