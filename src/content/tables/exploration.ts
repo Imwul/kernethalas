@@ -143,7 +143,7 @@ export const explorationTables: OracleTable[] = [
     ],
     rows: [
       r(1, 9, '조우 없음', undefined, { cols: { room: '없음 → 방이면 Events', corridor: '없음' }, next: [n('t-events', '방일 때만')] }),
-      r(10, 14, '방: 조우 / 통로: 없음', undefined, { cols: { room: '조우', corridor: '없음' }, next: [n('t-encounter-general', '방'), n('t-events', '통로면 굴리지 않음')] }),
+      r(10, 14, '방: 조우 / 통로: 없음', undefined, { cols: { room: '조우', corridor: '없음' }, next: [n('t-encounter-general', '방일 때만')] }),
       r(15, 20, '조우', undefined, { cols: { room: '조우', corridor: '조우' }, next: [n('t-encounter-general')] }),
     ],
     related: [req('encounter-check')],

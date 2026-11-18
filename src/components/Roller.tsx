@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import type { OracleTable } from '../content/schema';
+import type { OracleTable, TableRow } from '../content/schema';
 import { d100FromValue } from '../lib/dice';
 import { automaticRollSides, oracleRowsAvailable, readOracleValue, rollTable } from '../lib/oracle';
 import { tableRowSource } from '../lib/overlay';
@@ -15,16 +15,19 @@ interface Props {
   only: boolean;
   onOnly: (only: boolean) => void;
   onShowRow: () => void;
+  rollLabel?: string;
+  sourceForRow?: (row: TableRow) => string | undefined;
+  showUnrolledViewToggle?: boolean;
 }
 
-export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow }: Props) {
+export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle }: Props) {
   const id = useId();
   const [manual, setManual] = useState('');
   const [invalid, setInvalid] = useState(false);
   const [history, setHistory] = useState<number[]>([]);
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
-  const original = row && t.mode === 'local-only' ? tableRowSource(t.id, row.min) : undefined;
+  const original = row && (sourceForRow?.(row) ?? (t.mode === 'local-only' ? tableRowSource(t.id, row.min) : undefined));
   const digits = value !== null && sides === 100 ? d100FromValue(value) : null;
   const rollValue = (n: number) => {
     setInvalid(false);
@@ -50,7 +53,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow }: Pr
               if (number !== null) rollValue(number);
             }}>
               <IDie />
-              {value === null ? '굴리기' : '다시 굴리기'}
+              {rollLabel ?? (value === null ? '굴리기' : '다시 굴리기')}
             </button>
           )}
           {value !== null && (
@@ -105,9 +108,11 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow }: Pr
         ) : (
           <>
             <div className="oracle-result-value">
-              <span>{sides === 100 ? String(value).padStart(2, '0') : value}</span>
-              {row && <span>범위 {rangeText(row, t.dice)}</span>}
-              {digits && <span>십 {digits.tens} · 일 {digits.ones}{digits.tens === digits.ones && ' 더블'}</span>}
+              <span className="readout">{sides === 100 ? String(value).padStart(2, '0') : value}</span>
+              {(row || digits) && <div className="oracle-result-meta">
+                {row && <span>범위 {rangeText(row, t.dice)}</span>}
+                {digits && <span>십 {digits.tens} · 일 {digits.ones}{digits.tens === digits.ones && ' 더블'}</span>}
+              </div>}
             </div>
             <div className="oracle-result-text">
               {row && showLabel(t, row) && <span className="oracle-result-label" lang="en">{row.label}</span>}
@@ -142,10 +147,10 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow }: Pr
         </div>
       )}
 
-      {value !== null && (
+      {(value !== null || showUnrolledViewToggle) && (
         <div className="oracle-result-actions">
           <div className="seg" role="group" aria-label="표 보기">
-            <button type="button" aria-pressed={only} onClick={() => onOnly(true)}>결과만</button>
+            <button type="button" aria-pressed={only} onClick={() => onOnly(true)}>{value === null ? '표 접기' : '결과만'}</button>
             <button type="button" aria-pressed={!only} onClick={() => onOnly(false)}>전체 표</button>
           </div>
           {row && <CopyButton text={copyText} label="결과 복사" />}

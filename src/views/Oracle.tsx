@@ -310,14 +310,17 @@ interface OracleBodyProps {
   only?: boolean;
   onOnly?: (only: boolean) => void;
   compact?: boolean;
+  collapseTableBeforeRoll?: boolean;
+  rollLabel?: string;
+  sourceForRow?: (row: OracleTable['rows'][number]) => string | undefined;
 }
 
-export function OracleBody({ t, value, onValue, only, onOnly, compact = false }: OracleBodyProps) {
+export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow }: OracleBodyProps) {
   const [localOnly, setLocalOnly] = useState(compact);
   const table = useRef<HTMLDivElement>(null);
   const sides = tableSides(t.dice);
   const resultOnly = only ?? localOnly;
-  const showTable = value === null || !resultOnly;
+  const showTable = sides === null || !resultOnly || (value === null && !collapseTableBeforeRoll);
   return (
     <div className={`oracle-body${compact ? ' compact' : ''}${sides ? ' split' : ''}`}>
       {sides !== null && (
@@ -329,6 +332,9 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false }:
           onValue={onValue}
           only={resultOnly}
           onOnly={onOnly ?? setLocalOnly}
+          rollLabel={rollLabel}
+          sourceForRow={sourceForRow}
+          showUnrolledViewToggle={collapseTableBeforeRoll}
           onShowRow={() => {
             const row = table.current?.querySelector<HTMLTableRowElement>('tr[aria-current="true"]');
             row?.scrollIntoView({ block: 'center' });
@@ -338,7 +344,7 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false }:
       )}
       <div className="oracle-table-area">
         <Notes notes={t.notes} />
-        {showTable && <div className="oracle-table-sheet" ref={table}><TableView t={t} hit={value} /></div>}
+        {showTable && <div className="oracle-table-sheet" ref={table}><TableView t={t} hit={value} sourceForRow={sourceForRow} /></div>}
         {t.related.length > 0 && (
           <details className="oracle-related" open={!compact}>
             <summary>관련 항목</summary>

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { BOOK_LABEL, entryById, procedures, procById, rulingById } from '../content';
+import { BOOK_LABEL, entryById, procedures, procById, rulingById, tableById } from '../content';
 import type { ProcEdge, ProcNode, Procedure } from '../content/schema';
+import { rollDie } from '../lib/dice';
 import { Link, navigate, useLocation } from '../lib/router';
 import { Plan, KIND_KO } from '../components/Plan';
+import { ContextLink } from '../components/ReferenceContext';
 import { RulingMatrix } from '../components/RulingMatrix';
 import { BenchButton, Cite, Notes, PinButton, VChip, XRef, useVisit } from '../components/bits';
 import { NotFound } from './NotFound';
@@ -106,6 +108,7 @@ export function AtlasPage({ id }: { id: string }) {
         </div>
       </header>
       <p className="summary atlas-summary">{p.summary}</p>
+      {p.id === 'p-explore-room' && <ExplorationTools />}
       {p.id === 'p-attack' && <AttackComparison />}
       <div className="atlas-controls">
         <div className="seg" role="group" aria-label="절차 보기">
@@ -141,6 +144,56 @@ export function AtlasPage({ id }: { id: string }) {
         </details>
       </div>
     </div>
+  );
+}
+
+function ExplorationTable({ id, label, condition }: { id: string; label: string; condition?: string }) {
+  const table = tableById.get(id);
+  if (!table) return null;
+  return (
+    <ContextLink id={id} className="atlas-quick-item">
+      <span>{label}</span><span className="atlas-quick-die">{table.dice}</span>
+      {condition && <span className="atlas-quick-condition">{condition}</span>}
+    </ContextLink>
+  );
+}
+
+function ExplorationTools() {
+  const [showTension, setShowTension] = useState(false);
+  const [tension, setTension] = useState<{ sides: number; value: number } | null>(null);
+  return (
+    <section className="atlas-quick-tools" aria-labelledby="atlas-quick-title">
+      <h2 id="atlas-quick-title">탐험 바로가기</h2>
+      <div className="atlas-quick-grid">
+        <ExplorationTable id="t-room-shape" label="방·통로 모양" />
+        <button type="button" className="atlas-quick-item" aria-expanded={showTension} aria-controls="atlas-tension-tool" onClick={() => setShowTension(!showTension)}>
+          <span>긴장 주사위</span><span className="atlas-quick-die">D8 · D6 · D4</span>
+        </button>
+        <ExplorationTable id="t-encounter-check" label="조우 판정" condition="새 장소 · 은신처 제외" />
+        <ExplorationTable id="t-events" label="이벤트" condition="조우가 없는 새 방" />
+      </div>
+      <div id="atlas-tension-tool" className="atlas-tension-tool" hidden={!showTension}>
+        <div className="atlas-tension-rolls" role="group" aria-label="긴장 주사위 굴리기">
+          {[8, 6, 4].map((sides) => (
+            <button key={sides} type="button" className="btn ghost" aria-label={`D${sides} 굴리기`} onClick={() => setTension({ sides, value: rollDie(sides) })}>
+              D{sides}
+            </button>
+          ))}
+        </div>
+        <div className="atlas-tension-result" role="status">
+          {tension && <><span className="atlas-quick-die">D{tension.sides} 결과</span> <span className="readout">{tension.value}</span></>}
+        </div>
+        <div className="atlas-refs">
+          <XRef id="tension-die">긴장 주사위 규칙</XRef>
+          <XRef id="t-growing-darkness">짙어지는 어둠 (D4에서 1–2)</XRef>
+        </div>
+      </div>
+      <div className="atlas-refs atlas-quick-related">
+        <XRef id="lair-check">은신처 판정 (미발견)</XRef>
+        <XRef id="domain-exit-check">출구 판정 (은신처 발견 후)</XRef>
+        <XRef id="t-encounter-general">조우 표 선택 (일반 도메인 조우)</XRef>
+      </div>
+    </section>
   );
 }
 

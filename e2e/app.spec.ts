@@ -35,9 +35,14 @@ async function layoutIssues(page: Page) {
   });
 }
 
-for (const width of [360, 768, 1280]) {
+for (const { width, height } of [
+  { width: 360, height: 900 },
+  { width: 768, height: 900 },
+  { width: 1280, height: 900 },
+  { width: 3440, height: 1440 },
+]) {
   test.describe(`layout at ${width}px`, () => {
-    test.use({ viewport: { width, height: 900 } });
+    test.use({ viewport: { width, height } });
     for (const route of ROUTES) {
       test(`${route} fits the screen and keeps text ≥12px`, async ({ page }) => {
         await page.goto(route);
@@ -108,6 +113,10 @@ test('bestiary lists all 59 creatures, each with a way to appear', async ({ page
   await expect(rows).toHaveCount(59);
   const noRoll = await rows.evaluateAll((trs) => trs.filter((tr) => tr.querySelector('.rolls')?.textContent?.trim() === '—').map((tr) => tr.querySelector('th')?.textContent));
   expect(noRoll).toEqual([]);
-  await page.getByRole('button', { name: /^Overseer/ }).click();
-  await expect(rows).toHaveCount(11);
+  const categories = page.getByRole('group', { name: '분류' });
+  await categories.getByRole('button', { name: /^Overseer\s*10$/ }).click();
+  await expect(rows).toHaveCount(10);
+  await categories.getByRole('button', { name: /^Overseer 소환수/ }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Lesser Demon');
 });

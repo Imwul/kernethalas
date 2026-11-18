@@ -12,7 +12,7 @@ never advances a procedure for you, and only rolls dice when you press a button.
 npm install
 npm run dev          # http://localhost:5173
 npm test             # content validation + dice + search tests
-npm run e2e          # browser tests on the production build (layout 360/768/1280, search, roller, offline)
+npm run e2e          # browser tests on the production build (layout 360/768/1280/3440, search, roller, offline)
 npm run build        # validates content first, then builds dist/
 npm run overlay      # optional: original wording from YOUR PDF, local only (see below)
 ```

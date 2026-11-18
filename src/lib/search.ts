@@ -5,6 +5,7 @@
  * - typo tolerance for Latin tokens and curated play-time phrases
  */
 import { entries, tables, procedures, rulings, CATEGORY_LABEL, TABLE_GROUP_LABEL } from '../content';
+import { CREATURE_NAME_ALIASES } from '../content/creature-names';
 import { phoneticAliases } from './phonetic';
 import { situations } from '../content/situations';
 
@@ -103,6 +104,28 @@ function oneTypo(a: string, b: string): boolean {
     }
   }
   return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+const creatureNameIndex = entries.filter(({ kind }) => kind === 'creature').map(({ id, en, ko }) => {
+  const names = [en, ko, ...(CREATURE_NAME_ALIASES[id] ?? [])];
+  return {
+    id,
+    normalized: names.map(norm),
+    initials: names.map(chosung).filter(Boolean),
+    englishWords: words(en),
+  };
+});
+
+export function findCreatureNames(query: string): string[] {
+  const compact = query.replace(/\s/g, '');
+  const whole = norm(query);
+  if (!whole) return [];
+  const initials = isChoQuery(compact) ? chosung(compact) : '';
+  return creatureNameIndex.filter((entry) => (
+    entry.normalized.some((name) => name.includes(whole)) ||
+    (initials && entry.initials.some((name) => name.startsWith(initials))) ||
+    (/^[a-z]{4,}$/.test(whole) && entry.englishWords.some((word) => oneTypo(word, whole)))
+  )).map(({ id }) => id);
 }
 
 const EXTRA_ALIASES: Record<string, string[]> = {

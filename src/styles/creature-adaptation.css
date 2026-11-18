@@ -1,0 +1,104 @@
+.creature-level {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px var(--s2);
+  color: var(--ink-2);
+  font: 14px/1.35 var(--f-ui);
+}
+
+.creature-level input {
+  box-sizing: border-box;
+  width: 5.5rem;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px var(--f-mono);
+}
+
+.creature-level input[aria-invalid='true'] {
+  border-color: var(--oxblood-ink);
+}
+
+.creature-level input[aria-invalid='true'] + span,
+.creature-adaptation-check {
+  color: var(--oxblood-ink);
+}
+
+.creature-adaptation-stats {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  margin: 0;
+  border-block: 1px solid var(--rule-soft);
+}
+
+.creature-adaptation-stats > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.creature-adaptation-stats > div + div {
+  border-inline-start: 1px solid var(--rule-soft);
+}
+
+.creature-adaptation-stats dt,
+.creature-level small,
+.creature-adaptation-mods {
+  font: 13px/1.35 var(--f-ui);
+}
+
+.creature-adaptation-stats dt {
+  flex: none;
+  color: var(--ink-2);
+}
+
+.creature-adaptation-stats dd {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+}
+
+.creature-adaptation-stats strong {
+  font: 700 clamp(16px, 3vw, 21px)/1.2 var(--f-display-i);
+}
+
+.creature-stat-short { text-decoration: none; }
+
+@media (max-width: 900px) {
+  .creature-adaptation-stats {
+    position: sticky;
+    top: var(--creature-stats-top, calc(var(--header-h) + 1px));
+    z-index: 2;
+    background: var(--paper);
+    border-block-color: var(--rule);
+  }
+
+  .reference-panel-scroll:has(.creature-combat),
+  .pane-body:has(.creature-combat) {
+    --creature-stats-top: 0px;
+    padding-block-start: 0;
+    scroll-padding-top: 4rem;
+  }
+
+  .reference-panel-scroll > .reference-folio:has(.creature-combat) {
+    padding-block-start: 14px;
+  }
+
+  .pane-body > .reference-folio:has(.creature-combat) {
+    padding-block-start: var(--s4);
+  }
+}
+
+.creature-adaptation-mods {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

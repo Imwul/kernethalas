@@ -1,4 +1,110 @@
 /* Bestiary — one row per creature on wide screens, a labelled card per creature on narrow ones */
+.bestiary {
+  container-type: inline-size;
+}
+.bestiary-name-search {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2);
+  max-width: 34rem;
+  margin-bottom: var(--s4);
+}
+.bestiary-name-search .situation-search { flex: 1; min-width: 0; }
+.bestiary-name-search input::-webkit-search-cancel-button { appearance: none; }
+.bestiary-name-search button { flex: none; min-height: 44px; }
+.bestiary-lookup {
+  margin-bottom: var(--s5);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--copper);
+  background: var(--paper);
+}
+.bestiary-lookup-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s1) var(--s3);
+  margin-bottom: var(--s2);
+}
+.bestiary-lookup h2 {
+  margin: 0;
+  font-family: var(--f-ko-display);
+  font-size: 20px;
+}
+.bestiary-lookup-head a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: 14px var(--f-ui);
+  text-underline-offset: .22em;
+}
+.bestiary-lookup form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.bestiary-lookup-tables {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s1);
+}
+.bestiary-lookup-tables button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 50px;
+  padding: var(--s1) clamp(6px, 2vw, 15px);
+  border: 1px solid var(--rule);
+  background: var(--bone);
+  font: 14px/1.3 var(--f-ui);
+}
+.bestiary-lookup-tables button[aria-pressed='true'] {
+  border-color: var(--copper-ink);
+  background: var(--copper-wash);
+  color: var(--copper-ink);
+}
+.bestiary-lookup-hint {
+  color: var(--faded);
+  font: 12px var(--f-mono);
+}
+.bestiary-lookup-entry {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+}
+.bestiary-lookup-entry label {
+  display: block;
+  margin-bottom: var(--s1);
+  font: 13px var(--f-ui);
+}
+.bestiary-lookup-entry input {
+  display: block;
+  width: 6.5rem;
+  min-height: 44px;
+  padding: var(--s1) var(--s2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--bone);
+  font: 16px var(--f-mono);
+}
+.bestiary-lookup-entry input[aria-invalid='true'] {
+  border-color: var(--oxblood);
+}
+.bestiary-lookup-entry .btn {
+  min-height: 44px;
+}
+.bestiary-lookup .field-err {
+  flex-basis: 100%;
+  margin: 0;
+}
+@container (max-width: 420px) {
+  .bestiary-lookup-tables {
+    width: 100%;
+  }
+}
+
 .bestiary-sort {
   display: flex;
   align-items: center;
@@ -86,7 +192,7 @@
 }
 
 /* narrow: each row becomes a card; stat cells flow as label/value pairs */
-@media (max-width: 900px) {
+@container (max-width: 900px) {
   .bestiary-table thead {
     position: absolute;
     width: 1px;

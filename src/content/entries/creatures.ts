@@ -2,6 +2,8 @@ import type { Entry } from '../schema';
 import { core, rr, req, cond, opt, ed } from '../helpers';
 import creatureData from '../generated/creatures.json';
 import { creatureActionKo } from '../creature-actions';
+import { CREATURE_NAME_ALIASES } from '../creature-names';
+import { CREATURE_TYPE_DEFENSES, describeTypeDefense } from '../creature-defenses';
 import { combatTables } from '../tables/combat';
 
 // Hit tables are shown in Korean only, so stat blocks name anatomy and weak spots the same way.
@@ -50,6 +52,7 @@ export interface CreatureRecord {
 }
 
 export const creatures = creatureData as CreatureRecord[];
+export const creatureById = new Map(creatures.map((creature) => [creature.id, creature]));
 
 export const TYPE_KO: Record<string, string> = {
   Animal: '동물',
@@ -93,7 +96,7 @@ function creatureEntry(c: CreatureRecord): Entry {
     category: c.group === 'creature' ? 'creatures' : c.group === 'minion' ? 'character' : 'overseers',
     en: c.name,
     ko: c.name,
-    aliases: [c.name, ...c.types, ...c.types.map((t) => TYPE_KO[t] ?? t), group, ...c.traits],
+    aliases: [c.name, ...(CREATURE_NAME_ALIASES[c.id] ?? []), ...c.types, ...c.types.map((t) => TYPE_KO[t] ?? t), group, ...c.traits],
     tags: [group, ...c.types],
     summary: `${c.types.map((t) => `${t}(${TYPE_KO[t] ?? t})`).join(' · ')} — ${group}. 수치는 레벨 적응 적용 전 기본값.`,
     stats: {
@@ -163,16 +166,7 @@ export const creatureEntries: Entry[] = [
     ko: '생물 유형',
     aliases: ['type', 'creature type', 'animal', 'astral', 'construct', 'demon', 'elemental', 'humanoid', 'plant', 'undead', '동물', '아스트랄', '구조체', '악마', '원소', '인간형', '식물', '언데드', '면역', 'immune'],
     summary: '8가지 유형. 유형마다 고유한 취약·회복·상태 면역이 있다. 두 유형을 함께 가진 생물도 있다.',
-    outcomes: [
-      { label: 'Animal', text: '공통 특성 없음(개별 종은 있을 수 있음).' },
-      { label: 'Astral', text: '면역: Bleeding, Poisoned, Sickened, Frightened.' },
-      { label: 'Construct', text: '면역: Charmed, Poisoned, Bleeding, Sickened, Frightened, Sleeping.' },
-      { label: 'Demon', text: 'Infernal로 회복, Holy에 취약, Poisoned 면역.' },
-      { label: 'Elemental', text: '자기 원소 피해로 회복. 면역: Bleeding, Sickened, Poisoned.' },
-      { label: 'Humanoid', text: '공통 특성 없음.' },
-      { label: 'Plant', text: 'Fire에 취약. 면역: Frightened, Blinded.' },
-      { label: 'Undead', text: 'Holy에 취약, Necrotic으로 회복. 면역: Bleeding, Sickened, Poisoned, Frightened.' },
-    ],
+    outcomes: Object.entries(CREATURE_TYPE_DEFENSES).map(([label, defense]) => ({ label, text: describeTypeDefense(defense) })),
     tables: ['t-enemy-type'],
     related: [req('vulnerability'), opt('conditions')],
     source: [core(129, 130, 131), rr(22)],

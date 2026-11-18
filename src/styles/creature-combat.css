@@ -1,0 +1,136 @@
+.creature-combat {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--s3);
+}
+
+.creature-combat-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.creature-combat-head h2 {
+  font: 21px/1.2 var(--f-ko-display);
+}
+
+.creature-combat-head span,
+.creature-combat-traits {
+  color: var(--ink-2);
+  font: 14px/1.55 var(--f-ui);
+}
+
+.creature-combat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+  margin: 0;
+  padding: 0 0 var(--s2);
+}
+
+.creature-combat-meta > div {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.creature-combat-meta dt {
+  color: var(--faded);
+  font: 13px/1.4 var(--f-ui);
+}
+
+.creature-combat-meta dd {
+  margin: 0;
+  font: 16px/1.5 var(--f-ko);
+}
+
+.creature-combat-traits { margin: 0; }
+.creature-combat-traits .xref { margin-inline-end: var(--s2); }
+
+.creature-defenses {
+  padding: var(--s2) var(--s3);
+  border-inline-start: 2px solid var(--rule);
+  background: var(--paper);
+  font: 14px/1.45 var(--f-ui);
+}
+.creature-defenses h3 { margin: 0 0 var(--s1); font: 700 14px/1.45 var(--f-ui); }
+.creature-defenses dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--s4);
+  margin: 0;
+}
+.creature-defenses dl > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--s2);
+}
+.creature-defenses dt { flex: none; font-weight: 700; }
+.creature-defenses dd { min-width: 0; margin: 0; }
+.creature-defenses .vulnerable dt { color: var(--oxblood-ink); }
+.creature-defenses .resistant dt, .creature-defenses .immune dt { color: var(--copper-ink); }
+.creature-defenses .restored dt { color: var(--ochre); }
+
+.creature-roll-tools {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+}
+
+.creature-roll-tools > .seg { justify-self: start; }
+.creature-roll-tools .seg button { min-height: 44px; }
+.creature-roll-tools .oracle-body { margin: 0; }
+.creature-fixed-hit { margin: 0; padding: var(--s3); background: var(--paper); }
+
+.creature-reactions,
+.creature-aftermath {
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule-soft);
+}
+
+.creature-reactions h3,
+.creature-aftermath h3,
+.creature-spoils h4 {
+  margin: 0;
+  color: var(--ink-2);
+  font: 700 14px/1.5 var(--f-ui);
+}
+
+.creature-reaction-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--s3);
+}
+
+.creature-reaction-links .xref {
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.creature-aftermath-list { margin: var(--s1) 0 0; }
+.creature-aftermath-list > div {
+  display: grid;
+  grid-template-columns: clamp(5.75rem, 30%, 9rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s2);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.creature-aftermath-list .xref { min-height: 44px; align-items: center; }
+.creature-aftermath-list dd { margin: 0; padding-block: var(--s2); }
+.creature-spoils { margin-top: var(--s2); }
+.creature-spoils-links { display: flex; flex-wrap: wrap; gap: 0 var(--s4); }
+.creature-spoils-links .xref { min-height: 44px; padding-block: 10px; }
+.creature-other-stats .creature-combat-meta { padding: 0 var(--s3) var(--s3); }
+.creature-adaptation-source { padding: 0 var(--s3) var(--s3); }
+.creature-adaptation-source h3 { margin: 0; font: 700 14px/1.5 var(--f-ui); }
+.creature-adaptation-source ul { margin-block: var(--s1) 0; padding-inline-start: var(--s4); }
+
+@container (min-width: 880px) {
+  .reference-record .creature-combat { grid-column: 1; }
+}

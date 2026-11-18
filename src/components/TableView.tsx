@@ -17,7 +17,7 @@ export function showLabel(t: OracleTable, r: TableRow): boolean {
 /** One short title for a row: the dice readout and copy text use this. */
 export const rowTitle = (t: OracleTable, r: TableRow) => (t.gloss ? r.ko : r.label ?? r.ko);
 
-export function TableView({ t, hit }: { t: OracleTable; hit?: number | null }) {
+export function TableView({ t, hit, sourceForRow }: { t: OracleTable; hit?: number | null; sourceForRow?: (row: TableRow) => string | undefined }) {
   const lookup = t.dice === '—';
   const many = (t.columns?.length ?? 0) >= 2;
   const showResult = !lookup || t.rows.some((r) => r.ko !== r.label);
@@ -42,7 +42,7 @@ export function TableView({ t, hit }: { t: OracleTable; hit?: number | null }) {
       <tbody role="rowgroup">
         {t.rows.map((r) => {
           const isHit = hit != null && hit >= r.min && hit <= r.max;
-          const raw = tableRowSource(t.id, r.min);
+          const raw = sourceForRow?.(r) ?? tableRowSource(t.id, r.min);
           // original wording adds nothing when it is just the row's English label again
           const src = raw && !t.gloss && raw.trim().replace(/\.$/, '') !== r.label ? raw : undefined;
           const next = !!r.next?.length && (
