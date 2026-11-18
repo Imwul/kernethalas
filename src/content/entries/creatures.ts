@@ -114,11 +114,11 @@ function creatureEntry(c: CreatureRecord): Entry {
       ...(c.group === 'minion' ? [opt('minions')] : []),
     ],
     source: [core(...sourcePages)],
-    verification: 'partial',
+    verification: 'verified',
     notes: [
       {
         type: 'clarification',
-        text: '행동마다 판정, 피해, 적용 범위와 지속 시간을 요약했다. 묘사는 표시된 원본 쪽수에서 확인할 수 있다.',
+        text: '능력치 줄은 원문과 순서·값을 모두 대조했고, 행동 요약의 주사위·수치·상태·판정 Skill도 원문과 대조했다. 생물 소개 묘사 문단만 싣지 않는다(규칙 효과 없음).',
       },
     ],
   };
