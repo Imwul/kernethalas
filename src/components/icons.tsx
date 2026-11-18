@@ -60,6 +60,15 @@ export const IBench = () => (
     <path d="M5.5 9h2.5M16 9h2.5" />
   </S>
 );
+/** bestiary: a skull */
+export const IBeast = () => (
+  <S>
+    <path d="M5.5 11a6.5 6.5 0 0113 0v2.5l-1.8 1.8V19H7.3v-3.7L5.5 13.5z" />
+    <circle cx="9.4" cy="11.6" r="1.4" />
+    <circle cx="14.6" cy="11.6" r="1.4" />
+    <path d="M12 14.2l-.9 1.4h1.8zM10.2 19v-2M13.8 19v-2" />
+  </S>
+);
 export const ISun = () => (
   <S>
     <circle cx="12" cy="12" r="4" />

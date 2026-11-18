@@ -1,0 +1,146 @@
+/* Bestiary — one row per creature on wide screens, a labelled card per creature on narrow ones */
+.bestiary-sort {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: var(--s3) 0 var(--s4);
+  font-family: var(--f-ui);
+  font-size: 14px;
+}
+.bestiary-sort select {
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.bestiary-count {
+  margin-left: auto;
+  color: var(--faded);
+}
+.bestiary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--f-ko);
+  font-size: 15px;
+  border-top: 1px solid var(--ink);
+}
+.bestiary-table thead th {
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--faded);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ink);
+  position: sticky;
+  top: var(--header-h);
+  background: var(--bone);
+  z-index: 1;
+}
+.bestiary-table td,
+.bestiary-table tbody th {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: top;
+  text-align: left;
+}
+.bestiary-table .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bestiary-table tbody th.name {
+  font-weight: 400;
+  white-space: nowrap;
+}
+.bestiary-table .name a {
+  font-family: var(--f-display-i);
+  font-size: 17px;
+  color: var(--ink);
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+.bestiary-table .weak {
+  white-space: nowrap;
+}
+.bestiary-table .name a:hover {
+  color: var(--oxblood-ink);
+}
+.bestiary-table tbody tr:hover {
+  background: var(--copper-wash);
+}
+.bestiary-table .traits,
+.bestiary-table .rolls {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.bestiary-foot {
+  margin-top: var(--s4);
+  font-family: var(--f-ui);
+  font-size: 14px;
+  color: var(--faded);
+}
+
+/* narrow: each row becomes a card; stat cells flow as label/value pairs */
+@media (max-width: 900px) {
+  .bestiary-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .bestiary-table,
+  .bestiary-table tbody {
+    display: block;
+    border-top: 0;
+  }
+  .bestiary-table tr {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .bestiary-table tbody tr:hover {
+    background: none;
+  }
+  .bestiary-table td,
+  .bestiary-table tbody th {
+    padding: 0;
+    border: 0;
+  }
+  .bestiary-table tbody th.name {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+  .bestiary-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--f-ui);
+    font-size: 12px;
+    color: var(--faded);
+  }
+  .bestiary-table .n {
+    text-align: left;
+  }
+  .bestiary-table tr {
+    gap: 4px 12px;
+    padding: 10px 0;
+  }
+  .bestiary-table td[data-label='유형'],
+  .bestiary-table td[data-label='Armor'] {
+    grid-column: span 2;
+  }
+  .bestiary-table .rolls {
+    grid-column: span 3;
+  }
+  .bestiary-table .traits {
+    grid-column: 1 / -1;
+    order: 1; /* after 약점 + 등장, which share a row */
+  }
+}

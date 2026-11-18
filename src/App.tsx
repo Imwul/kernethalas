@@ -5,7 +5,7 @@ import { nav, useNav } from './lib/store';
 import { Palette } from './components/Palette';
 import { ReferenceContext, type PreviewReference } from './components/ReferenceContext';
 import { ReferencePanel, type ReferenceFrame } from './components/ReferencePanel';
-import { Crest, IBench, IDrawer, IMoon, IPlan, IQuestion, IRecord, ISearch, ISun, ISystem } from './components/icons';
+import { Crest, IBeast, IBench, IDrawer, IMoon, IPlan, IQuestion, IRecord, ISearch, ISun, ISystem } from './components/icons';
 import { Home } from './views/Home';
 import { ReferenceIndex, ReferencePage } from './views/Reference';
 import { OracleIndex, OraclePage } from './views/Oracle';
@@ -13,12 +13,14 @@ import { AtlasIndex, AtlasPage } from './views/Atlas';
 import { Rulings } from './views/Rulings';
 import { Workbench, Dock } from './views/Workbench';
 import { Sources } from './views/Sources';
+import { Bestiary } from './views/Bestiary';
 import { NotFound } from './views/NotFound';
 import { CATEGORY_LABEL } from './content';
 import type { SearchFilter } from './lib/search';
 
 const SECTIONS = [
   { to: '/ref', ko: '색인', short: '색인', icon: <IRecord /> },
+  { to: '/bestiary', ko: '생물 도감', short: '도감', icon: <IBeast /> },
   { to: '/oracle', ko: '무작위 표', short: '표', icon: <IDrawer /> },
   { to: '/atlas', ko: '절차', short: '절차', icon: <IPlan /> },
   { to: '/rulings', ko: '판정 문답', short: '문답', icon: <IQuestion /> },
@@ -37,6 +39,7 @@ function route(path: string, onSearch: (q?: string) => void) {
   if (path === '/rulings') return <Rulings />;
   if (path === '/workbench') return <Workbench />;
   if (path === '/sources') return <Sources />;
+  if (path === '/bestiary') return <Bestiary />;
   return <NotFound />;
 }
 
@@ -120,8 +123,9 @@ export function App() {
           </Link>
           <nav className="mainnav" aria-label="주요 영역">
             {SECTIONS.map((s) => (
-              <Link key={s.to} to={s.to} aria-current={path.startsWith(s.to) ? 'page' : undefined}>
-                {s.ko}
+              <Link key={s.to} to={s.to} aria-current={path.startsWith(s.to) ? 'page' : undefined} aria-label={s.ko}>
+                <span className="nav-full">{s.ko}</span>
+                <span className="nav-short" aria-hidden="true">{s.short}</span>
               </Link>
             ))}
           </nav>
@@ -175,7 +179,7 @@ export function App() {
       <nav className="tabbar" aria-label="주요 영역">
         {SECTIONS.map((s, index) => (
           <Fragment key={s.to}>
-            {index === 2 && <button className="tab-search" onClick={() => openSearch()} aria-label="규칙 검색"><ISearch /><span aria-hidden="true">검색</span></button>}
+            {index === 3 && <button className="tab-search" onClick={() => openSearch()} aria-label="규칙 검색"><ISearch /><span aria-hidden="true">검색</span></button>}
             <Link to={s.to} aria-current={path.startsWith(s.to) ? 'page' : undefined}>
               {s.icon}
               <span aria-hidden="true">{s.short}</span>

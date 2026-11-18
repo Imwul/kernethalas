@@ -65,6 +65,11 @@ export function ReferenceIndex() {
           <section key={c} className="plate-sec" aria-labelledby={`cat-${c}`}>
             <div className="section-head">
               <h2 id={`cat-${c}`}>{CATEGORY_LABEL[c].ko}</h2>
+              {(c === 'creatures' || c === 'overseers') && (
+                <Link to={c === 'overseers' ? '/bestiary?g=overseer' : '/bestiary?g=creature'} className="more">
+                  수치 비교는 도감에서 →
+                </Link>
+              )}
             </div>
             {subgroups(list.filter((e) => e.category === c)).map(([label, items]) => (
               <div key={label || 'all'}>

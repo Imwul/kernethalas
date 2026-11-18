@@ -7,7 +7,17 @@ import { combatTables } from '../tables/combat';
 // Hit tables are shown in Korean only, so stat blocks name anatomy and weak spots the same way.
 const hitTables = combatTables.filter((t) => t.id.startsWith('t-hit-'));
 const ANATOMY_KO = new Map(hitTables.map((t) => [t.en.split(' — ')[1], t.ko.split(' — ')[1]]));
-const PART_KO = new Map(hitTables.flatMap((t) => t.rows.map((r) => [r.label ?? '', r.ko] as const)));
+export const PART_KO = new Map(hitTables.flatMap((t) => t.rows.map((r) => [r.label ?? '', r.ko] as const)));
+/** "1 (Chest, Head)" → "1 (가슴, 머리)"; "(All Hit Locations)" → "(전 부위)" */
+export function armorKo(armor: string): string {
+  return armor.replace(/\(([^)]*)\)/, (_, inner: string) =>
+    `(${inner
+      .split(',')
+      .map((p) => p.trim())
+      .map((p) => (/^all( hit)? locations$/i.test(p) ? '전 부위' : (PART_KO.get(p) ?? p)))
+      .join(', ')})`,
+  );
+}
 
 export interface CreatureAction {
   min: number;
@@ -41,7 +51,7 @@ export interface CreatureRecord {
 
 export const creatures = creatureData as CreatureRecord[];
 
-const TYPE_KO: Record<string, string> = {
+export const TYPE_KO: Record<string, string> = {
   Animal: '동물',
   Astral: '아스트랄',
   Construct: '구조체',
@@ -95,7 +105,7 @@ function creatureEntry(c: CreatureRecord): Entry {
       'Hit Location': c.hitLocation
         ? `${ANATOMY_KO.get(c.hitLocation) ?? c.hitLocation}${c.weakSpot ? ` · 약점 ${PART_KO.get(c.weakSpot) ?? c.weakSpot}` : ''}`
         : '몸통만 · 약점 없음',
-      Armor: c.armor,
+      Armor: armorKo(c.armor),
       'Combat Skill': c.combatSkill,
       'Magic Resistance': c.magicResistance,
       ...(c.spoils ? { Spoils: c.spoils } : {}),

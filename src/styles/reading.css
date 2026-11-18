@@ -219,7 +219,7 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 .search-foot { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; font: 13px var(--f-ui); color: var(--ink-2); }
 .search-foot > :last-child { margin-inline-start: auto; }
 .search-keys kbd { margin-inline-start: 5px; }
-.tabbar { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.tabbar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .tab-search {
   display: grid;
   place-items: center;

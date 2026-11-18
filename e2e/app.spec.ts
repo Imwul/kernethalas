@@ -7,6 +7,8 @@ const ROUTES = [
   '/ref/prone',
   '/ref/m-wraith',
   '/ref/cr-veilshifter',
+  '/bestiary',
+  '/bestiary?g=overseer&s=health',
   '/oracle',
   '/oracle/t-events',
   '/oracle/t-room-shape',
@@ -98,4 +100,14 @@ test('works offline after the first visit', async ({ page, context }) => {
   await context.setOffline(true);
   await page.goto('/ref/m-zealot');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Zealot');
+});
+
+test('bestiary lists all 59 creatures, each with a way to appear', async ({ page }) => {
+  await page.goto('/bestiary');
+  const rows = page.locator('.bestiary-table tbody tr');
+  await expect(rows).toHaveCount(59);
+  const noRoll = await rows.evaluateAll((trs) => trs.filter((tr) => tr.querySelector('.rolls')?.textContent?.trim() === '—').map((tr) => tr.querySelector('th')?.textContent));
+  expect(noRoll).toEqual([]);
+  await page.getByRole('button', { name: /^Overseer/ }).click();
+  await expect(rows).toHaveCount(11);
 });

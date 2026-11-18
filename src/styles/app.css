@@ -2634,3 +2634,16 @@ input[aria-invalid='true'] {
     display: none;
   }
 }
+
+/* top nav: short labels until there is room for the full ones */
+.mainnav .nav-full {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .mainnav .nav-full {
+    display: inline;
+  }
+  .mainnav .nav-short {
+    display: none;
+  }
+}
