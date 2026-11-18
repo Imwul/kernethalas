@@ -11,3 +11,5 @@ scripts/.overlay-manifest.json
 .DS_Store
 *.tsbuildinfo
 .env*
+test-results/
+playwright-report/

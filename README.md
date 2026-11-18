@@ -12,13 +12,14 @@ never advances a procedure for you, and only rolls dice when you press a button.
 npm install
 npm run dev          # http://localhost:5173
 npm test             # content validation + dice + search tests
+npm run e2e          # browser tests on the production build (layout 360/768/1280, search, roller, offline)
 npm run build        # validates content first, then builds dist/
 npm run overlay      # optional: original wording from YOUR PDF, local only (see below)
 ```
 
 Live: https://ker-nethalas-ossuary.vercel.app (Vercel project `ker-nethalas-ossuary`).
 
-`npm run deploy` builds, stages **only** `dist/` into `.deploy/` (git-ignored, linked to the Vercel project) and publishes to production. Never deploy the project folder itself: it holds the rulebook PDFs and the local overlay. `vercel.json` rewrites all paths to `index.html` so every rule has a shareable URL.
+`npm run deploy` runs the unit and browser tests, builds, stages **only** `dist/` into `.deploy/` (git-ignored, linked to the Vercel project) and publishes to production. Never deploy the project folder itself: it holds the rulebook PDFs and the local overlay. `vercel.json` rewrites all paths to `index.html` so every rule has a shareable URL.
 
 ## Layout of the code
 
@@ -58,3 +59,8 @@ That file is git-ignored, and production builds replace it with an empty stub un
 ## Status
 
 See the in-app **Sources & Coverage** page (`/sources`) for live counts by verification state and the list of flagged entries.
+
+## Offline & sharing
+
+- Production builds ship a service worker (generated in `vite.config.ts`). After one online visit the whole reference works without a connection; Google Fonts are cached as they are used. It can be added to the phone home screen (`public/manifest.webmanifest`).
+- Every rule, table and procedure gets its own static HTML (`dist/ref/<id>.html` …) with its title, summary and a preview image (`public/og.png`), so shared links show the right page. Titles and descriptions come from `src/lib/meta.ts`.

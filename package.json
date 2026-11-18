@@ -11,13 +11,15 @@
     "test": "vitest run tests",
     "typecheck": "tsc -b",
     "overlay": "vitest run scripts/overlay-manifest.test.ts && python3 -I scripts/extract_overlay.py ${npm_config_pdf:-KerNethalas-Corebook.pdf} scripts/.overlay-manifest.json src/local/source-overlay.json",
-    "deploy": "npm run build && node scripts/stage-deploy.mjs && cd .deploy && npx --yes vercel@latest deploy --prod --yes && rm -f .env.local"
+    "deploy": "npm test && npm run e2e && node scripts/stage-deploy.mjs && cd .deploy && npx --yes vercel@latest deploy --prod --yes && rm -f .env.local",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
