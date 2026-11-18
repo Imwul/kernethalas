@@ -80,4 +80,13 @@ describe('situation finder', () => {
     expect(findSituations(query)[0]?.id).toBe(situation);
     expect(top(query, 3)).toContain(ref);
   });
+  it('finds English terms typed the way they sound in Hangul', () => {
+    expect(top('프론', 1)).toEqual(['prone']);
+    expect(top('텐션 다이', 1)).toEqual(['tension-die']);
+    expect(top('텐션다이', 1)).toEqual(['tension-die']);
+    expect(top('파이어볼', 1)).toEqual(['m-flamecaster']);
+    expect(top('플레임캐스터', 1)).toEqual(['m-flamecaster']);
+    expect(top('이니셔티브', 1)).toEqual(['initiative']);
+    expect(top('데미지 풀', 1)).toEqual(['damage-pool']);
+  });
 });

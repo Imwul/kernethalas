@@ -5,6 +5,7 @@
  * - typo tolerance for Latin tokens and curated play-time phrases
  */
 import { entries, tables, procedures, rulings, CATEGORY_LABEL, TABLE_GROUP_LABEL } from '../content';
+import { phoneticAliases } from './phonetic';
 import { situations } from '../content/situations';
 
 export type DocKind = 'rule' | 'condition' | 'trait' | 'creature' | 'item' | 'term' | 'mastery' | 'table' | 'procedure' | 'ruling';
@@ -117,6 +118,8 @@ const EXTRA_ALIASES: Record<string, string[]> = {
 
 function mk(id: string, kind: DocKind, ko: string, en: string, aliases: string[], summary: string, body: string[], group: string): Doc {
   const names = [...aliases, ...(EXTRA_ALIASES[id] ?? [])];
+  // Hangul spellings of English terms ("프론" → Prone); kept out of the initials index to avoid noise
+  const sounds = phoneticAliases([en, ...names]);
   const lines = [...new Set([summary, ...body].filter(Boolean))];
   return {
     id,
@@ -127,7 +130,7 @@ function mk(id: string, kind: DocKind, ko: string, en: string, aliases: string[]
     group,
     title: norm(ko) + '|' + norm(en),
     titleCho: chosung(ko),
-    aliases: names.map(norm).filter(Boolean),
+    aliases: [...names, ...sounds].map(norm).filter(Boolean),
     aliasCho: names.map(chosung).filter(Boolean),
     body: norm(lines.join(' ')),
     lines: lines.map((line) => ({ text: line, normalized: norm(line) })),
