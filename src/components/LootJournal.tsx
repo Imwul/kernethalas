@@ -3,10 +3,12 @@ import { tableById } from '../content';
 import { rollDie, tableSides } from '../lib/dice';
 import { journalPropertyText, journalRarity, journalRow, journalRowName, potionJournalLine, propertyCount } from '../lib/loot-journal';
 import { automaticRollSides, readOracleValue, rollTable } from '../lib/oracle';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import type { PlayRollDetails } from '../lib/play-roll-history';
 import { gearCount, type GearEffect } from '../lib/play-inventory';
 import { CopyButton, XRef } from './bits';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
+import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/loot-journal.css';
 
 type JournalRollProps = {
@@ -23,11 +25,14 @@ export function JournalRoll({ label, value, onValue, resultText, ...source }: Jo
   const table = 'tableId' in source ? tableById.get(source.tableId) : undefined;
   const dice = table?.dice ?? ('die' in source ? source.die : '');
   const sides = tableSides(dice);
+  const action = label ?? table?.ko ?? '주사위';
+  const field = usePlayRollField(`journal:${action}`, action, dice, value !== null, sides === 100);
   if (sides === null) return null;
   const row = table && journalRow(table.id, value);
   const canRoll = !table || automaticRollSides(table) !== null;
-  const commit = (roll: number) => {
-    commitRoll(() => onValue(roll));
+  const commit = (roll: number, source: PlayRollDetails['source']) => {
+    commitRoll(() => onValue(roll), { label: action, dice, value: sides === 100 && roll === 100 ? '00' : String(roll),
+      source, field: field['data-play-roll-field'] });
     setTyped('');
     setInvalid(false);
   };
@@ -38,21 +43,22 @@ export function JournalRoll({ label, value, onValue, resultText, ...source }: Jo
         event.preventDefault();
         const roll = readOracleValue(typed.trim(), sides);
         if (roll === null) setInvalid(true);
-        else commit(roll);
+        else commit(roll, 'manual');
       }}>
         <div className="field">
-          <label htmlFor={id}>직접 굴린 값</label>
-          <input id={id} inputMode="numeric" data-play-dice autoComplete="off" value={typed} placeholder={sides === 100 ? '1–100 / 00' : `1–${sides}`}
+          <label htmlFor={id}>직접 굴린 값</label><PlayDieHint dice={dice} sides={sides} />
+          <input id={id} inputMode="numeric" {...field} autoComplete="off" value={typed} placeholder={sides === 100 ? '1–100 / 00' : `1–${sides}`}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined} onChange={(event) => {
               setTyped(event.target.value);
               setInvalid(false);
             }} />
         </div>
+        {sides === 100 && <PlayZeroKey onInput={() => { setTyped('00'); setInvalid(false); }} />}
         <button type="submit" className="btn ghost">확인</button>
         {canRoll && (
           <button type="button" className="btn ghost" onClick={() => {
             const roll = table ? rollTable(table) : rollDie(sides);
-            if (roll !== null) commit(roll);
+            if (roll !== null) commit(roll, 'app');
           }}>{dice} 굴리기</button>
         )}
         {invalid && <p id={`${id}-error`} className="field-err" role="alert">1–{sides}{sides === 100 && ' 또는 00'}을 입력하세요.</p>}

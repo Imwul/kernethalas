@@ -1,0 +1,193 @@
+.play-combat :is(.play-combat-tools, .play-round-add) {
+  min-width: 0;
+  margin-block: 0;
+}
+
+.play-combat-tools > summary,
+.play-round-add > summary {
+  min-height: 44px;
+}
+
+.play-combat-tool-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+  padding: 0 var(--s2) var(--s3);
+  font: 14px/1.5 var(--f-ui);
+}
+
+.play-combat-tool-controls,
+.play-round-buttons,
+.play-round-rules,
+.play-round-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+}
+
+.play-combat-tool-controls {
+  align-items: end;
+}
+
+.play-round-buttons .btn {
+  padding-inline: var(--s2);
+}
+
+.play-combat-tool-controls > .field {
+  flex: 1 1 min(100%, 12rem);
+  max-width: 15rem;
+}
+
+.play-combat-tool-body .field {
+  min-width: 0;
+}
+
+.play-combat-tool-body :is(input:not([type='checkbox']), select) {
+  width: 100%;
+  min-height: 44px;
+}
+
+.play-combat-tool-controls > .xref {
+  min-height: 44px;
+  align-items: center;
+}
+
+.play-combat-tool-check {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.play-combat-tool-check input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+.play-round-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s1) var(--s2);
+  border-inline-start: 2px solid var(--copper);
+  padding: var(--s1) var(--s2);
+  background: var(--bone-2);
+  overflow-wrap: anywhere;
+}
+
+.play-round-status > strong {
+  color: var(--copper-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.play-round-rules {
+  color: var(--ink-2);
+}
+
+.play-round-rules p,
+.play-round-reminder-text p {
+  margin: 0;
+}
+
+.play-round-reminders {
+  margin: 0;
+  padding: 0;
+  border-block-start: 1px solid var(--rule-soft);
+  list-style: none;
+}
+
+.play-round-reminders > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+  padding: var(--s1) var(--s2);
+  border-block-end: 1px solid var(--rule-soft);
+}
+
+.play-round-reminders > li[data-due] {
+  background: var(--copper-wash);
+}
+
+.play-round-reminder-text {
+  display: grid;
+  flex: 1 1 min(100%, 12rem);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.play-round-reminder-text > span {
+  color: var(--ink-2);
+}
+
+.play-round-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: var(--s2);
+  align-items: end;
+  padding-block: var(--s1) var(--s2);
+}
+
+.play-round-form > .btn {
+  justify-self: start;
+}
+
+.play-damage-comparison {
+  width: min(100%, 52rem);
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.play-damage-comparison caption {
+  margin-block-end: var(--s1);
+  color: var(--ink-2);
+  text-align: start;
+}
+
+.play-damage-comparison :is(th, td) {
+  padding: var(--s1) var(--s2);
+  border-block-end: 1px solid var(--rule-soft);
+  text-align: start;
+  vertical-align: baseline;
+  overflow-wrap: anywhere;
+}
+
+.play-damage-comparison thead {
+  background: var(--bone-2);
+}
+
+.play-damage-comparison thead th:first-child {
+  width: 44%;
+}
+
+.play-damage-response,
+.play-damage-immunity {
+  display: block;
+}
+
+.play-damage-response[data-reaction='vulnerable'] { color: var(--oxblood-ink); }
+.play-damage-response[data-reaction='guard'] { color: var(--copper-ink); }
+.play-damage-immunity { color: var(--ink-2); }
+
+.play-damage-actions > summary {
+  display: list-item;
+  width: fit-content;
+  min-height: 44px;
+  padding-block-start: var(--s2);
+}
+
+.play-damage-actions > label {
+  display: flex;
+  align-items: start;
+  padding-block: var(--s1);
+}
+
+.play-damage-actions label input {
+  margin-block-start: var(--s1);
+}
+
+.play-damage-actions :is(b, label span > span) {
+  display: block;
+}

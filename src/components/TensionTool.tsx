@@ -1,8 +1,10 @@
 import { useId, useState } from 'react';
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayRoll } from '../lib/play-draft';
+import { usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import type { PlayRollDetails } from '../lib/play-roll-history';
 import { XRef } from './bits';
+import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/tension-tool.css';
 
 const TENSION_DICE = [8, 6, 4] as const;
@@ -31,12 +33,13 @@ export function TensionTool({ onResult, showDarknessLink = true, initialSides = 
   const commitRoll = usePlayRoll();
   const result = value === undefined ? localResult : value;
   const sides = selected ?? result?.sides ?? initialSides;
-  const apply = (die: TensionDie, rolled: number) => {
+  const field = usePlayRollField('tension', '긴장 주사위', `D${sides}`, !!result);
+  const apply = (die: TensionDie, rolled: number, source: PlayRollDetails['source']) => {
     const next = { sides: die, value: rolled, nextDie: rolled <= 2 ? NEXT_DIE[die] : die, darkness: die === 4 && rolled <= 2 };
     commitRoll(() => {
       if (value === undefined) setLocalResult(next);
       onResult?.(next);
-    });
+    }, { label: '긴장 주사위', dice: `D${die}`, value: String(rolled), source, field: field['data-play-roll-field'] });
     setSelected(null);
     setManual('');
     setInvalid(false);
@@ -46,7 +49,7 @@ export function TensionTool({ onResult, showDarknessLink = true, initialSides = 
     <div className="tension-tool">
       <div className="tension-rolls" role="group" aria-label="긴장 주사위 굴리기">
         {TENSION_DICE.map((die) => (
-          <button key={die} type="button" className="btn ghost" aria-label={`D${die} 굴리기`} onClick={() => apply(die, rollDie(die))}>
+          <button key={die} type="button" className="btn ghost" aria-label={`D${die} 굴리기`} onClick={() => apply(die, rollDie(die), 'app')}>
             D{die}
           </button>
         ))}
@@ -55,7 +58,7 @@ export function TensionTool({ onResult, showDarknessLink = true, initialSides = 
         event.preventDefault();
         const value = readOracleValue(manual.trim(), sides);
         if (value === null) setInvalid(true);
-        else apply(sides, value);
+        else apply(sides, value, 'manual');
       }}>
         <label className="field"><span>현재 주사위</span>
           <select aria-label="긴장 주사위 크기" value={sides} onChange={(event) => {
@@ -63,8 +66,8 @@ export function TensionTool({ onResult, showDarknessLink = true, initialSides = 
             setInvalid(false);
           }}>{TENSION_DICE.map((die) => <option key={die} value={die}>D{die}</option>)}</select>
         </label>
-        <label className="field"><span>굴린 값</span>
-          <input aria-label="긴장 주사위 굴린 값" value={manual} inputMode="numeric" data-play-dice autoComplete="off" placeholder={`1–${sides}`}
+        <label className="field"><span>굴린 값</span><PlayDieHint dice={`D${sides}`} sides={sides} />
+          <input aria-label="긴장 주사위 굴린 값" value={manual} inputMode="numeric" {...field} autoComplete="off" placeholder={`1–${sides}`}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined}
             onChange={(event) => {
               setManual(event.target.value);

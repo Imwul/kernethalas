@@ -6,7 +6,7 @@ import type { EncounterSet } from '../../lib/custom-encounters';
 import { rollDie, tableSides } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { automaticRollSides, readOracleValue, rollTable } from '../../lib/oracle';
-import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
 import type { PaperChange } from '../../lib/play-inventory';
 import { CreatureCombatCard } from '../CreatureCombatCard';
 import { EncounterStart } from '../EncounterStart';
@@ -14,8 +14,10 @@ import { XRef } from '../bits';
 import { IDie } from '../icons';
 import { PlayCreatureSearch } from './PlayCreatureSearch';
 import { EncounterLibraryControls, PlayCustomEncounterEditor } from './PlayCustomEncounter';
+import { PlayDamageComparison } from './PlayDamageComparison';
 import { PlayFlee } from './PlayFlee';
 import { PlayMastery } from './PlayMastery';
+import { PlayRoundBoard } from './PlayRoundBoard';
 import { PlayTargetAllocation } from './PlayTargetAllocation';
 import '../../styles/play-combat.css';
 
@@ -65,19 +67,23 @@ function appendTarget(lineup: CombatLineup, target: Target): CombatLineup {
 
 interface EncounterRollProps {
   table?: OracleTable;
+  customSetId?: string;
+  completed?: boolean;
   submitLabel: string;
   onResult: (value: number) => (() => void) | null;
 }
 
-function EncounterRoll({ table, submitLabel, onResult }: EncounterRollProps) {
+function EncounterRoll({ table, customSetId, completed = false, submitLabel, onResult }: EncounterRollProps) {
   const inputId = useId();
   const [manual, setManual] = useState('');
   const [error, setError] = useState('');
   const commitRoll = usePlayRoll();
   const dice = table?.dice ?? 'D20';
   const sides = tableSides(dice);
+  const label = table?.ko ?? '사용자 지정 조우표';
+  const field = usePlayRollField(`encounter-roll-${table?.id ?? customSetId}`, label, dice, completed);
 
-  const apply = (value: number | null) => {
+  const apply = (value: number | null, source: 'manual' | 'app') => {
     if (value === null) {
       setError(`1에서 ${sides} 사이의 정수를 입력하세요.`);
       return;
@@ -87,7 +93,7 @@ function EncounterRoll({ table, submitLabel, onResult }: EncounterRollProps) {
       setError('이 값에 해당하는 결과를 표에서 확인하세요.');
       return;
     }
-    commitRoll(commit);
+    commitRoll(commit, { label, dice, value: String(value), source, field: field['data-play-roll-field'] });
     setError('');
     setManual('');
   };
@@ -95,11 +101,11 @@ function EncounterRoll({ table, submitLabel, onResult }: EncounterRollProps) {
   return (
     <form className="play-combat-roll" data-play-roll noValidate onSubmit={(event) => {
       event.preventDefault();
-      apply(readOracleValue(manual.trim(), sides));
+      apply(readOracleValue(manual.trim(), sides), 'manual');
     }}>
       <div className="field">
         <label htmlFor={inputId}>{dice} 결과</label>
-        <input id={inputId} data-play-dice inputMode="numeric" autoComplete="off" placeholder={`1–${sides}`}
+        <input id={inputId} {...field} inputMode="numeric" autoComplete="off" placeholder={`1–${sides}`}
           value={manual} onChange={(event) => {
             setManual(event.target.value);
             if (error) setError('');
@@ -107,7 +113,7 @@ function EncounterRoll({ table, submitLabel, onResult }: EncounterRollProps) {
       </div>
       <button type="submit" className="btn primary">{submitLabel}</button>
       {(!table || automaticRollSides(table) !== null) && (
-        <button type="button" className="btn ghost" onClick={() => apply(table ? rollTable(table) : rollDie(20))}>
+        <button type="button" className="btn ghost" onClick={() => apply(table ? rollTable(table) : rollDie(20), 'app')}>
           <IDie /> {dice} 굴리기
         </button>
       )}
@@ -240,10 +246,10 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           <PlayDraftScope key={`allocation-${targetIds}`} name={`allocation-${targetIds}`}>
             <PlayTargetAllocation targets={targets} />
           </PlayDraftScope>
-          <details className="fold play-combat-round">
-            <summary>라운드 정리</summary>
-            <p><XRef id="conditions">지속 피해와 상태</XRef>는 각 상태의 처리 시점에 확인합니다. 새 라운드에서 <XRef id="defense-reaction-penalty">연속 방어 페널티</XRef>를 초기화합니다.</p>
-          </details>
+          <PlayDraftScope key={`combat-tools-${lineup.encounterId}`} name={`combat-tools-${lineup.encounterId}`}>
+            <PlayRoundBoard targets={targets} />
+            {targets.length > 1 && <PlayDamageComparison targets={targets} />}
+          </PlayDraftScope>
           <PlayDraftScope key={`target-${selected.id}`} name={`target-${selected.id}`}>
             <CreatureCombatCard creature={selected.creature} entry={entryById.get(selected.creature.id)!} showEncounterStart={false} />
           </PlayDraftScope>
@@ -274,7 +280,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           </div>
           {method === 'encounter' && (
             <>
-              <EncounterRoll table={TABLE_CHOICE} submitLabel="D6 확인" onResult={(roll) => {
+              <EncounterRoll table={TABLE_CHOICE} completed={choice !== null} submitLabel="D6 확인" onResult={(roll) => {
                 const id = resultRow(TABLE_CHOICE, roll)?.next?.[0]?.id;
                 return id && isEncounterTable(id) ? () => setChoice({ table: id, roll }) : null;
               }} />
@@ -312,7 +318,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
                 onCustomSetSelect(id);
                 setCustomGap(null);
               }} onChange={onCustomSetsChange} />
-              <EncounterRoll key={customSet.id} submitLabel="생물 선택" onResult={(roll) => () => {
+              <EncounterRoll key={customSet.id} customSetId={customSet.id} submitLabel="생물 선택" onResult={(roll) => () => {
                 const row = customSet.rows.find(({ min, max }) => min <= roll && roll <= max);
                 const creature = row ? creatureById.get(row.creatureId) : undefined;
                 if (creature) selectCreature(creature, `${customSet.name} D20 ${roll}`);

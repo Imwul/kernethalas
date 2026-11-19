@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { d100FromValue, resolveCheck, rollDie, type CheckOutcome, type CheckResult, type Edge } from '../lib/dice';
 import { encounterInteger } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import type { PlayRollDetails } from '../lib/play-roll-history';
 import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
 import { GROWTH_SKILLS, isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
+import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/physical-skill-roll.css';
 
 const DIFFICULTY = [30, 20, 10, 0, 0, -10, -20, -30];
@@ -52,9 +54,11 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   onResult: (result: CheckResult) => void;
   onClear?: () => void;
 }) {
+  const id = useId();
   const commitRoll = usePlayRoll();
   const recordCritical = useRecordSkillCritical();
   const [confirmed, setConfirmed] = usePlayDraftState<{ inputs: Inputs; result: CheckResult } | null>(slot, null);
+  const field = usePlayRollField(slot, label, 'D100', !!confirmed, true);
   const [draft, setDraft] = useState<Partial<Inputs>>({});
   const [invalid, setInvalid] = useState(false);
   const inputs = { ...EMPTY, skill: initialSkill, ...confirmed?.inputs, roll: '', ...draft };
@@ -66,7 +70,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
     setInvalid(false);
   };
 
-  const apply = (roll: number | null) => {
+  const apply = (roll: number | null, source: PlayRollDetails['source']) => {
     const base = encounterInteger(inputs.skill);
     if (roll === null || base === null || randomDifficulty && difficultyDie === null || !Number.isSafeInteger(base + modifier + difficulty)) {
       setInvalid(true);
@@ -77,7 +81,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
       setConfirmed({ inputs: { ...inputs, roll: String(roll) }, result });
       if (!existingRoll && context !== 'npc') recordCritical(inputs.weapon || skill, result, context === 'skill' ? skill : null);
       onResult(result);
-    });
+    }, existingRoll ? undefined : { label, dice: 'D100', value: roll === 100 ? '00' : String(roll), source, field: field['data-play-roll-field'] });
     setDraft({});
     setInvalid(false);
   };
@@ -89,7 +93,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
       <legend>{label}</legend>
       {!readOnly && <form className="physical-check-form" data-play-roll noValidate onSubmit={(event) => {
         event.preventDefault();
-        apply(readOracleValue(inputs.roll.trim(), 100));
+        apply(readOracleValue(inputs.roll.trim(), 100), 'manual');
       }}>
         <label className="field"><span>{skill} 수치</span>
           <input value={inputs.skill} inputMode="text" placeholder="예: 45" onChange={(event) => update({ skill: event.target.value })} />
@@ -100,21 +104,23 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
             {WEAPON_SKILLS.map((name) => <option key={name}>{name}</option>)}
           </select>
         </label>}
-        {randomDifficulty && <label className="field"><span>난이도 D8</span>
-          <input value={inputs.difficulty} inputMode="numeric" placeholder="1–8" onChange={(event) => update({ difficulty: event.target.value })} />
-        </label>}
+        {randomDifficulty && <div className="field"><label htmlFor={`${id}-difficulty`}>난이도 D8</label>
+          <PlayDieHint dice="D8" sides={8} />
+          <input id={`${id}-difficulty`} value={inputs.difficulty} inputMode="numeric" placeholder="1–8" onChange={(event) => update({ difficulty: event.target.value })} />
+        </div>}
         <label className="field"><span>유불리</span>
           <select value={inputs.edge} onChange={(event) => update({ edge: event.target.value as Edge })}>
             <option value="none">없음</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option>
           </select>
         </label>
-        <label className="field"><span>직접 굴린 D100</span>
-          <input value={inputs.roll} inputMode="numeric" data-play-dice placeholder="1–100 / 00" aria-invalid={invalid || undefined}
+        <div className="field"><label htmlFor={`${id}-roll`}>직접 굴린 D100</label><PlayDieHint dice="D100" sides={100} />
+          <input id={`${id}-roll`} value={inputs.roll} inputMode="numeric" {...field} placeholder="1–100 / 00" aria-invalid={invalid || undefined}
             onChange={(event) => update({ roll: event.target.value })} />
-        </label>
+        </div>
         <div className="physical-check-actions">
+          <PlayZeroKey onInput={() => update({ roll: '00' })} />
           <button type="submit" className="btn ghost">판정</button>
-          {!existingRoll && <button type="button" className="btn ghost" onClick={() => apply(rollDie(100))}>D100 굴리기</button>}
+          {!existingRoll && <button type="button" className="btn ghost" onClick={() => apply(rollDie(100), 'app')}>D100 굴리기</button>}
           {onClear && confirmed && <button type="button" className="btn ghost" onClick={() => commitRoll(() => {
             setConfirmed(null);
             setDraft({});

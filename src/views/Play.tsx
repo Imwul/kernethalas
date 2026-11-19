@@ -3,6 +3,7 @@ import { tableById } from '../content';
 import { creatureById, type CreatureRecord } from '../content/entries/creatures';
 import { CopyButton, XRef } from '../components/bits';
 import { PlayAdvancement } from '../components/play/PlayAdvancement';
+import { PlayCheckpoints } from '../components/play/PlayCheckpoints';
 import { PlayCombat, type EncounterSeed } from '../components/play/PlayCombat';
 import { PlayDomain } from '../components/play/PlayDomain';
 import { PlayEquipment } from '../components/play/PlayEquipment';
@@ -10,9 +11,13 @@ import { PlayExploration, type ExplorationReport } from '../components/play/Play
 import { ExplorationActionLinks, type ExplorationActionsHandle } from '../components/play/PlayExplorationActions';
 import { PlayInventory, useGearLedger } from '../components/play/PlayInventory';
 import { PlayWrapUp } from '../components/play/PlayWrapUp';
+import { focusPlayRoll, PlayActionBar, PlayRollHistory, usePhysicalFirst } from '../components/play/PlayWorkflow';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
 import { introEncounterCreature, nameDomainDiscoveries, newDomainProgress } from '../lib/domain-progress';
 import { PlayDraftProvider, PlayDraftScope, usePlayDraft, usePlayDraftState } from '../lib/play-draft';
+import type { PlayCheckpointData } from '../lib/play-checkpoints';
+import { PAPER_MAP_SLOT, paperMapKey, type PaperMapLocation } from '../lib/paper-map';
+import { playRollStage } from '../lib/play-roll-history';
 import {
   activeDarkness, darknessDetails, domainOverseer, influenceText, newPlayDomain, tensionSides,
   type DarknessEvent, type PlayDomainRecord, type RetreatedEncounter, type TensionSides,
@@ -20,6 +25,7 @@ import {
 import type { PaperChange } from '../lib/play-inventory';
 import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
 import '../styles/play.css';
+import '../styles/play-workflow.css';
 
 const STAGES = [
   { id: 'explore', label: '탐험', heading: '이번 장소 탐험', references: ['p-explore-room', 'first-domain-rules', 'retracing'] },
@@ -48,7 +54,7 @@ const REST_EFFECTS = new Set([15, 17, 19, 61]);
 const EXPLORE_EFFECTS = new Set([61, 69, 73]);
 
 function encounterFromEvent(source: string): EncounterSeed | undefined {
-  const intro = /^intro-encounter-(\d+)$/.exec(source);
+  const intro = /^intro-encounter-(\d+)(?::[\w:-]+)?$/.exec(source);
   if (intro) {
     const id = introEncounterCreature(Number(intro[1]));
     return id ? { creatureIds: [id], description: `도입 도메인 D20 ${intro[1]}` } : undefined;
@@ -100,6 +106,8 @@ function PlayDesk() {
   const pendingGrowth = usePendingSkillGrowth();
   const skillCriticalHistory = useSkillCriticalHistory();
   const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
+  const [paperMap, setPaperMap] = usePlayDraftState<PaperMapLocation[]>(PAPER_MAP_SLOT, []);
+  const [physicalFirst, togglePhysicalFirst] = usePhysicalFirst();
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
   const [exploration, setExploration] = useState<ExplorationReport | null>(null);
@@ -165,6 +173,7 @@ function PlayDesk() {
   const combat = battles[combatId] ?? BASE_BATTLE;
   const wrapBattle = battles[wrapId];
   const completedBattles = Object.entries(battles).filter(([, battle]) => battle.outcome && battle.outcome !== 'fled');
+  const finishedSources = Object.entries(battles).flatMap(([id, battle]) => battle.outcome ? [id.split(':').at(-1)!] : []);
   const campEncounterResolved = completedBattles.flatMap(([, battle]) => battle.planKey ?? []);
   const roster = wrapBattle?.outcome === 'victory'
     ? wrapBattle.creatureIds.flatMap((id) => creatureById.get(id) ?? [])
@@ -185,6 +194,14 @@ function PlayDesk() {
   const goTo = (id: StageId) => {
     setActive(id);
     focusStage(id);
+  };
+  const goToRollHistory = () => {
+    setActive('journal');
+    requestAnimationFrame(() => {
+      const heading = document.getElementById('play-roll-log-title');
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'start' });
+    });
   };
   const changeBattle = useCallback((update: (previous: Battle) => Battle) => {
     setBattles((previous) => {
@@ -293,9 +310,7 @@ function PlayDesk() {
   const exploreTension = tensionSides(exploration?.nextTension);
   const confirmedTension = tensionSides(nextTension) ?? breatherTension ?? exploreTension;
   const carryTension = confirmedTension ?? initialTension;
-  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides) => {
-    draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
-      roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth });
+  const resetReports = () => {
     setRevision((previous) => previous + 1);
     setConfirmReset(false);
     setExploration(null);
@@ -309,7 +324,20 @@ function PlayDesk() {
     setActionDarkness([]);
     setBreatherDarkness(null);
     setBreatherTension(null);
+  };
+  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides) => {
+    draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
+      roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth, [PAPER_MAP_SLOT]: paperMap });
+    resetReports();
     focusStage('explore');
+  };
+  const restoreCheckpoint = async ({ slots, history, encounters, gear: ledger }: PlayCheckpointData) => {
+    if (!await gear.change(() => ({ ledger }))) return false;
+    saveCustomSets(encounters);
+    draft.replaceRoom(slots, history);
+    resetReports();
+    focusStage(playRollStage(slots.active));
+    return true;
   };
   const storeDomain = (keepRoomEffects: boolean) => domains.map((record) => record.id === domain.id ? {
     ...record,
@@ -363,6 +391,8 @@ function PlayDesk() {
     ...Object.entries(masterySheet).flatMap(([id, items]) => items.map((item) => ({ ...item, id: `${id}:${item.id}` }))),
   ];
   const gearChanges = sheet.filter((item) => item.gear);
+  const paperCommitted = applied.length > 0 || (!!roomLedgerId && gear.ledger.entries.some((entry) => entry.source?.startsWith(`${roomLedgerId}:`)));
+  const paperId = paperMap.find((record) => record.domainId === domainId && paperMapKey(record.paperId) === draft.slots['explore/paper-map-key'])?.paperId;
 
   const stageHeading = (id: StageId) => (
     <h2 id={`play-${id}`} className="play-stage-heading" tabIndex={-1} ref={(node) => {
@@ -371,13 +401,14 @@ function PlayDesk() {
   );
 
   return (
-    <div className="play-desk" onKeyDownCapture={advanceDiceFocus}>
+    <div className="play-desk" data-physical-first={physicalFirst || undefined} onKeyDownCapture={advanceDiceFocus}>
       <header className="play-header">
         <div>
           <h1>플레이 모드</h1>
           <p>종이 시트와 저널 옆에서 이번 장소의 판정과 결과를 모읍니다.</p>
         </div>
         <div className="play-header-actions">
+          <button className="btn ghost" type="button" aria-pressed={physicalFirst} onClick={togglePhysicalFirst}>실물 입력 우선</button>
           <button className="btn ghost" type="button" disabled={!draft.canUndo} onClick={draft.undoRoll}>직전 굴림 되돌리기</button>
           <button className="btn ghost" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
             onClick={() => setConfirmReset((open) => !open)}>새 장소 시작</button>
@@ -390,6 +421,8 @@ function PlayDesk() {
           <button className="btn ghost" type="button" onClick={() => setConfirmReset(false)}>취소</button>
         </div>
       )}
+      <PlayCheckpoints data={{ slots: draft.slots, gear: gear.ledger, encounters: customSets, history: draft.history }}
+        place={placeName.trim() || paperId || `장소 ${roomNumber}`} stage={stage.label} onRestore={restoreCheckpoint} />
       <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
         onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])} />
       <details className="fold play-gear-fold" ref={inventory}>
@@ -421,11 +454,12 @@ function PlayDesk() {
             )}
             <PlayDraftScope name="explore">
               <PlayExploration key={revision} actionsRef={explorationActions} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')}
-                initialTension={initialTension} lightCost={previousEffects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
+                finishedSources={finishedSources} initialTension={initialTension} lightCost={previousEffects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
                 onDarknessChange={setDarkness} onActionDarknessChange={setActionDarkness}
                 darknessEffectCount={previousEffects.length} onTrader={openTrader}
                 domainProgress={domain.progress} onDomainProgress={(progress) => updateDomain({ progress })}
                 domainPlaceId={String(roomNumber)} domainPlaceName={placeName} domainDefeated={defeated}
+                paperMapDomain={domainId} paperMap={paperMap} onPaperMapChange={setPaperMap}
                 domainDestinations={domains.filter((target) => target.id !== domain.id && target.progress?.mode !== 'intro')}
                 onLeaveDomain={switchDomain} />
             </PlayDraftScope>
@@ -485,7 +519,7 @@ function PlayDesk() {
                 <PlayAdvancement onSheetChange={setAdvancementSheet} onJournalChange={setAdvancementReport} />
               </PlayDraftScope>
             </details>
-            <button type="button" className="btn primary play-stage-next" onClick={() => goTo('journal')}>저널 기록 보기</button>
+            <button type="button" className="btn primary play-stage-next" data-play-next="" onClick={() => goTo('journal')}>저널 기록 보기</button>
           </section>
           <section className="play-stage" id="play-stage-journal" aria-labelledby="play-journal" hidden={active !== 'journal'}>
             {stageHeading('journal')}
@@ -521,15 +555,22 @@ function PlayDesk() {
                   <p>{journal}</p>
                   <div className="play-header-actions">
                     <CopyButton text={journal} label="장소 기록 복사" />
-                    <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(true), domain.id, carryTension)}>다음 장소</button>
+                    <button className="btn primary" type="button" data-play-next="" onClick={() => resetRoom(storeDomain(true), domain.id, carryTension)}>다음 장소</button>
                   </div>
                   <p className="play-carry">다음 장소는 긴장 주사위 D{carryTension}{carryTension === 6 ? '으로' : '로'} 시작합니다.</p>
                 </div>
               ) : <p className="play-empty">도구에서 굴림이나 결과를 확인하면 여기에 모입니다.</p>}
             </div>
+            <PlayRollHistory key={revision} paperCommitted={paperCommitted} onCorrection={(entry) => {
+              const battleId = entry.stage === 'combat' ? Object.keys(battles).find((id) => entry.scope.startsWith(`combat/${encodeURIComponent(id)}/`)) : undefined;
+              if (battleId) setCombatId(battleId);
+              setActive(entry.stage);
+              focusPlayRoll(entry.stage, entry.field);
+            }} />
           </section>
         </div>
         <aside className="play-context" aria-label="플레이 중 참고">
+          <PlayActionBar stage={active} onHistory={goToRollHistory} />
           <section>
             <h2>이번 장소</h2>
             {facts.length ? (

@@ -106,6 +106,11 @@ export const nav = {
   restoreOpen(prev: { open: string[]; active: string | null }) {
     set({ open: [...new Set([...state.open, ...prev.open])].slice(-OPEN_MAX), active: prev.active });
   },
+  replaceOpen(next: { open: readonly string[]; active: string | null }) {
+    const open = [...new Set(next.open)].slice(0, OPEN_MAX);
+    const active = next.active && open.includes(next.active) ? next.active : open.at(-1) ?? null;
+    set({ open, active });
+  },
   activate(id: string) {
     set({ active: id });
   },

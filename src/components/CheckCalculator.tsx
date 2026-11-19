@@ -2,10 +2,11 @@ import { useId, useState } from 'react';
 import { procById } from '../content';
 import { d100FromValue, resolveAttack, resolveCheck, resolveOpposed, type AttackResult, type Edge } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { isSkillDouble } from '../lib/skill-criticals';
 import { isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
+import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 
 interface SideState {
   skill: string;
@@ -45,6 +46,11 @@ function Side({ label, s, set }: { label: string; s: SideState; set: (v: Partial
   const id = useId();
   const invalidSkill = s.skill !== '' && readAdjustedSkill(s.skill) === null;
   const invalid = s.rollv !== '' && readOracleValue(s.rollv.trim(), 100) === null;
+  const field = usePlayRollField(`attack:${label}`, label, 'D100', !!s.rollv && !invalid, true);
+  const changeRoll = (rollv: string) => {
+    const sameRoll = readOracleValue(rollv.trim(), 100) === readOracleValue(s.rollv.trim(), 100);
+    set({ rollv, growthRecorded: sameRoll && s.growthRecorded });
+  };
   return (
     <fieldset className="checkcalc-side">
       <legend>{label}</legend>
@@ -58,13 +64,11 @@ function Side({ label, s, set }: { label: string; s: SideState; set: (v: Partial
         </div>
         <div className="field">
           <label htmlFor={`${id}-roll`}><span className="sr-only">{label} </span>D100</label>
-          <input id={`${id}-roll`} inputMode="numeric" value={s.rollv} placeholder="1–100 / 00"
+          <PlayDieHint dice="D100" sides={100} />
+          <input id={`${id}-roll`} inputMode="numeric" value={s.rollv} placeholder="1–100 / 00" {...field}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-roll-error` : undefined}
-            onChange={(e) => {
-              const rollv = e.target.value;
-              const sameRoll = readOracleValue(rollv.trim(), 100) === readOracleValue(s.rollv.trim(), 100);
-              set({ rollv, growthRecorded: sameRoll && s.growthRecorded });
-            }} />
+            onChange={(e) => changeRoll(e.target.value)} />
+          <PlayZeroKey onInput={() => changeRoll('00')} />
           {invalid && <p className="field-err" id={`${id}-roll-error`}>1–100 사이의 정수 또는 00을 입력하세요.</p>}
         </div>
         <div className="field">

@@ -24,7 +24,16 @@ const roomProfiles = [
   { width: 58, height: 54, rx: 11 },
 ];
 
-export function RoomShapeDiagram({ roll }: { roll: number }) {
+export const ROOM_EXIT_MARKS = { unexplored: '미탐색', checked: '조사함', locked: '잠김' } as const;
+export type RoomExitMark = keyof typeof ROOM_EXIT_MARKS;
+
+export interface RoomShapeState {
+  turns: number;
+  entrance: number | null;
+  marks: Partial<Record<number, RoomExitMark>>;
+}
+
+export function RoomShapeDiagram({ roll, state }: { roll: number; state?: RoomShapeState }) {
   const shape = roomShapeForRoll(roll);
   if (!shape) return null;
   const { place, exits } = shape;
@@ -44,20 +53,37 @@ export function RoomShapeDiagram({ roll }: { roll: number }) {
   });
   const branches = paths.map(({ from, to }) => `M${from.x},${from.y}L${to.x},${to.y}`).join(' ');
   const junction = place === 'corridor' && exits > 1;
+  const angle = (state?.turns ?? 0) * 90;
   return (
-    <svg className="room-shape-diagram" viewBox="0 0 128 96" role="img"
+    <svg className="room-shape-diagram" viewBox={state ? '-8 -24 144 144' : '0 0 128 96'} role="img"
       aria-label={`${roll}번 ${place === 'room' ? '방' : '통로'} 모양 예시 · 출입구 ${exits}개`}>
-      {junction && <circle className="room-shape-outline-junction" cx={center.x} cy={center.y} r={outlineWidth / 2} />}
-      <path className="room-shape-outline" d={branches} strokeWidth={outlineWidth} />
-      {place === 'room' && <rect className="room-shape-chamber" {...room} />}
-      {junction && <circle className="room-shape-passage-junction" cx={center.x} cy={center.y} r={passageWidth / 2} />}
-      <path className="room-shape-passage" d={branches} strokeWidth={passageWidth} />
-      {paths.map(({ from, to }, i) => {
-        const length = Math.hypot(to.x - from.x, to.y - from.y);
-        const x = (to.y - from.y) * 5 / length;
-        const y = (from.x - to.x) * 5 / length;
-        return <line className="room-shape-exit" key={i} x1={to.x - x} y1={to.y - y} x2={to.x + x} y2={to.y + y} />;
-      })}
+      <g transform={angle ? `rotate(${angle} ${center.x} ${center.y})` : undefined}>
+        {junction && <circle className="room-shape-outline-junction" cx={center.x} cy={center.y} r={outlineWidth / 2} />}
+        <path className="room-shape-outline" d={branches} strokeWidth={outlineWidth} />
+        {place === 'room' && <rect className="room-shape-chamber" {...room} />}
+        {junction && <circle className="room-shape-passage-junction" cx={center.x} cy={center.y} r={passageWidth / 2} />}
+        <path className="room-shape-passage" d={branches} strokeWidth={passageWidth} />
+        {paths.map(({ from, to }, i) => {
+          const length = Math.hypot(to.x - from.x, to.y - from.y);
+          const dx = (to.x - from.x) / length;
+          const dy = (to.y - from.y) / length;
+          const labelX = to.x + dx * 8;
+          const labelY = to.y + dy * 8;
+          const marker = state?.marks[i];
+          const entrance = state?.entrance === i;
+          return (
+            <g key={i}>
+              <line className="room-shape-exit" x1={to.x - dy * 5} y1={to.y + dx * 5}
+                x2={to.x + dy * 5} y2={to.y - dx * 5} data-mark={marker} data-entrance={entrance || undefined} />
+              {state && <text className="room-shape-number" x={labelX} y={labelY}
+                data-mark={marker} data-entrance={entrance || undefined}
+                transform={angle ? `rotate(${-angle} ${labelX} ${labelY})` : undefined}>
+                {i + 1}
+              </text>}
+            </g>
+          );
+        })}
+      </g>
     </svg>
   );
 }

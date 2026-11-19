@@ -1,8 +1,9 @@
 import { useId, useState } from 'react';
 import { readOracleValue } from '../../lib/oracle';
-import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
 import { targetAllocation } from '../../lib/target-allocation';
 import { XRef } from '../bits';
+import { PlayDieHint } from './PlayDieHints';
 
 function memberCount(value: string, minimum: number) {
   return /^\d+$/.test(value) && Number(value) >= minimum && Number(value) <= 20 ? Number(value) : null;
@@ -20,6 +21,8 @@ export function PlayTargetAllocation({ targets }: { targets: { id: string; label
   const pcCount = memberCount(pcs, 1);
   const allyCount = memberCount(allies, 0);
   const allocation = pcCount === null || allyCount === null ? null : targetAllocation(targets.length, pcCount, allyCount, picks);
+  const dice = `D${allocation?.sides ?? 0}`;
+  const diceField = usePlayRollField('target-tiebreaker', '적 배분 후보 선택', dice, !allocation?.remaining);
   const reset = () => {
     setPlan({ picks: [], assignments: {} });
     setValue('');
@@ -29,11 +32,13 @@ export function PlayTargetAllocation({ targets }: { targets: { id: string; label
     if (!allocation?.remaining) return;
     const roll = readOracleValue(value, allocation.sides);
     const selected = roll === null ? undefined : allocation.candidates[roll - 1];
-    if (!selected) {
+    if (roll === null || !selected) {
       setError(roll === null ? `1–${allocation.sides} 값을 입력하세요.` : '후보에 없는 눈입니다. 같은 주사위를 다시 굴립니다.');
       return;
     }
-    commitRoll(() => setPlan((previous) => ({ picks: [...previous.picks, selected.id], assignments: {} })));
+    commitRoll(() => setPlan((previous) => ({ picks: [...previous.picks, selected.id], assignments: {} })), {
+      label: '적 배분 후보 선택', dice, value: String(roll), source: 'manual', field: diceField['data-play-roll-field'],
+    });
     setValue('');
     setError('');
   };
@@ -62,11 +67,12 @@ export function PlayTargetAllocation({ targets }: { targets: { id: string; label
                 <p className="play-combat-note">남은 적 {allocation.remaining}마리의 상대를 후보 중에서 정합니다.</p>
                 <ol>{allocation.candidates.map(({ id: memberId, name }) => <li key={memberId}>{name}</li>)}</ol>
                 <form className="play-aux-form" data-play-roll noValidate onSubmit={(event) => { event.preventDefault(); assignExtra(); }}>
-                  <label className="field"><span>후보 선택 D{allocation.sides}</span>
-                    <input id={id} inputMode="numeric" data-play-dice value={value} placeholder={`1–${allocation.sides}`}
+                  <div className="field"><label htmlFor={id}>후보 선택 D{allocation.sides}</label>
+                    <PlayDieHint dice={dice} sides={allocation.sides} />
+                    <input id={id} inputMode="numeric" {...diceField} value={value} placeholder={`1–${allocation.sides}`}
                       aria-invalid={!!error || undefined} aria-describedby={error ? `${id}-error` : undefined}
                       onChange={(event) => { setValue(event.target.value); setError(''); }} />
-                  </label>
+                  </div>
                   <button type="submit" className="btn ghost">배분 확인</button>
                   {error && <p id={`${id}-error`} role="alert" className="field-err">{error}</p>}
                 </form>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { entryById, tableById, procById, rulingById, hrefOf, titleOf, kindOf } from '../content';
 import { Link } from '../lib/router';
 import { nav, OPEN_MAX, useNav } from '../lib/store';
+import { BENCH_SET_NAME_MAX, benchSetName, readBenchSets, storeBenchSets, type BenchLayout, type BenchSet } from '../lib/workbench-sets';
 import { EntryBody } from '../components/EntryBody';
 import { IClose, IDown, IUp } from '../components/icons';
 import { KIND_KO } from '../components/Plan';
@@ -37,6 +38,89 @@ function BenchPresets() {
       </div>
       <p className="bench-preset-feedback" role="status">{feedback?.open === open && feedback.text}</p>
     </div>
+  );
+}
+
+function SavedBenchSets({ layout, onRestore }: { layout: BenchLayout; onRestore: (set: BenchSet) => void }) {
+  const { open, active } = useNav();
+  const [sets, setSets] = useState(() => readBenchSets() ?? []);
+  const [name, setName] = useState('');
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState('');
+  const temporary = useRef(false);
+
+  const currentList = () => temporary.current ? sets : readBenchSets() ?? sets;
+  const updateSets = (next: BenchSet[], text: string) => {
+    temporary.current = !storeBenchSets(next);
+    setSets(next);
+    setFeedback(temporary.current ? `${text} 작업대를 열어 둔 동안만 남습니다.` : text);
+  };
+
+  return (
+    <details className="fold bench-saved">
+      <summary>내 작업대 세트</summary>
+      <div className="bench-saved-body">
+        {open.length > 0 && (
+          <form className="bench-saved-form" onSubmit={(event) => {
+            event.preventDefault();
+            const current = currentList();
+            const title = benchSetName(name);
+            if (!title || title.length > BENCH_SET_NAME_MAX) return;
+            if (current.some((set) => set.name === title)) {
+              setFeedback('같은 이름의 세트가 있습니다. 다른 이름을 입력하세요.');
+              return;
+            }
+            updateSets([{ id: crypto.randomUUID(), name: title, open: [...open], active, layout }, ...current], `${title} 저장 완료`);
+            setName('');
+          }}>
+            <label className="field">
+              <span>작업대 세트 이름</span>
+              <input value={name} maxLength={BENCH_SET_NAME_MAX} placeholder="예: Overseer 전투"
+                onChange={(event) => setName(event.target.value)} />
+            </label>
+            <button className="btn ghost" type="submit" disabled={!benchSetName(name)}>현재 배치 저장</button>
+          </form>
+        )}
+        {sets.length > 0 ? (
+          <ul className="bench-saved-list">
+            {sets.map((set) => {
+              const closing = open.filter((id) => !set.open.includes(id)).length;
+              const restore = () => {
+                onRestore(set);
+                setFeedback(`${set.name} 배치를 열었습니다.`);
+                setConfirm(null);
+              };
+              return (
+                <li key={set.id} className="bench-saved-row">
+                  <div>
+                    <strong>{set.name}</strong>
+                    <span>{set.open.length}개 항목 · {set.layout === 'tabs' ? '탭' : '나란히'}</span>
+                  </div>
+                  <div className="bench-saved-controls">
+                    <button className="btn ghost" type="button" aria-label={`${set.name} 세트 열기`} onClick={() => {
+                      if (closing) setConfirm(set.id);
+                      else restore();
+                    }}>세트 열기</button>
+                    <button className="iconbtn" type="button" aria-label={`${set.name} 세트 삭제`} title="세트 삭제" onClick={() => {
+                      updateSets(currentList().filter((item) => item.id !== set.id), `${set.name} 세트를 삭제했습니다.`);
+                      if (confirm === set.id) setConfirm(null);
+                    }}><IClose /></button>
+                  </div>
+                  {confirm === set.id && (
+                    <div className="bench-saved-confirm">
+                      <p>현재 항목 {closing}개를 닫고 이 세트를 엽니다.</p>
+                      <button className="btn primary" type="button" onClick={restore}>배치 바꾸기</button>
+                      <button className="btn ghost" type="button" onClick={() => setConfirm(null)}>취소</button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : open.length === 0 && <p>항목을 펼친 뒤 배치에 이름을 붙여 저장하세요.</p>}
+        {feedback && <p className="bench-preset-feedback" role="status">{feedback}</p>}
+      </div>
+    </details>
   );
 }
 
@@ -107,10 +191,12 @@ function TablePane({ id }: { id: string }) {
   );
 }
 
-export function Pane({ id, onFocus }: { id: string; onFocus?: () => void }) {
+export function Pane({ id, onFocus, tab, hidden }: { id: string; onFocus?: () => void; tab?: boolean; hidden?: boolean }) {
   const k = kindOf(id);
   return (
-    <section className="pane" aria-label={titleOf(id).ko} onFocus={onFocus}>
+    <section className="pane" aria-label={titleOf(id).ko} onFocus={onFocus} hidden={hidden}
+      role={tab ? 'tabpanel' : undefined} id={tab ? `bench-panel-${id}` : undefined}
+      aria-labelledby={tab ? `bench-tab-${id}` : undefined}>
       <div className="pane-head">
         <span className="pk">{k ? KIND_SHORT[k] : ''}</span>
         <Link to={hrefOf(id)}>{titleOf(id).ko}</Link>
@@ -127,7 +213,7 @@ export function Pane({ id, onFocus }: { id: string; onFocus?: () => void }) {
 
 export function Workbench() {
   const { open, active, pins, recent } = useNav();
-  const [layout, setLayout] = useState<'tabs' | 'columns'>('columns');
+  const [layout, setLayout] = useState<BenchLayout>('columns');
   const cur = active && open.includes(active) ? active : open[open.length - 1];
   const [undo, setUndo] = useState<{ msg: string; run: () => void } | null>(null);
   useEffect(() => {
@@ -163,7 +249,7 @@ export function Workbench() {
       </div>
       <header className="page-head">
         <h1 className="page-title">작업대</h1>
-        <p className="lede">규칙을 나란히 펼쳐 비교합니다. 게임 진행은 기록하지 않고 펼친 항목·Pin·최근 열람만 이 브라우저에 남습니다.</p>
+        <p className="lede">규칙을 나란히 펼쳐 비교하고, 자주 쓰는 조합을 작업대 세트로 저장하세요.</p>
       </header>
 
       <section aria-labelledby="open-h">
@@ -186,37 +272,49 @@ export function Workbench() {
           </span>
         </div>
         <BenchPresets />
+        <SavedBenchSets layout={layout} onRestore={(set) => {
+          nav.replaceOpen(set);
+          setLayout(set.layout);
+        }} />
         {open.length === 0 ? (
           <div className="empty">
             규칙·표·절차 페이지의 <b>작업대에 펼치기</b> 버튼이나 검색 창의 <kbd>Shift</kbd>+<kbd>Enter</kbd>로 항목을 펼치세요.
           </div>
-        ) : layout === 'tabs' ? (
+        ) : (
           <>
-            <div className="bench-tabs" role="tablist">
-              {open.map((id) => (
-                <div key={id} className="bench-tab" role="tab" aria-selected={id === cur} tabIndex={0} onClick={() => nav.activate(id)} onKeyDown={(e) => e.key === 'Enter' && nav.activate(id)}>
-                  <span>{titleOf(id).ko}</span>
+            {layout === 'tabs' && <div className="bench-tabs" role="tablist" aria-label="펼친 항목">
+              {open.map((id, index) => (
+                <div key={id} className="bench-tab" role="presentation" data-current={id === cur}>
+                  <button type="button" role="tab" id={`bench-tab-${id}`} aria-controls={`bench-panel-${id}`}
+                    aria-selected={id === cur} tabIndex={id === cur ? 0 : -1} onClick={() => nav.activate(id)}
+                    onKeyDown={(event) => {
+                      const offset = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+                      const target = offset ? (index + offset + open.length) % open.length
+                        : event.key === 'Home' ? 0 : event.key === 'End' ? open.length - 1 : -1;
+                      if (target < 0) return;
+                      event.preventDefault();
+                      const next = open[target];
+                      nav.activate(next);
+                      document.getElementById(`bench-tab-${next}`)?.focus();
+                    }}><span>{titleOf(id).ko}</span></button>
                   <button
                     className="x"
+                    type="button"
                     aria-label={`${titleOf(id).ko} 닫기`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nav.close(id);
-                    }}
+                    onClick={() => nav.close(id)}
                   >
                     <IClose />
                   </button>
                 </div>
               ))}
+            </div>}
+            <div className={`bench-cols ${layout === 'columns' && open.length > 1 ? 'multi' : ''}`}>
+              {open.map((id) => (
+                <Pane key={id} id={id} onFocus={layout === 'columns' ? () => nav.activate(id) : undefined}
+                  tab={layout === 'tabs'} hidden={layout === 'tabs' && cur !== id} />
+              ))}
             </div>
-            {cur && <Pane id={cur} />}
           </>
-        ) : (
-          <div className={`bench-cols ${open.length > 1 ? 'multi' : ''}`}>
-            {open.map((id) => (
-              <Pane key={id} id={id} onFocus={() => nav.activate(id)} />
-            ))}
-          </div>
         )}
       </section>
 

@@ -2,10 +2,11 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { CAMP_ACTIVITIES, CAMP_BARRICADE, campTotals, resolveCampCheck, type CampActivityId, type CampQuantities } from '../lib/camp';
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { gearCount, type PaperChange } from '../lib/play-inventory';
 import { XRef } from './bits';
 import { JournalRoll } from './LootJournal';
+import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/camp-calculator.css';
 
 function readInteger(raw: string, signed = false) {
@@ -21,7 +22,7 @@ const materials = (items: Partial<Record<string, number>>) =>
   Object.entries(items).map(([item, amount]) => `${item} ${amount}`).join(' · ');
 
 function CampNumberField({
-  label, value, onChange, invalid = false, error = '0 이상의 정수를 입력하세요.', placeholder = '0', canBeNegative = false, physicalDie = false, disabled = false,
+  label, value, onChange, invalid = false, error = '0 이상의 정수를 입력하세요.', placeholder = '0', canBeNegative = false, physicalDie, disabled = false,
 }: {
   label: string;
   value: string;
@@ -30,16 +31,17 @@ function CampNumberField({
   error?: string;
   placeholder?: string;
   canBeNegative?: boolean;
-  physicalDie?: boolean;
+  physicalDie?: ReturnType<typeof usePlayRollField>;
   disabled?: boolean;
 }) {
   const id = useId();
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
+      {physicalDie && <PlayDieHint dice="D20" sides={20} />}
       <input
         id={id} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder} inputMode={canBeNegative ? 'text' : 'numeric'} data-play-dice={physicalDie || undefined}
+        placeholder={placeholder} inputMode={canBeNegative ? 'text' : 'numeric'} {...physicalDie}
         aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined}
       />
       {invalid && <span id={`${id}-error`} className="field-err">{error}</span>}
@@ -108,6 +110,10 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
   };
   const effectiveDarkness = darkness || domainDarkness === true;
   const roll = readOracleValue(die.trim(), 20);
+  const campRollField = usePlayRollField('camp-check', '야영 판정', 'D20', roll !== null);
+  const recordCampCheck = (value: number, source: 'manual' | 'app') => commitRoll(() => setField('die', String(value)), {
+    label: '야영 판정', dice: 'D20', value: String(value), source, field: campRollField['data-play-roll-field'],
+  });
   const extraCheck = readInteger(other, true);
   const { plan, result, rangeError, planKey } = useMemo(() => {
     const counts: CampQuantities = {};
@@ -202,17 +208,17 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
             const number = readOracleValue((manual ?? die).trim(), 20);
             if (number === null) setInvalidRoll(true);
             else {
-              commitRoll(() => setField('die', String(number)));
+              recordCampCheck(number, 'manual');
               setManual(null);
               setInvalidRoll(false);
             }
           }}>
             <CampNumberField label="직접 굴린 D20" value={manual ?? die} onChange={(value) => { setManual(value); setInvalidRoll(false); }}
-              placeholder="1–20" physicalDie invalid={invalidRoll} error="1–20 사이의 정수를 입력하세요." />
+              placeholder="1–20" physicalDie={campRollField} invalid={invalidRoll} error="1–20 사이의 정수를 입력하세요." />
             <div className="camp-roll-actions">
               <button className="btn ghost" type="submit">야영 판정 확인</button>
               <button className="btn ghost" type="button" onClick={() => {
-                commitRoll(() => setField('die', String(rollDie(20))));
+                recordCampCheck(rollDie(20), 'app');
                 setManual(null);
                 setInvalidRoll(false);
               }}>D20 굴리기</button>

@@ -1,0 +1,47 @@
+.play-checkpoints { min-inline-size: 0; }
+.play-checkpoints > summary, .play-checkpoint-actions > button, .play-checkpoint-form :is(input, button) {
+  min-block-size: 44px;
+}
+.play-checkpoints-body, .play-checkpoint-list {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--s3);
+}
+.play-checkpoints-body { padding: 0 var(--s3) var(--s3); }
+.play-checkpoint-form, .play-checkpoint-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s2) var(--s3);
+}
+.play-checkpoint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  min-inline-size: 0;
+}
+.play-checkpoint-list { margin: 0; padding: 0; list-style: none; }
+.play-checkpoint-row { align-items: center; padding-block-start: var(--s2); border-top: 1px solid var(--rule-soft); }
+.play-checkpoint-label { min-inline-size: 0; }
+.play-checkpoint-label > * { display: block; }
+.play-checkpoint-label > :is(span, time), .play-checkpoint-feedback {
+  color: var(--ink-2);
+  font: 14px/1.5 var(--f-ui);
+}
+.play-checkpoint-label > *, .play-checkpoint-feedback { overflow-wrap: anywhere; }
+.play-checkpoint-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s2);
+  border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--copper);
+  padding: var(--s3);
+  background: var(--paper);
+}
+.play-checkpoint-review :is(h3, p), .play-checkpoints-body > p { margin: 0; }
+
+@media (max-width: 600px) {
+  .play-checkpoint-form, .play-checkpoint-row { grid-template-columns: minmax(0, 1fr); }
+  .play-checkpoint-form > button { justify-self: start; }
+}

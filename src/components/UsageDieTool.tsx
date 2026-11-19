@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { rollDie, tableSides } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { resolveUsageDie, USAGE_DIE_PROFILES, type UsageDie, type UsageDieRule } from '../lib/usage-die';
 import { XRef } from './bits';
 import { IDie } from './icons';
@@ -28,11 +28,13 @@ export function UsageDieTool({ rule, onReport, progress }: Props) {
   const die = progress ? progress.recorded?.die ?? progress.die : selectedDie;
   const value = progress ? progress.recorded?.value ?? null : selectedValue;
   const sides = die === null ? null : tableSides(die);
+  const field = usePlayRollField(`usage:${rule}`, profile.title, die ?? '', value !== null);
   const result = die && value !== null ? resolveUsageDie(rule, die, value) : null;
   const report = !result ? '' : result.kind === 'trigger' ? result.title : `방어구 내구도 ${result.next}${result.kind === 'unchanged' ? ' 유지' : '로 하락'}`;
   useEffect(() => { onReport?.(report); }, [onReport, report]);
-  const showRoll = (rolled: number) => {
-    commitRoll(() => (progress?.onRoll ?? setValue)(rolled));
+  const showRoll = (rolled: number, source: 'manual' | 'app') => {
+    commitRoll(() => (progress?.onRoll ?? setValue)(rolled), { label: profile.title, dice: die ?? '', value: String(rolled),
+      source, field: field['data-play-roll-field'] });
     setManual('');
     setInvalid(false);
   };
@@ -58,7 +60,7 @@ export function UsageDieTool({ rule, onReport, progress }: Props) {
               </div>
             )}
             <button className="btn primary" type="button" disabled={sides === null} onClick={() => {
-              if (sides !== null) showRoll(rollDie(sides));
+              if (sides !== null) showRoll(rollDie(sides), 'app');
             }}>
               <IDie /> {die ? `${die} 굴리기` : '굴리기'}
             </button>
@@ -70,11 +72,11 @@ export function UsageDieTool({ rule, onReport, progress }: Props) {
               setInvalid(true);
               return;
             }
-            showRoll(next);
+            showRoll(next, 'manual');
           }}>
             <div className="field">
               <label htmlFor={`${id}-manual`}>직접 굴린 값</label>
-              <input id={`${id}-manual`} inputMode="numeric" data-play-dice autoComplete="off" disabled={sides === null}
+              <input id={`${id}-manual`} inputMode="numeric" {...field} autoComplete="off" disabled={sides === null}
                 value={manual} placeholder={sides === null ? undefined : `1–${sides}`} aria-invalid={invalid || undefined}
                 aria-describedby={invalid ? `${id}-error` : undefined} onChange={(event) => {
                   setManual(event.target.value);

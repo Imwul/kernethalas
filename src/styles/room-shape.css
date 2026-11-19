@@ -28,6 +28,18 @@
 .room-shape-passage-junction { fill: var(--paper); }
 .room-shape-exit { stroke: var(--copper-ink); stroke-width: 2.5; stroke-linecap: round; }
 
+.room-shape-number {
+  fill: var(--ink-2);
+  font: 700 10px/1 var(--f-mono);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.room-shape-exit[data-mark='locked'] { stroke: var(--oxblood-ink); }
+.room-shape-number[data-mark='locked'] { fill: var(--oxblood-ink); }
+.room-shape-exit[data-mark='checked'] { stroke: var(--ink-2); }
+.room-shape-exit[data-entrance] { stroke: var(--ochre); stroke-width: 3.5; }
+.room-shape-number[data-entrance] { fill: var(--ochre); }
+
 .room-shape-result {
   inline-size: min(100%, 11rem);
   margin: var(--s2) 0 0;

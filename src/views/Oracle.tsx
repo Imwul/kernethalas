@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { tables, tableById, TABLE_GROUP_LABEL } from '../content';
 import type { OracleTable } from '../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, type EncounterPlace } from '../content/tables/exploration';
@@ -6,6 +6,7 @@ import { Link, navigate, useLocation } from '../lib/router';
 import { TableView } from '../components/TableView';
 import { CheckCalculator } from '../components/CheckCalculator';
 import { Roller } from '../components/Roller';
+import type { RoomShapeState } from '../components/RoomShapeDiagram';
 import { BenchButton, Cite, Notes, PinButton, Relations, VChip, useVisit } from '../components/bits';
 import { IDie, IPin, ISearch } from '../components/icons';
 import { roll, tableSides } from '../lib/dice';
@@ -216,9 +217,11 @@ interface OracleBodyProps {
   collapseTableBeforeRoll?: boolean;
   rollLabel?: string;
   sourceForRow?: (row: OracleTable['rows'][number]) => string | undefined;
+  roomShape?: RoomShapeState;
+  afterResult?: ReactNode;
 }
 
-export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow }: OracleBodyProps) {
+export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow, roomShape, afterResult }: OracleBodyProps) {
   const [localOnly, setLocalOnly] = useState(compact);
   const [encounterPlace, setEncounterPlace] = useState<EncounterPlace | null>(null);
   const table = useRef<HTMLDivElement>(null);
@@ -243,6 +246,8 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
           onOnly={onOnly ?? setLocalOnly}
           rollLabel={rollLabel}
           sourceForRow={sourceForRow}
+          roomShape={roomShape}
+          afterResult={afterResult}
           showUnrolledViewToggle={collapseTableBeforeRoll}
           beforeRoll={isEncounter && (
             <div className="oracle-encounter-place">

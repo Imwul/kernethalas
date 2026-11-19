@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
 import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
@@ -334,6 +334,7 @@ export function PlaySurvival({ pane, onPane, onReport }: {
   onPane: (pane: SurvivalPane) => void;
   onReport: (report: SurvivalReport) => void;
 }) {
+  const paneId = useId();
   const [records, setRecords] = usePlayDraftState<SurvivalRecord[]>('records', []);
   const report = useMemo(() => ({
     summary: records.map(({ summary }) => summary).join(' · '),
@@ -348,13 +349,13 @@ export function PlaySurvival({ pane, onPane, onReport }: {
   return (
     <section className="play-survival" aria-label="치료·성장 도구">
       <div className="seg survival-nav" role="group" aria-label="치료·성장 선택">
-        <button type="button" aria-pressed={pane === 'treatment'} onClick={() => onPane('treatment')}>붕대·지속 피해</button>
-        <button type="button" aria-pressed={pane === 'rot'} onClick={() => onPane('rot')}>부패병</button>
-        <button type="button" aria-pressed={pane === 'growth'} onClick={() => onPane('growth')}>기술 성장</button>
+        <button type="button" aria-controls={`${paneId}-treatment`} aria-pressed={pane === 'treatment'} onClick={() => onPane('treatment')}>붕대·지속 피해</button>
+        <button type="button" aria-controls={`${paneId}-rot`} aria-pressed={pane === 'rot'} onClick={() => onPane('rot')}>부패병</button>
+        <button type="button" aria-controls={`${paneId}-growth`} aria-pressed={pane === 'growth'} onClick={() => onPane('growth')}>기술 성장</button>
       </div>
-      <div hidden={pane !== 'treatment'}><TreatmentTool onRecord={onRecord} healedHere={records.some(({ kind, key }) => kind === 'treatment' && key === 'heal')} /></div>
-      <div hidden={pane !== 'rot'}><RotTool onRecord={onRecord} /></div>
-      <div hidden={pane !== 'growth'}><GrowthTool onRecord={onRecord} recorded={records.filter(({ kind }) => kind === 'growth').flatMap(({ key }) => key ?? [])} /></div>
+      <div id={`${paneId}-treatment`} hidden={pane !== 'treatment'}><TreatmentTool onRecord={onRecord} healedHere={records.some(({ kind, key }) => kind === 'treatment' && key === 'heal')} /></div>
+      <div id={`${paneId}-rot`} hidden={pane !== 'rot'}><RotTool onRecord={onRecord} /></div>
+      <div id={`${paneId}-growth`} hidden={pane !== 'growth'}><GrowthTool onRecord={onRecord} recorded={records.filter(({ kind }) => kind === 'growth').flatMap(({ key }) => key ?? [])} /></div>
       {records.length > 0 && <ul className="survival-records" aria-label="이번 장소 치료·성장 결과">
         {records.map(({ summary }, index) => <li key={index}>{summary}</li>)}
       </ul>}

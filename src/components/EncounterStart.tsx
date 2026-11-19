@@ -3,10 +3,11 @@ import type { CreatureRecord } from '../content/entries/creatures';
 import type { CheckResult, Edge } from '../lib/dice';
 import { encounterCheck, encounterFear, encounterInitiativeModifier, encounterInteger, encounterOpposed } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
 import { useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
+import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/encounter-start.css';
 
 type StartMode = 'initiative' | 'surprise' | 'ambushed';
@@ -26,12 +27,16 @@ function CheckField({ label, value, set, roll = false, nonnegative = false }: {
   const id = useId();
   const parsed = roll ? readOracleValue(value.trim(), 100) : encounterInteger(value);
   const invalid = value.trim() !== '' && (parsed === null || (nonnegative && parsed < 0));
+  const field = usePlayRollField(`encounter:${label}`, label.replace(/ D100$/, ''), 'D100', parsed !== null, true);
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
+      {roll && <PlayDieHint dice="D100" sides={100} />}
       <input id={id} value={value} inputMode={roll || nonnegative ? 'numeric' : 'text'}
+        {...(roll ? field : {})}
         onChange={(event) => set(event.target.value)} placeholder={roll ? '1–100 / 00' : undefined}
         aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined} />
+      {roll && <PlayZeroKey onInput={() => set('00')} />}
       {invalid && <p id={`${id}-error`} className="field-err">
         {roll ? '1–100 또는 00을 입력하세요.' : nonnegative ? '0 이상의 정수를 입력하세요.' : '정수를 입력하세요.'}
       </p>}

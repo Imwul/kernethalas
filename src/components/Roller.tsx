@@ -3,11 +3,13 @@ import type { OracleTable, TableRow } from '../content/schema';
 import { d100FromValue } from '../lib/dice';
 import { automaticRollSides, oracleRowsAvailable, readOracleValue, rollTable } from '../lib/oracle';
 import { tableRowSource } from '../lib/overlay';
-import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import type { PlayRollDetails } from '../lib/play-roll-history';
 import { CopyButton, XRef } from './bits';
 import { IDie } from './icons';
-import { RoomShapeDiagram } from './RoomShapeDiagram';
+import { RoomShapeDiagram, type RoomShapeState } from './RoomShapeDiagram';
 import { rangeText, rowTitle, showLabel } from './TableView';
+import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 
 interface Props {
   t: OracleTable;
@@ -21,25 +23,28 @@ interface Props {
   sourceForRow?: (row: TableRow) => string | undefined;
   showUnrolledViewToggle?: boolean;
   beforeRoll?: ReactNode;
+  roomShape?: RoomShapeState;
+  afterResult?: ReactNode;
 }
 
-export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle, beforeRoll }: Props) {
+export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle, beforeRoll, roomShape, afterResult }: Props) {
   const id = useId();
   const [manual, setManual] = useState('');
   const [invalid, setInvalid] = useState(false);
   const [history, setHistory] = usePlayDraftState<number[]>(`oracle-history:${t.id}`, []);
   const commitRoll = usePlayRoll();
+  const field = usePlayRollField(`oracle:${t.id}`, t.ko, t.dice, value !== null, sides === 100);
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
   const showLocalSource = t.mode === 'local-only' || t.group === 'flavor' || t.id === 't-events';
   const original = row && (sourceForRow?.(row) ?? (showLocalSource ? tableRowSource(t.id, row.min) : undefined));
   const digits = value !== null && sides === 100 ? d100FromValue(value) : null;
-  const rollValue = (n: number) => {
+  const rollValue = (n: number, source: PlayRollDetails['source']) => {
     setInvalid(false);
     commitRoll(() => {
       setHistory((h) => [n, ...h].slice(0, 12));
       onValue(n);
-    });
+    }, { label: t.ko, dice: t.dice, value: sides === 100 && n === 100 ? '00' : String(n), source, field: field['data-play-roll-field'] });
   };
   const copyText = row ? [
     `[${t.en}, ${t.dice}: ${value}] ${showLabel(t, row) ? row.label + ' — ' : ''}${row.ko}`,
@@ -49,6 +54,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
   return (
     <section className="oracle-instrument" aria-label="표 굴리기">
       {beforeRoll}
+      <div className="oracle-instrument-entry">
       <div className="oracle-instrument-top">
         <div className="oracle-dice-spec">
           <span>{t.dice}</span>
@@ -58,7 +64,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
           {canRoll && (
             <button className="btn primary" type="button" onClick={() => {
               const number = rollTable(t);
-              if (number !== null) rollValue(number);
+              if (number !== null) rollValue(number, 'app');
             }}>
               <IDie />
               {rollLabel ?? (value === null ? '굴리기' : '다시 굴리기')}
@@ -85,14 +91,14 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
           setInvalid(true);
           return;
         }
-        rollValue(number);
+        rollValue(number, 'manual');
         setManual('');
       }}>
-        <label htmlFor={id}>직접 굴린 값</label>
+        <div className="oracle-manual-label"><label htmlFor={id}>직접 굴린 값</label><PlayDieHint dice={t.dice} sides={sides} /></div>
         <input
           id={id}
           inputMode="numeric"
-          data-play-dice
+          {...field}
           autoComplete="off"
           value={manual}
           onChange={(e) => {
@@ -103,6 +109,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? `${id}-error` : undefined}
         />
+        {sides === 100 && <PlayZeroKey onInput={() => { setManual('00'); setInvalid(false); }} />}
         <button className="btn ghost" type="submit">확인</button>
         {invalid && (
           <p className="field-err" id={`${id}-error`} role="alert">
@@ -110,6 +117,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
           </p>
         )}
       </form>
+      </div>
 
       <div className="oracle-result" role="status" aria-live="polite" data-idle={value === null && !canRoll || undefined}>
         {value === null ? (
@@ -139,7 +147,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
               )}
               {t.id === 't-room-shape' && row && (
                 <figure className="room-shape-result">
-                  <RoomShapeDiagram roll={row.min} />
+                  <RoomShapeDiagram roll={row.min} state={roomShape} />
                   <figcaption>출입구 배치 예시</figcaption>
                 </figure>
               )}
@@ -148,6 +156,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
         )}
       </div>
 
+      {afterResult}
       {!!row?.next?.length && (
         <div className="oracle-follow-on">
           <span>이어서 보기</span>

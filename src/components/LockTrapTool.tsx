@@ -3,10 +3,12 @@ import { tableById } from '../content';
 import { rollDie } from '../lib/dice';
 import { forceOpeningBonus, lockpickDifficulty, LOCK_THRESHOLDS, trapInvestigation, type Detection, type LockTarget } from '../lib/lock-trap';
 import { readOracleValue } from '../lib/oracle';
-import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import type { PlayRollDetails } from '../lib/play-roll-history';
 import { XRef } from './bits';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { TensionTool, type TensionResult } from './TensionTool';
+import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/lock-trap.css';
 
 const TARGETS = { door: '문', container: '용기', environment: '환경 함정' } as const;
@@ -168,15 +170,16 @@ function TrapRoll({ label, sides, value, inputRef, onChange, confirm = false }: 
   const [draft, setDraft] = useState<string | null>(null);
   const [submittedInvalid, setSubmittedInvalid] = useState(false);
   const commitRoll = usePlayRoll();
+  const input = usePlayRollField(`trap:${label}`, label, `D${sides}`, readOracleValue(value, sides) !== null);
   const field = confirm ? draft ?? value : value;
   const invalid = submittedInvalid || field.trim() !== '' && readOracleValue(field.trim(), sides) === null;
-  const apply = (roll: number) => {
-    commitRoll(() => onChange(String(roll)));
+  const apply = (roll: number, source: PlayRollDetails['source']) => {
+    commitRoll(() => onChange(String(roll)), { label, dice: `D${sides}`, value: String(roll), source, field: input['data-play-roll-field'] });
     setDraft(null);
     setSubmittedInvalid(false);
   };
   const contents = <>
-    <input id={id} ref={inputRef} data-play-dice={confirm || undefined} inputMode="numeric" autoComplete="off"
+    <input id={id} ref={inputRef} {...(confirm ? input : {})} inputMode="numeric" autoComplete="off"
       placeholder={`1–${sides}`} value={field} aria-invalid={invalid || undefined}
       aria-describedby={invalid ? `${id}-error` : undefined} onChange={(event) => {
         if (confirm) setDraft(event.target.value);
@@ -184,16 +187,16 @@ function TrapRoll({ label, sides, value, inputRef, onChange, confirm = false }: 
         setSubmittedInvalid(false);
       }} />
     {confirm && <button type="submit" className="btn ghost" aria-label={`${label} 확인`}>확인</button>}
-    <button type="button" className="btn ghost" aria-label={`${label} 굴리기`} onClick={() => apply(rollDie(sides))}>굴리기</button>
+    <button type="button" className="btn ghost" aria-label={`${label} 굴리기`} onClick={() => apply(rollDie(sides), 'app')}>굴리기</button>
   </>;
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}>{label}</label><PlayDieHint dice={`D${sides}`} sides={sides} />
       {confirm ? <form className="lock-trap-roll" data-play-roll noValidate onSubmit={(event) => {
         event.preventDefault();
         const roll = readOracleValue(field.trim(), sides);
         if (roll === null) setSubmittedInvalid(true);
-        else apply(roll);
+        else apply(roll, 'manual');
       }}>{contents}</form> : <div className="lock-trap-roll">{contents}</div>}
       {invalid && <span id={`${id}-error`} className="field-err">{sides} 이하의 양의 정수를 입력하세요.</span>}
     </div>

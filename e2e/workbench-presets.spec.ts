@@ -48,3 +48,46 @@ test('a preset that cannot fit leaves the mobile workbench intact', async ({ pag
   await expect(page.getByRole('region', { name: '공격 판정 해결', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: '상태 이상 개요', exact: true })).toBeVisible();
 });
+
+test('a named workbench set restores the saved mobile tab and keeps live common panes mounted', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto('/workbench');
+  await page.getByRole('button', { name: '탐험 프리셋 펼치기', exact: true }).click();
+  await page.getByRole('button', { name: '탭', exact: true }).click();
+  const tabs = page.getByRole('tablist', { name: '펼친 항목' });
+  const shape = tabs.getByRole('tab', { name: '방 · 통로 모양', exact: true });
+  await shape.click();
+  const body = page.getByRole('tabpanel', { name: '방 · 통로 모양', exact: true });
+  const input = body.getByRole('textbox', { name: '직접 굴린 값', exact: true });
+  await input.fill('29');
+  await input.press('Enter');
+  await expect(body.getByRole('img', { name: '29번 방 모양 예시 · 출입구 8개' })).toBeVisible();
+  await shape.focus();
+  await shape.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Tension Die 처리', exact: true })).toBeFocused();
+  await expect(body).toBeHidden();
+  await shape.click();
+  await expect(body.getByRole('img', { name: '29번 방 모양 예시 · 출입구 8개' })).toBeVisible();
+
+  const sets = page.locator('.bench-saved');
+  await sets.getByText('내 작업대 세트', { exact: true }).click();
+  await sets.getByRole('textbox', { name: '작업대 세트 이름' }).fill('탐험 필수');
+  await sets.getByRole('button', { name: '현재 배치 저장', exact: true }).click();
+
+  await page.getByRole('button', { name: '나란히', exact: true }).click();
+  await page.getByRole('button', { name: '전투 프리셋 펼치기', exact: true }).click();
+  const restore = sets.getByRole('button', { name: '탐험 필수 세트 열기', exact: true });
+  await restore.click();
+  await expect(sets.getByText('현재 항목 2개를 닫고 이 세트를 엽니다.')).toBeVisible();
+  await sets.getByRole('button', { name: '배치 바꾸기', exact: true }).click();
+  await expect(shape).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.getByRole('tab')).toHaveCount(3);
+  await expect(body.getByRole('img', { name: '29번 방 모양 예시 · 출입구 8개' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+
+  await page.reload();
+  await sets.getByText('내 작업대 세트', { exact: true }).click();
+  await restore.click();
+  await expect(shape).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.getByRole('tab')).toHaveCount(3);
+});

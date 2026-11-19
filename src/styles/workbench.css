@@ -1,3 +1,8 @@
+.bench {
+  min-inline-size: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .bench-presets {
   margin-block: var(--s2) var(--s4);
 }
@@ -24,6 +29,60 @@
 
 .bench-preset-feedback:empty {
   margin: 0;
+}
+
+.bench-saved {
+  margin-block: var(--s2) var(--s4);
+  min-inline-size: 0;
+}
+
+.bench-saved-body, .bench-saved-list {
+  display: grid;
+  gap: var(--s3);
+  min-inline-size: 0;
+}
+
+.bench-saved-body { padding: 0 var(--s3) var(--s3); }
+.bench-saved-body > p { margin: 0; overflow-wrap: anywhere; }
+.bench-saved-list { margin: 0; padding: 0; list-style: none; }
+.bench-saved-form, .bench-saved-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s2) var(--s3);
+}
+.bench-saved-row { align-items: center; padding: var(--s2) 0; border-top: 1px solid var(--rule-soft); }
+.bench-saved-row strong { display: block; overflow-wrap: anywhere; }
+.bench-saved-row span { color: var(--ink-2); font: 14px/1.45 var(--f-ui); }
+.bench-saved-controls, .bench-saved-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.bench-saved-confirm { grid-column: 1 / -1; }
+.bench-saved-confirm p { margin: 0; }
+.bench-saved :is(button, input), .bench-saved summary { min-block-size: 44px; }
+
+.bench .bench-tab { padding: 0; gap: 0; cursor: default; }
+.bench .bench-tab[data-current='true'] { background: var(--paper); border-color: var(--ink); }
+.bench .bench-tab [role='tab'] {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding: var(--s2) var(--s3);
+}
+.bench .bench-tab [role='tab'] span { display: block; }
+.bench .bench-tab .x { inline-size: 44px; block-size: 44px; flex: none; }
+.bench-cols > .pane[hidden] { display: none; }
+
+@media (max-width: 520px) {
+  .bench-saved-form, .bench-saved-row { grid-template-columns: minmax(0, 1fr); }
+  .bench-saved-form > button { justify-self: start; }
+}
+
+@media (min-width: 1100px) {
+  .bench .bench-cols.multi {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  }
 }
 
 .bench-procedure {

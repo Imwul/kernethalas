@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { tableById, titleOf } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import { creatureSpoilsTables } from '../../lib/creature-combat';
@@ -82,6 +82,7 @@ export function PlayWrapUp({
   onCampEncounter, campEncounterResolved, campDarkness, campAttunementBlocked,
   afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush,
 }: Props) {
+  const paneId = useId();
   const pendingGrowth = usePendingSkillGrowth();
   const [pane, setPane] = usePlayDraftState<Pane>('pane', 'loot');
   const [survivalPane, setSurvivalPane] = usePlayDraftState<SurvivalPane>('survival-pane', 'treatment');
@@ -235,16 +236,16 @@ export function PlayWrapUp({
         </dl>
       </section>}
       <div className="seg play-wrap-nav" role="group" aria-label="정리할 항목">
-        <button type="button" aria-pressed={active === 'loot'} onClick={() => setPane('loot')}>전리품</button>
-        <button type="button" aria-pressed={active === 'breather'} onClick={() => setPane('breather')}>숨 고르기</button>
-        <button type="button" aria-pressed={active === 'camp'} onClick={() => setPane('camp')}>야영</button>
-        <button type="button" aria-pressed={active === 'survival'} onClick={() => setPane('survival')}>치료·성장</button>
-        {combatEnded && <button type="button" aria-pressed={active === 'recovery'} onClick={() => setPane('recovery')}>전투 종료</button>}
+        <button type="button" aria-controls={`${paneId}-loot`} aria-pressed={active === 'loot'} onClick={() => setPane('loot')}>전리품</button>
+        <button type="button" aria-controls={`${paneId}-breather`} aria-pressed={active === 'breather'} onClick={() => setPane('breather')}>숨 고르기</button>
+        <button type="button" aria-controls={`${paneId}-camp`} aria-pressed={active === 'camp'} onClick={() => setPane('camp')}>야영</button>
+        <button type="button" aria-controls={`${paneId}-survival`} aria-pressed={active === 'survival'} onClick={() => setPane('survival')}>치료·성장</button>
+        {combatEnded && <button type="button" aria-controls={`${paneId}-recovery`} aria-pressed={active === 'recovery'} onClick={() => setPane('recovery')}>전투 종료</button>}
       </div>
-      <div className="play-wrap-slot" hidden={active !== 'loot'}>
+      <div className="play-wrap-slot" id={`${paneId}-loot`} hidden={active !== 'loot'}>
         <PlaySpoils groups={groups} onReport={updateLoot} />
       </div>
-      <div className="play-wrap-slot" hidden={active !== 'breather'}>
+      <div className="play-wrap-slot" id={`${paneId}-breather`} hidden={active !== 'breather'}>
         <JournalRoll die="D10" label="숨 고르기 회복" value={breatherRoll} onValue={setBreather} resultText={breather} />
         <p className="play-wrap-note">광원 5 소모, 긴장 주사위 한 단계 하락.</p>
         <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest</XRef> 능력을 다시 쓸 수 있습니다.</p>
@@ -295,7 +296,7 @@ export function PlayWrapUp({
           <button className="btn ghost" type="button" onClick={() => openSurvival('rot')}>부패병 판정</button>
         </div>
       </div>
-      <div className="play-wrap-slot" hidden={active !== 'camp'}>
+      <div className="play-wrap-slot" id={`${paneId}-camp`} hidden={active !== 'camp'}>
         {pendingGrowth.length > 0 && (
           <div className="play-wrap-links" role="group" aria-label="야영 성장 대기">
             <p className="play-wrap-note">{pendingGrowth.join(' · ')}</p>
@@ -310,11 +311,11 @@ export function PlayWrapUp({
           <button className="btn ghost" type="button" onClick={() => openSurvival('rot')}>부패병 판정</button>
         </div>
       </div>
-      <div className="play-wrap-slot" hidden={active !== 'survival'}>
+      <div className="play-wrap-slot" id={`${paneId}-survival`} hidden={active !== 'survival'}>
         <PlayDraftScope name="survival"><PlaySurvival pane={survivalPane} onPane={setSurvivalPane} onReport={setSurvival} /></PlayDraftScope>
       </div>
       {combatEnded && (
-        <div className="play-wrap-slot" hidden={active !== 'recovery'}>
+        <div className="play-wrap-slot" id={`${paneId}-recovery`} hidden={active !== 'recovery'}>
           <JournalRoll key={battleId} die="D4" label="전투 후 Toughness 회복" value={recovery} onValue={setRecovery}
             resultText={recovery !== null ? `Toughness +${recovery}` : undefined} />
           {bosses.map(({ id, name }) => <JournalRoll key={`${battleId}:${id}`} die="D4" label={`${name} 처치 후 Sanity 회복`}
@@ -387,6 +388,7 @@ export function SpoilsRoll({ tableId, onReport, onSheetChange, onGearChange }: {
 }
 
 function SpoilsRollBody({ tableId, onReport }: { tableId: string; onReport: (report: LootReport) => void }) {
+  const followId = useId();
   const [value, setValue] = usePlayDraftState<number | null>('roll', null);
   const [follow, setFollow] = usePlayDraftState('follow', '');
   const [followOpen, setFollowOpen] = usePlayDraftState('follow-open', false);
@@ -470,7 +472,8 @@ function SpoilsRollBody({ tableId, onReport }: { tableId: string; onReport: (rep
       {(choices.length > 0 || onlyRefs.length > 0) && (
         <div className="play-wrap-links">
           {choices.map(({ id }) => (
-            <button className="btn ghost" key={id} type="button" aria-expanded={follow === id && followOpen} onClick={() => {
+            <button className="btn ghost" key={id} type="button" aria-expanded={follow === id && followOpen}
+              aria-controls={follow === id ? followId : undefined} onClick={() => {
               if (follow === id) setFollowOpen(!followOpen);
               else {
                 clearFollow();
@@ -485,7 +488,7 @@ function SpoilsRollBody({ tableId, onReport }: { tableId: string; onReport: (rep
         </div>
       )}
       {follow && choices.some(({ id }) => id === follow) && (
-        <div hidden={!followOpen}>
+        <div id={followId} hidden={!followOpen}>
           <PlayDraftScope key={localFollowKey} name="follow-up">
             {follow === 'p-potion' || follow === 'p-magic-item' ? (
               <LootJournal kind={follow === 'p-potion' ? 'potion' : 'magic-item'} onJournalChange={onItemReport} />

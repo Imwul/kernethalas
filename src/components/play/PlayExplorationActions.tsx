@@ -6,7 +6,7 @@ import { followUpSteps } from '../../lib/exploration-follow-up';
 import type { LockTarget } from '../../lib/lock-trap';
 import { readOracleValue } from '../../lib/oracle';
 import { activeDarkness } from '../../lib/play-domain';
-import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
 import { gearCount, type GearEffect, type PaperChange } from '../../lib/play-inventory';
 import { useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
@@ -16,10 +16,11 @@ import { PhysicalSkillRoll, SkillCriticalDetails, skillCheckSucceeded } from '..
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
 import { ExplorationFollowUp, type FollowUpReport } from './ExplorationFollowUp';
 import { PlayRoll } from './PlayRoll';
+import { PlayDieHint, PlayZeroKey } from './PlayDieHints';
 import { SpoilsRoll } from './PlayWrapUp';
 
 export type ActionSheetItem = PaperChange;
-type SearchReport = { text: string; item: string; gear?: GearEffect };
+type SearchReport = { used: boolean; needsEncounter: boolean; text: string; item: string; gear?: GearEffect };
 export interface ExplorationActionReport {
   text: string;
   sheet: ActionSheetItem[];
@@ -53,6 +54,8 @@ interface Props {
   priorDarknessRolls?: number[];
   onReport: (report: ExplorationActionReport) => void;
   onCombat: (source: string) => void;
+  scavengeLimit?: 1 | 2 | 3;
+  finishedSources: string[];
 }
 
 const DOOR_TABLE = tableById.get('t-door')!;
@@ -97,10 +100,12 @@ function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetIt
   ];
 }
 
-export function PlayExplorationActions({ room, actionsRef, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat }: Props) {
+export function PlayExplorationActions({ room, actionsRef, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat,
+  scavengeLimit = 1, finishedSources }: Props) {
   const [rolls, setRolls] = usePlayDraftState<ActionRoll[]>('action-tension', []);
   const [doorOpen, setDoorOpen] = usePlayDraftState('door-panel', false);
   const [searchOpen, setSearchOpen] = usePlayDraftState('scavenge-panel', false);
+  const [searchAttempt, setSearchAttempt] = usePlayDraftState('scavenge-selected', 1);
   const [deepOpen, setDeepOpen] = usePlayDraftState('deep-panel', false);
   const [door, setDoor] = usePlayDraftState<'roll' | 'present'>('door-choice', 'roll');
   const [finishedDoors, setFinishedDoors] = usePlayDraftState<DoorRecord[]>('finished-doors', []);
@@ -112,13 +117,18 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const [doorReport, setDoorReport] = useState<PlayLockReport | null>(null);
   const [environmentReport, setEnvironmentReport] = useState<PlayLockReport | null>(null);
   const [containerReport, setContainerReport] = useState<PlayLockReport | null>(null);
-  const [scavenge, setScavenge] = useState<SearchReport>({ text: '', item: '' });
+  const [scavenge, setScavenge] = useState<Partial<Record<number, SearchReport>>>({});
   const [lootText, setLootText] = useState('');
   const [lootItem, setLootItem] = useState('');
   const [lootGear, setLootGear] = useState<GearEffect>();
   const [followUps, setFollowUps] = useState<Record<string, ActionSheetItem[]>>({});
   const panelId = useId();
   const panel = useRef<HTMLElement>(null);
+  const currentSearch = Math.min(searchAttempt, scavengeLimit);
+  const reportSearch = useCallback((attempt: number, result: SearchReport) => {
+    setScavenge((current) => JSON.stringify(current[attempt]) === JSON.stringify(result)
+      ? current : { ...current, [attempt]: result });
+  }, []);
 
   useImperativeHandle(actionsRef, () => ({
     open(action) {
@@ -162,12 +172,20 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const reportFollowUp = useCallback((key: string, { items }: FollowUpReport) => {
     setFollowUps((current) => JSON.stringify(current[key] ?? []) === JSON.stringify(items) ? current : { ...current, [key]: items });
   }, []);
+  const searchNumbers = useMemo(() => Array.from({ length: scavengeLimit }, (_, index) => index + 1), [scavengeLimit]);
+  const searchesUsed = searchNumbers.filter((number) => scavenge[number]?.used).length;
+  const activeSearch = scavenge[currentSearch];
+  const nextSearch = activeSearch?.used && !activeSearch.needsEncounter
+    ? searchNumbers.find((number) => !scavenge[number]?.used) : undefined;
   const report = useMemo<ExplorationActionReport>(() => ({
     text: [
       ...finishedDoors.map(({ text }) => text),
       doorText ? `문 ${doorNumber} · ${doorText}` : '',
       environmentReport?.text,
-      room && scavenge.text ? `뒤지기 ${scavenge.text}` : '',
+      ...(room ? searchNumbers.flatMap((number) => {
+        const result = scavenge[number];
+        return result?.text ? [`뒤지기${scavengeLimit > 1 ? ` ${number}회차 ·` : ''} ${result.text}`] : [];
+      }) : []),
       room && deepStarted ? '깊은 수색 · Exhaustion +2' : '',
       activeContainer?.text,
       contents ? `용기 ${hasLoot && lootText ? lootText : contents.ko}` : '',
@@ -180,14 +198,21 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       ...lockSheet(doorKey, activeDoor),
       ...lockSheet('environment', environmentReport),
       ...lockSheet('container', activeContainer),
-      ...(room && scavenge.item ? [{ id: 'scavenge-item', text: scavenge.item, gear: scavenge.gear }] : []),
+      ...(room ? searchNumbers.flatMap((number) => {
+        const result = scavenge[number];
+        return result?.item ? [{
+          id: number === 1 ? 'scavenge-item' : `scavenge-item-${number}`,
+          text: result.item,
+          gear: result.gear,
+        }] : [];
+      }) : []),
       ...(room && deepStarted ? [{ id: 'deep-exhaustion', text: '깊은 수색 · Exhaustion +2' }] : []),
       ...(hasLoot && lootItem ? [{ id: 'container-loot', text: lootItem, gear: lootGear }] : []),
       ...darknessRecords.flatMap(({ key }) => (followUps[key] ?? []).map((item) => ({ ...item, id: `${key}-${item.id}` }))),
     ],
     nextTension,
     darknessRolls: rolls.flatMap(({ darkness }) => darkness === null ? [] : [darkness]),
-  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorNumber, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, rolls, room, scavenge]);
+  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorNumber, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, rolls, room, scavenge, scavengeLimit, searchNumbers]);
   useEffect(() => { onReport(report); }, [onReport, report]);
 
   const renderTension = (actionId: string, label: string) => {
@@ -218,7 +243,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
               </PlayDraftScope>
             )}
           </>}
-        {ambush && <button className="btn primary play-explore-action-btn" type="button" onClick={() => onCombat(`action-darkness:${actionId}`)}>행동 중 매복 조우로</button>}
+        {ambush && <button className="btn primary play-explore-action-btn" type="button" data-play-next="" onClick={() => onCombat(`action-darkness:${actionId}`)}>행동 중 매복 조우로</button>}
         {follow && <button type="button" className="btn ghost play-explore-action-btn" onClick={() => {
           const heading = document.getElementById(`${panelId}-${follow.key}`);
           heading?.focus({ preventScroll: true });
@@ -270,7 +295,29 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
         <>
           <details className="fold" open={searchOpen} onToggle={(event) => setSearchOpen(event.currentTarget.open)}>
             <summary data-explore-action="scavenge">방 뒤지기</summary>
-            <div className="play-explore-action-body"><Scavenge onReport={setScavenge} onCombat={() => onCombat('scavenge')} /></div>
+            <div className="play-explore-action-body">
+              {scavengeLimit > 1 && <div className="play-scavenge-attempts">
+                <p className="play-explore-note" role="status">{searchesUsed}/{scavengeLimit}회 사용</p>
+                <div className="seg" role="group" aria-label="방 뒤지기 시도 선택">
+                  {searchNumbers.map((number) => (
+                    <button type="button" key={number} aria-pressed={currentSearch === number}
+                      aria-controls={`${panelId}-scavenge-${number}`}
+                      data-play-next={number === nextSearch ? '' : undefined} data-play-roll-label={`방 뒤지기 ${number}회차`}
+                      onClick={() => setSearchAttempt(number)}>{number}회차</button>
+                  ))}
+                </div>
+              </div>}
+              {searchNumbers.map((number) => {
+                const source = number === 1 ? 'scavenge' : `scavenge-${number}`;
+                const search = <Scavenge attempt={number} multiple={scavengeLimit > 1}
+                  encounterFinished={finishedSources.includes(source)} onReport={reportSearch} onCombat={() => onCombat(source)} />;
+                return (
+                  <div key={number} id={`${panelId}-scavenge-${number}`} hidden={currentSearch !== number}>
+                    {number === 1 ? search : <PlayDraftScope name={`scavenge-attempt-${number}`}>{search}</PlayDraftScope>}
+                  </div>
+                );
+              })}
+            </div>
           </details>
           <details className="fold" open={deepOpen} onToggle={(event) => setDeepOpen(event.currentTarget.open)}>
             <summary data-explore-action="deep">깊은 수색</summary>
@@ -317,7 +364,13 @@ function ActionDarknessFollowUp({ headingId, title, recordKey, row, count, onRep
   );
 }
 
-function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => void; onCombat: () => void }) {
+function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: {
+  attempt: number;
+  multiple: boolean;
+  encounterFinished: boolean;
+  onReport: (attempt: number, value: SearchReport) => void;
+  onCombat: () => void;
+}) {
   const id = useId();
   const commitRoll = usePlayRoll();
   const recordCritical = useRecordSkillCritical();
@@ -353,7 +406,11 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
   const rewardName = reward?.item;
   const gear = useMemo(() => rewardName && amount !== null && amount > 0 ? gearCount(rewardName === '₵' ? '동전' : rewardName, amount)
     : spoilsRow ? spoilsGear : undefined, [rewardName, amount, spoilsRow, spoilsGear]);
-  useEffect(() => { onReport({ text, item, gear }); }, [onReport, text, item, gear]);
+  const used = check !== null;
+  const needsEncounter = checkOutcome?.outcome === 'fumble' && !encounterFinished;
+  const rollLabel = multiple ? `방 뒤지기 ${attempt}회차` : '방 뒤지기';
+  const diceField = usePlayRollField('scavenge', rollLabel, 'D100', used, true);
+  useEffect(() => { onReport(attempt, { used, needsEncounter, text, item, gear }); }, [attempt, onReport, used, needsEncounter, text, item, gear]);
 
   const resetRewards = () => {
     setQuantity([]);
@@ -361,8 +418,9 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
     setRewards((previous) => previous + 1);
     setSpoils('');
     setSpoilsItem('');
+    setSpoilsGear(undefined);
   };
-  const applyCheck = (roll: number | null) => {
+  const applyCheck = (roll: number | null, source: 'manual' | 'app') => {
     if (roll === null || !Number.isSafeInteger(skillNumber)) {
       setInvalid(true);
       return;
@@ -373,7 +431,7 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
       setBonus(false);
       setTableRoll(null);
       resetRewards();
-    });
+    }, { label: rollLabel, dice: 'D100', value: roll === 100 ? '00' : String(roll), source, field: diceField['data-play-roll-field'] });
     setSkill(null);
     setRoll(null);
     setEdge(null);
@@ -381,29 +439,32 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
   };
 
   return (
-    <section className="play-explore-step" aria-label="방 뒤지기 판정">
-      <p className="play-explore-note">Scavenge 판정 · 방마다 한 번</p>
+    <section className="play-explore-step" aria-label={multiple ? `방 뒤지기 판정 ${attempt}회차` : '방 뒤지기 판정'}>
+      {!multiple && <p className="play-explore-note">Scavenge 판정 · 방마다 한 번</p>}
       <form className="play-scavenge-check" data-play-roll noValidate onSubmit={(event) => {
         event.preventDefault();
-        applyCheck(readOracleValue(rawRoll.trim(), 100));
+        applyCheck(readOracleValue(rawRoll.trim(), 100), 'manual');
       }}>
         <label className="field"><span>보정 Scavenge Skill</span><input value={skill} inputMode="text"
           onChange={(event) => setSkill(event.target.value)} placeholder="예: 55" /></label>
-        <label className="field"><span>Scavenge D100</span><input value={rawRoll} inputMode="numeric" data-play-dice
+        <div className="field"><label htmlFor={`${id}-scavenge-roll`}>Scavenge D100</label><PlayDieHint dice="D100" sides={100} />
+          <input id={`${id}-scavenge-roll`} value={rawRoll} inputMode="numeric" {...diceField}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-scavenge-error` : undefined}
-          onChange={(event) => { setRoll(event.target.value); setInvalid(false); }} placeholder="1–100/00" /></label>
+          onChange={(event) => { setRoll(event.target.value); setInvalid(false); }} placeholder="1–100/00" /></div>
         <label className="field"><span>이점</span><select value={edge} onChange={(event) => setEdge(event.target.value as Edge)}>
           <option value="none">없음</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option>
         </select></label>
+        <PlayZeroKey onInput={() => { setRoll('00'); setInvalid(false); }} />
         <button className="btn ghost" type="submit">뒤지기 판정 확인</button>
-        <button className="btn ghost" type="button" onClick={() => applyCheck(Number.isSafeInteger(skillNumber) ? rollDie(100) : null)}>D100 굴리기</button>
+        <button className="btn ghost" type="button" onClick={() => applyCheck(Number.isSafeInteger(skillNumber) ? rollDie(100) : null, 'app')}>D100 굴리기</button>
         {invalid && <p className="field-err" id={`${id}-scavenge-error`} role="alert">Skill 정수와 1–100 사이의 주사위(또는 00)를 입력하세요.</p>}
       </form>
       {checkOutcome && <div className="play-explore-note" role="status">
         뒤지기 {CHECK_LABELS[checkOutcome.outcome]}
         <SkillCriticalDetails skill="Scavenge" outcome={checkOutcome.outcome} />
       </div>}
-      {checkOutcome?.outcome === 'fumble' && <button className="btn primary play-explore-action-btn" type="button" onClick={onCombat}>뒤지기 조우로</button>}
+      {needsEncounter && <button className="btn primary play-explore-action-btn" type="button" data-play-next=""
+        onClick={onCombat}>뒤지기 조우로</button>}
       {allowsTable && (
         <>
           {checkOutcome.outcome === 'critical' && <label className="play-explore-lair"><input type="checkbox" checked={bonus} onChange={(event) => {

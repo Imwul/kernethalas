@@ -80,6 +80,18 @@ export function readGearLedger(): GearLedger | null {
   } catch { return null; }
 }
 
+export function isGearLedger(value: unknown): value is GearLedger {
+  if (!value || typeof value !== 'object') return false;
+  const ledger = value as Partial<GearLedger>;
+  return Array.isArray(ledger.items) && ledger.items.every(isGearItem)
+    && new Set(ledger.items.map(({ id }) => id)).size === ledger.items.length
+    && Array.isArray(ledger.entries) && ledger.entries.every((entry) => entry && typeof entry.id === 'string'
+      && typeof entry.reason === 'string' && (entry.source === undefined || typeof entry.source === 'string')
+      && (entry.old === null || isGearItem(entry.old)) && isGearItem(entry.next)
+      && (entry.old === null || entry.old.id === entry.next.id))
+    && new Set(ledger.entries.map(({ id }) => id)).size === ledger.entries.length;
+}
+
 export function storeGearLedger(ledger: GearLedger) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ledger)); return true; }
   catch { return false; }
