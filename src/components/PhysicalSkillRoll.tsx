@@ -39,7 +39,7 @@ export function SkillCriticalDetails({ skill, outcome, growthSkill = skill, show
 }
 
 export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty = false, slot = 'skill-roll', initialSkill = '',
-  readOnly = false, physicalOnly = false, context = 'skill', onResult, onClear }: {
+  readOnly = false, existingRoll = false, context = 'skill', onResult, onClear }: {
   label: string;
   skill: string;
   modifier?: number;
@@ -47,7 +47,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   slot?: string;
   initialSkill?: string;
   readOnly?: boolean;
-  physicalOnly?: boolean;
+  existingRoll?: boolean;
   context?: 'skill' | 'attack' | 'npc';
   onResult: (result: CheckResult) => void;
   onClear?: () => void;
@@ -75,7 +75,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
     const result = resolveCheck(d100FromValue(roll), base + modifier + difficulty, inputs.edge);
     commitRoll(() => {
       setConfirmed({ inputs: { ...inputs, roll: String(roll) }, result });
-      if (context !== 'npc') recordCritical(inputs.weapon || skill, result, context === 'skill' ? skill : null);
+      if (!existingRoll && context !== 'npc') recordCritical(inputs.weapon || skill, result, context === 'skill' ? skill : null);
       onResult(result);
     });
     setDraft({});
@@ -114,7 +114,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
         </label>
         <div className="physical-check-actions">
           <button type="submit" className="btn ghost">판정</button>
-          {!physicalOnly && <button type="button" className="btn ghost" onClick={() => apply(rollDie(100))}>D100 굴리기</button>}
+          {!existingRoll && <button type="button" className="btn ghost" onClick={() => apply(rollDie(100))}>D100 굴리기</button>}
           {onClear && confirmed && <button type="button" className="btn ghost" onClick={() => commitRoll(() => {
             setConfirmed(null);
             setDraft({});
@@ -129,7 +129,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
         <strong>{OUTCOMES[result.outcome]}</strong>
         <span>보정 후 {skill} {result.skill}{result.flippedRead && ' · 뒤집은 값'}</span>
         {context !== 'npc' && <SkillCriticalDetails skill={skill} outcome={result.outcome}
-          growthSkill={confirmed.inputs.weapon || skill} showEffect={context === 'skill'} />}
+          growthSkill={existingRoll ? '' : confirmed.inputs.weapon || skill} showEffect={context === 'skill'} />}
       </div>}
     </fieldset>
   );

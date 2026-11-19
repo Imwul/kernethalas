@@ -255,7 +255,7 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
           {(draft.attuned === 'reason-roll' || draft.attuned === 'reason') && <>
             <p className="loot-help">앞서 굴린 Reason이 대성공이면 이 아이템을 즉시 감정할 수 있습니다.</p>
             <PlayDraftScope name="magic-reason">
-              <PhysicalSkillRoll label="감정에 사용할 Reason 판정" skill="Reason" physicalOnly readOnly={draft.attuned === 'reason'}
+              <PhysicalSkillRoll label="감정에 사용할 Reason 판정" skill="Reason" existingRoll readOnly={draft.attuned === 'reason'}
                 onResult={(result) => {
                   setDraft((current) => ({ ...current, attuned: result.outcome === 'critical' ? 'reason' : 'reason-roll', rarity: null, properties: [] }));
                 }} />

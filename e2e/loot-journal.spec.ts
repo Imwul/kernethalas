@@ -66,3 +66,47 @@ test('a magic weapon needs attunement before rarity and fills table follow-ups f
   await enterRoll(journal, '속성 수치 D10', '7');
   await expect(line).toContainText('Gloves · Uncommon · 최대 Toughness +7');
 });
+
+test('using a prior Reason critical for attunement does not record it again', async ({ page }) => {
+  await page.goto('/play');
+  const explore = page.getByRole('region', { name: '장소 탐험', exact: true });
+  await explore.getByRole('button', { name: '방', exact: true }).click();
+  const tension = explore.getByRole('region', { name: '긴장 주사위', exact: true }).getByLabel('긴장 주사위 굴린 값');
+  await tension.fill('3');
+  await tension.press('Enter');
+  for (const [label, value] of [['조우 판정', '9'], ['이벤트', '39']]) {
+    const input = explore.getByRole('region', { name: label, exact: true }).getByLabel('직접 굴린 값');
+    await input.fill(value);
+    await input.press('Enter');
+  }
+  await skillRoll(explore, 'Reason 판정', 'Reason', 45, 33);
+
+  await page.getByRole('button', { name: '휴식·정리', exact: true }).click();
+  const wrap = page.getByRole('region', { name: '휴식과 전리품 정리' });
+  await wrap.getByRole('button', { name: '야영', exact: true }).click();
+  await wrap.getByRole('button', { name: '대기 중인 기술 성장으로', exact: true }).click();
+  const growth = wrap.getByRole('region', { name: '야영 기술 성장' });
+  await growth.getByRole('button', { name: 'Reason', exact: true }).click();
+  await growth.getByRole('button', { name: '종이 시트에서 성장 표시를 지웠어요', exact: true }).click();
+
+  await wrap.getByRole('button', { name: '전리품', exact: true }).click();
+  await enterRoll(wrap, '전리품 D6', '6');
+  await wrap.getByRole('button', { name: '보물 이어서' }).click();
+  await enterRoll(wrap, '보물 D20', '1');
+  await wrap.getByRole('button', { name: '마법 아이템 생성 이어서' }).click();
+  const item = wrap.getByRole('region', { name: '마법 아이템 기록' });
+  await enterRoll(item, '마법 아이템 종류 D8', '5');
+  await item.getByRole('combobox', { name: '아이템 조율' }).selectOption('reason-roll');
+  const reason = await skillRoll(item, '감정에 사용할 Reason 판정', 'Reason', 45, 33);
+  await expect(reason.getByRole('status')).toContainText('Brilliant Deduction');
+  await expect(reason.getByRole('status')).not.toContainText('기술 성장 표시');
+  await expect(item.getByRole('group', { name: '아이템 희귀도 D10' })).toBeVisible();
+
+  await wrap.getByRole('button', { name: '야영', exact: true }).click();
+  await expect(wrap.getByRole('group', { name: '야영 성장 대기' })).toHaveCount(0);
+  await page.getByRole('button', { name: '저널', exact: true }).click();
+  const journal = page.getByRole('region', { name: '이번 장소 기록' });
+  const critical = 'Reason · D100 33 · 대성공';
+  await expect(journal).toContainText(critical);
+  expect((await journal.innerText()).split(critical)).toHaveLength(2);
+});
