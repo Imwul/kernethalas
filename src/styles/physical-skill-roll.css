@@ -21,3 +21,5 @@
 .physical-check-form > .field-err { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
 .physical-check-result { padding-block-start: var(--s1); border-block-start: 1px solid var(--rule-soft); overflow-wrap: anywhere; }
 .physical-check-result > .readout { font-size: 1.45rem; }
+.physical-check-critical { flex: 1 0 100%; display: grid; min-width: 0; gap: var(--s1); }
+.physical-check-critical:empty { display: none; }

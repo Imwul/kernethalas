@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { detectTrap, skillRoll } from './helpers/skill-roll';
 
 async function enterRoll(section: Locator, value: string) {
   await section.getByRole('textbox', { name: '직접 굴린 값', exact: true }).fill(value);
@@ -66,13 +67,13 @@ test('door noise and deep search pass the resolved Tension die into each action'
   await actions.getByText('문·함정 조사', { exact: true }).click();
   await enterRoll(actions.getByRole('region', { name: '문이 있는가?', exact: true }), '2');
   const door = actions.getByRole('region', { name: '문 조사' });
-  await door.getByLabel('Perception 탐지 결과').selectOption('success');
+  await detectTrap(door);
   await door.getByLabel('함정 여부 D10', { exact: true }).fill('6');
   await door.getByRole('button', { name: '함정 여부 D10 확인', exact: true }).click();
   await door.getByLabel('잠김 여부 D20', { exact: true }).fill('15');
   await door.getByRole('button', { name: '잠김 여부 D20 확인', exact: true }).click();
   await door.getByLabel('개방 방법').selectOption('force');
-  await door.getByRole('button', { name: '강제 개방 성공', exact: true }).click();
+  await skillRoll(door, '강제 개방 판정', 'Athletics', 50, 38);
   const noise = door.getByRole('region', { name: '강제 개방 긴장 굴림' });
   await expect(noise.getByRole('combobox', { name: '긴장 주사위 크기' })).toHaveValue('6');
   await expect(door.getByText('개방 성공 · XP +10', { exact: true })).toHaveCount(0);
@@ -103,7 +104,7 @@ test('door noise and deep search pass the resolved Tension die into each action'
   await deep.getByRole('textbox', { name: '긴장 주사위 굴린 값' }).fill('3');
   await deep.getByRole('button', { name: '긴장 주사위 확인' }).click();
   const container = actions.getByRole('region', { name: '용기 조사' });
-  await container.getByLabel('Perception 탐지 결과').selectOption('success');
+  await detectTrap(container);
   await container.getByLabel('함정 여부 D10', { exact: true }).fill('6');
   await container.getByRole('button', { name: '함정 여부 D10 확인', exact: true }).click();
   await container.getByLabel('잠김 여부 D20', { exact: true }).fill('3');

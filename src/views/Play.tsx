@@ -18,6 +18,7 @@ import {
   type DarknessEvent, type PlayDomainRecord, type RetreatedEncounter, type TensionSides,
 } from '../lib/play-domain';
 import type { PaperChange } from '../lib/play-inventory';
+import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
 import '../styles/play.css';
 
 const STAGES = [
@@ -96,6 +97,8 @@ export function Play() {
 function PlayDesk() {
   const draft = usePlayDraft()!;
   const gear = useGearLedger();
+  const pendingGrowth = usePendingSkillGrowth();
+  const skillCriticalHistory = useSkillCriticalHistory();
   const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -292,7 +295,7 @@ function PlayDesk() {
   const carryTension = confirmedTension ?? initialTension;
   const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides) => {
     draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
-      roomLedgerId: crypto.randomUUID(), initialTension: tension });
+      roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth });
     setRevision((previous) => previous + 1);
     setConfirmReset(false);
     setExploration(null);
@@ -335,15 +338,18 @@ function PlayDesk() {
   ].filter(Boolean);
   const facts = [
     { label: '장소', value: [placeName.trim(), exploration?.shape ?? exploration?.place].filter(Boolean).join(' · ') },
+    { label: '환경 묘사', value: exploration?.description },
     { label: '짙어지는 어둠', value: exploration?.darkness },
     { label: '이벤트', value: exploration?.event },
     { label: '조우', value: exploration?.encounter && !fightFacts.length ? ENCOUNTER_LABELS[exploration.encounter] : null },
     { label: '적', value: fightFacts.join(' / ') },
     { label: '능력', value: Object.values(masteryReports).filter(Boolean).join(' / ') },
     { label: '탐험 행동', value: exploration?.actions },
+    { label: '대성공·대실패', value: skillCriticalHistory.join(' / ') },
     { label: '휴식·전리품', value: wrapFacts.join(' / ') },
     { label: '상인 거래', value: equipmentReport },
     { label: '성장', value: advancementReport },
+    { label: '야영 성장 대기', value: pendingGrowth.join(' · ') },
     { label: '다음 긴장 주사위', value: confirmedTension ? `D${confirmedTension}` : null },
     { label: '메모', value: note.trim() },
   ].filter(({ value }) => value);

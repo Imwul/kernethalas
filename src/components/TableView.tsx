@@ -2,6 +2,7 @@ import type { OracleTable, TableRow } from '../content/schema';
 import { oracleRowsAvailable } from '../lib/oracle';
 import { tableRowSource } from '../lib/overlay';
 import { XRef } from './bits';
+import { RoomShapeDiagram } from './RoomShapeDiagram';
 
 export const rangeText = (r: TableRow, dice: string) =>
   dice === '—' ? r.label ?? String(r.min) : r.min === r.max ? pad(r.min, dice) : `${pad(r.min, dice)}–${pad(r.max, dice)}`;
@@ -21,6 +22,7 @@ export function TableView({ t, hit, sourceForRow }: { t: OracleTable; hit?: numb
   const lookup = t.dice === '—';
   const many = (t.columns?.length ?? 0) >= 2;
   const showResult = !lookup || t.rows.some((r) => r.ko !== r.label);
+  const showShape = t.id === 't-room-shape';
   if (!t.rows.length) return <p className="empty">수록된 결과가 없습니다. 출처에서 확인하세요.</p>;
   return (
     <table role="table" className={`ttable${many ? ' cols-many' : ''}${lookup ? ' lookup' : ''}`}>
@@ -37,6 +39,7 @@ export function TableView({ t, hit, sourceForRow }: { t: OracleTable; hit?: numb
               {c.ko}
             </th>
           ))}
+          {showShape && <th scope="col">모양 예시</th>}
         </tr>
       </thead>
       <tbody role="rowgroup">
@@ -71,6 +74,7 @@ export function TableView({ t, hit, sourceForRow }: { t: OracleTable; hit?: numb
                   {r.cols?.[c.key]}
                 </td>
               ))}
+              {showShape && <td className="room-shape-cell"><RoomShapeDiagram roll={r.min} /></td>}
             </tr>
           );
         })}

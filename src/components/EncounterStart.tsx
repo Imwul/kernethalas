@@ -1,19 +1,24 @@
 import { useId } from 'react';
-import { tableById } from '../content';
 import type { CreatureRecord } from '../content/entries/creatures';
 import type { CheckResult, Edge } from '../lib/dice';
 import { encounterCheck, encounterFear, encounterInitiativeModifier, encounterInteger, encounterOpposed } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraftState } from '../lib/play-draft';
+import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
+import { useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
 import '../styles/encounter-start.css';
 
 type StartMode = 'initiative' | 'surprise' | 'ambushed';
-type RollDraft = { roll: string; edge: Edge };
+type RollDraft = { roll: string; edge: Edge; growthRecorded?: boolean };
 const emptyRoll: RollDraft = { roll: '', edge: 'none' };
 const emptyCheck = { ...emptyRoll, skill: '' };
 const labels = { pc: 'PC 측 선공', enemy: '적 측 선공', reroll: '동률 · 다시 굴림', undefined: '원문에 승자 명시 없음' } as const;
-const criticalRows = tableById.get('t-noncombat-crits')?.rows ?? [];
+
+function changeGrowthRoll<T extends RollDraft>(draft: T, roll: string): T {
+  const sameRoll = readOracleValue(roll.trim(), 100) === readOracleValue(draft.roll.trim(), 100);
+  return { ...draft, roll, growthRecorded: sameRoll && draft.growthRecorded };
+}
 
 function CheckField({ label, value, set, roll = false, nonnegative = false }: {
   label: string; value: string; set: (value: string) => void; roll?: boolean; nonnegative?: boolean;
@@ -49,14 +54,30 @@ function EdgeField({ label, value, set }: { label: string; value: Edge; set: (va
 }
 
 function CriticalEffect({ skill, check }: { skill: 'Initiative' | 'Stealth'; check: CheckResult | null }) {
-  if (check?.outcome !== 'critical' && check?.outcome !== 'fumble') return null;
-  const column = check.outcome === 'critical' ? 'crit' : 'fumble';
-  const effect = criticalRows.find((row) => row.label === skill)?.cols?.[column];
+  if (!check || !isSkillDouble(check.outcome)) return null;
+  const effect = skillCriticalEffect(skill, check.outcome);
   return effect ? <p className="encounter-note">PC {check.outcome === 'critical' ? '대성공' : '대실패'} · {effect}</p> : null;
+}
+
+function EncounterGrowth({ skill, check, recorded, onRecord }: {
+  skill: 'Stealth' | 'Perception';
+  check: CheckResult | null;
+  recorded?: boolean;
+  onRecord: () => void;
+}) {
+  const play = usePlayDraft();
+  if (!play || !check || !isSkillDouble(check.outcome)) return null;
+  return (
+    <button className="btn ghost" type="button" disabled={recorded} onClick={onRecord}>
+      {skill} 야영 성장 {recorded ? '표시됨' : '표시'}
+    </button>
+  );
 }
 
 export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, 'name' | 'mind' | 'traits'> }) {
   const id = useId();
+  const commit = usePlayRoll();
+  const record = useRecordSkillCritical();
   const knownFear = encounterFear(creature?.traits ?? []);
   const knownAlert = creature?.traits.includes('Alert') ?? false;
   const [mode, setMode] = usePlayDraftState<StartMode>('start-mode', 'initiative');
@@ -156,7 +177,7 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
           <div className="encounter-grid">
             <CheckField label="PC 최저 Stealth" value={stealth.skill} set={(skill) => setStealth({ ...stealth, skill })} />
             <CheckField label="솔로 동료 수" value={followers} set={setFollowers} nonnegative />
-            <CheckField label="PC 기습 D100" value={stealth.roll} roll set={(roll) => setStealth({ ...stealth, roll })} />
+            <CheckField label="PC 기습 D100" value={stealth.roll} roll set={(roll) => setStealth(changeGrowthRoll(stealth, roll))} />
             <CheckField label="적 기습 D100" value={surpriseEnemy.roll} roll set={(roll) => setSurpriseEnemy({ ...surpriseEnemy, roll })} />
             <EdgeField label="PC 기습 이점" value={stealth.edge} set={(edge) => setStealth({ ...stealth, edge })} />
             <EdgeField label="적 기습 이점" value={surpriseEnemy.edge} set={(edge) => setSurpriseEnemy({ ...surpriseEnemy, edge })} />
@@ -172,6 +193,10 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
               <CriticalEffect skill="Stealth" check={surprisePC} />
             </div>
           )}
+          {surprise && surprisePC && <EncounterGrowth skill="Stealth" check={surprisePC} recorded={stealth.growthRecorded} onRecord={() => commit(() => {
+            setStealth({ ...stealth, growthRecorded: true });
+            record('Stealth', surprisePC);
+          })} />}
         </fieldset>
       )}
       {(mode === 'initiative' || failedSurprise || (mode === 'surprise' && alertActive)) && (
@@ -179,7 +204,7 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
           <legend>Initiative · Perception 대 Mind</legend>
           <div className="encounter-grid">
             <CheckField label="PC 최고 Perception" value={perception.skill} set={(skill) => setPerception({ ...perception, skill })} />
-            <CheckField label="PC Initiative D100" value={perception.roll} roll set={(roll) => setPerception({ ...perception, roll })} />
+            <CheckField label="PC Initiative D100" value={perception.roll} roll set={(roll) => setPerception(changeGrowthRoll(perception, roll))} />
             <CheckField label="적 Initiative D100" value={initiativeEnemy.roll} roll set={(roll) => setInitiativeEnemy({ ...initiativeEnemy, roll })} />
             <EdgeField label="PC Initiative 이점" value={perception.edge} set={(edge) => setPerception({ ...perception, edge })} />
             <EdgeField label="적 Initiative 이점" value={initiativeEnemy.edge} set={(edge) => setInitiativeEnemy({ ...initiativeEnemy, edge })} />
@@ -195,6 +220,10 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
               <CriticalEffect skill="Initiative" check={initiativePC} />
             </div>
           )}
+          {initiative && initiativePC && <EncounterGrowth skill="Perception" check={initiativePC} recorded={perception.growthRecorded} onRecord={() => commit(() => {
+            setPerception({ ...perception, growthRecorded: true });
+            record('Perception', initiativePC, 'Initiative');
+          })} />}
         </fieldset>
       )}
       <div className="encounter-links">

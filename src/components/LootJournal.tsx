@@ -3,9 +3,10 @@ import { tableById } from '../content';
 import { rollDie, tableSides } from '../lib/dice';
 import { journalPropertyText, journalRarity, journalRow, journalRowName, potionJournalLine, propertyCount } from '../lib/loot-journal';
 import { automaticRollSides, readOracleValue, rollTable } from '../lib/oracle';
-import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { gearCount, type GearEffect } from '../lib/play-inventory';
 import { CopyButton, XRef } from './bits';
+import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import '../styles/loot-journal.css';
 
 type JournalRollProps = {
@@ -76,7 +77,7 @@ function JournalLine({ text }: { text: string }) {
   );
 }
 
-type PotionMethod = '' | 'medicine' | 'failed' | 'drank' | 'stone';
+type PotionMethod = '' | 'medicine-check' | 'medicine' | 'failed' | 'drank' | 'stone';
 
 type JournalResult = (text: string, gear?: GearEffect) => void;
 
@@ -84,10 +85,13 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
   const [method, setMethod] = usePlayDraftState<PotionMethod>('potion-method', '');
   const [kindRoll, setKindRoll] = usePlayDraftState<number | null>('potion-kind', null);
   const [ageRoll, setAgeRoll] = usePlayDraftState<number | null>('potion-age', null);
+  const [medicineAttempt, setMedicineAttempt] = usePlayDraftState('potion-medicine-attempt', 0);
+  const clear = useClearPlayDraftScope();
   const potion = journalRow('t-potions', kindRoll);
   const aging = journalRow('t-potion-aging', ageRoll);
-  const identified = method !== '' && method !== 'failed';
-  const text = potion && aging ? potionJournalLine(potion, aging, method === 'drank') : '';
+  const medicine = method === 'medicine' || method === 'failed' || method === 'medicine-check';
+  const identified = method === 'medicine' || method === 'drank' || method === 'stone';
+  const text = identified && potion && aging ? potionJournalLine(potion, aging, method === 'drank') : '';
   useEffect(() => {
     onJournalChange?.(text, potion && aging && text && method !== 'drank'
       ? { kind: 'count', name: `${journalRowName(potion)} 물약${aging.min === 11 ? '' : ` (노화 ${ageRoll})`}`, amount: 1, weight: 'light' }
@@ -96,7 +100,9 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
 
   const chooseMethod = (next: PotionMethod) => {
     setMethod(next);
-    if (next === '' || next === 'failed') {
+    if (next === '' || next === 'medicine-check') {
+      clear('potion-medicine');
+      setMedicineAttempt((previous) => previous + 1);
       setKindRoll(null);
       setAgeRoll(null);
     }
@@ -110,14 +116,21 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
       </div>
       <label className="field loot-select">
         <span>물약 감정</span>
-        <select value={method} onChange={(event) => chooseMethod(event.target.value as PotionMethod)}>
-          <option value="">감정 방법 또는 판정 결과 선택</option>
-          <option value="medicine">Medicine 성공</option>
-          <option value="failed">Medicine 실패</option>
+        <select value={medicine ? 'medicine-check' : method} onChange={(event) => chooseMethod(event.target.value as PotionMethod)}>
+          <option value="">감정 방법 선택</option>
+          <option value="medicine-check">Medicine 판정</option>
           <option value="drank">마셔 봄</option>
           <option value="stone">Borestian Stone</option>
         </select>
       </label>
+      {medicine && <PlayDraftScope name="potion-medicine">
+        <PhysicalSkillRoll key={medicineAttempt} label="물약 감정 Medicine 판정" skill="Medicine" readOnly={method === 'medicine'}
+          onResult={(result) => {
+            setMethod(skillCheckSucceeded(result) ? 'medicine' : 'failed');
+            setKindRoll(null);
+            setAgeRoll(null);
+          }} />
+      </PlayDraftScope>}
       {method === 'failed' && <p className="loot-help">마셔 본 뒤 물약 종류를 정할 수 있습니다.</p>}
       {identified && (
         <JournalRoll tableId="t-potions" value={kindRoll} onValue={(roll) => {
@@ -132,7 +145,7 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
   );
 }
 
-type Attunement = '' | 'camp' | 'reason';
+type Attunement = '' | 'camp' | 'reason' | 'reason-roll';
 
 interface PropertyRoll {
   value: number;
@@ -156,6 +169,11 @@ const EMPTY_MAGIC_DRAFT: MagicDraft = {
 
 function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult }) {
   const [draft, setDraft] = usePlayDraftState<MagicDraft>('magic-item', EMPTY_MAGIC_DRAFT);
+  const clear = useClearPlayDraftScope();
+  const resetItem = (next: MagicDraft) => {
+    clear('magic-reason');
+    setDraft(next);
+  };
   const item = journalRow('t-item', draft.item);
   const baseId = item?.next?.find(({ id }) => id === 't-random-weapon' || id === 't-random-armor')?.id;
   const base = baseId ? journalRow(baseId, draft.base) : undefined;
@@ -165,7 +183,8 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
   const baseReady = !!item && (!baseId || (!!base && (!detailId || !!detail)));
   const amulet = item?.label === 'Amulet';
   const propertiesId = item?.next?.find(({ id }) => id.startsWith('t-props-'))?.id;
-  const rarity = draft.attuned === '' ? undefined : journalRarity(journalRow('t-item-rarity', draft.rarity));
+  const attuned = draft.attuned === 'camp' || draft.attuned === 'reason';
+  const rarity = attuned ? journalRarity(journalRow('t-item-rarity', draft.rarity)) : undefined;
   const lookups = (detail ?? base)?.next?.filter(({ id }) => tableById.get(id)?.dice === '—') ?? [];
   const propertySlots = Array.from({ length: rarity ? propertyCount(rarity) : 0 }, (_, index) => {
     const selected = draft.properties[index];
@@ -191,7 +210,7 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
   const note = draft.peculiarity.trim();
   const text = itemName && baseReady && (amulet
     ? mastery && [`${itemName} · Mastery ${journalRowName(mastery)}`, note].filter(Boolean).join(' · ')
-    : [itemName, rarity ?? (draft.attuned ? '감정함' : '미조율'),
+    : [itemName, rarity ?? (attuned ? '감정함' : '미조율'),
       ...propertySlots.flatMap(({ effect, complete }) => effect && complete ? [effect] : []),
       rarity && propertySlots.some(({ complete }) => !complete) ? '속성 확인 중' : '',
       note,
@@ -202,14 +221,14 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
     <section className="loot-journal" aria-label="마법 아이템 기록">
       <div className="loot-journal-head">
         <h2>마법 아이템 기록</h2>
-        {item && <button type="button" className="btn ghost" onClick={() => setDraft(EMPTY_MAGIC_DRAFT)}>새 아이템</button>}
+        {item && <button type="button" className="btn ghost" onClick={() => resetItem(EMPTY_MAGIC_DRAFT)}>새 아이템</button>}
       </div>
-      <JournalRoll tableId="t-item" value={draft.item} onValue={(roll) => setDraft({ ...EMPTY_MAGIC_DRAFT, item: roll })} />
+      <JournalRoll tableId="t-item" value={draft.item} onValue={(roll) => resetItem({ ...EMPTY_MAGIC_DRAFT, item: roll })} />
       {baseId && <JournalRoll key={`${draft.item}-base`} tableId={baseId} value={draft.base} onValue={(roll) => {
-        setDraft({ ...EMPTY_MAGIC_DRAFT, item: draft.item, base: roll, peculiarity: draft.peculiarity });
+        resetItem({ ...EMPTY_MAGIC_DRAFT, item: draft.item, base: roll, peculiarity: draft.peculiarity });
       }} />}
       {detailId && <JournalRoll key={`${base?.min}-detail`} tableId={detailId} value={draft.detail} onValue={(roll) => {
-        setDraft({ ...EMPTY_MAGIC_DRAFT, item: draft.item, base: draft.base, detail: roll, peculiarity: draft.peculiarity });
+        resetItem({ ...EMPTY_MAGIC_DRAFT, item: draft.item, base: draft.base, detail: roll, peculiarity: draft.peculiarity });
       }} />}
       {lookups.length > 0 && <div className="loot-refs">{lookups.map(({ id }) => <XRef key={id} id={id} />)}</div>}
       {amulet && <JournalRoll tableId="t-random-mastery" value={draft.mastery} onValue={(roll) => setDraft({ ...draft, mastery: roll })} />}
@@ -218,17 +237,27 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
         <>
           <label className="field loot-select">
             <span>아이템 조율</span>
-            <select value={draft.attuned} onChange={(event) => {
-              const attuned = event.target.value as Attunement;
-              setDraft(attuned ? { ...draft, attuned } : { ...draft, attuned, rarity: null, properties: [] });
+            <select value={draft.attuned === 'reason' ? 'reason-roll' : draft.attuned} onChange={(event) => {
+              const method = event.target.value as Attunement;
+              clear('magic-reason');
+              setDraft(method === 'camp' ? { ...draft, attuned: method } : { ...draft, attuned: method, rarity: null, properties: [] });
             }}>
               <option value="">미조율</option>
               <option value="camp">캠프에서 조율함</option>
-              <option value="reason">Reason 대성공으로 감정함</option>
+              <option value="reason-roll">이미 굴린 Reason 판정 입력</option>
             </select>
           </label>
-          {draft.attuned === '' && <p className="loot-help"><XRef id="attunement">조율</XRef>한 뒤 희귀도와 속성을 굴립니다.</p>}
-          {draft.attuned !== '' && <JournalRoll tableId="t-item-rarity" value={draft.rarity} onValue={(roll) => {
+          {(draft.attuned === 'reason-roll' || draft.attuned === 'reason') && <>
+            <p className="loot-help">앞서 굴린 Reason이 대성공이면 이 아이템을 즉시 감정할 수 있습니다.</p>
+            <PlayDraftScope name="magic-reason">
+              <PhysicalSkillRoll label="감정에 사용할 Reason 판정" skill="Reason" physicalOnly readOnly={draft.attuned === 'reason'}
+                onResult={(result) => {
+                  setDraft((current) => ({ ...current, attuned: result.outcome === 'critical' ? 'reason' : 'reason-roll', rarity: null, properties: [] }));
+                }} />
+            </PlayDraftScope>
+          </>}
+          {!attuned && <p className="loot-help"><XRef id="attunement">조율</XRef>한 뒤 희귀도와 속성을 굴립니다.</p>}
+          {attuned && <JournalRoll tableId="t-item-rarity" value={draft.rarity} onValue={(roll) => {
             setDraft({ ...draft, rarity: roll, properties: [] });
           }} resultText={rarity && `${rarity} · 속성 ${propertyCount(rarity)}개`} />}
           {rarity && propertySlots.map(({ selected, followUpId, fixedD10, effect }, index) => (

@@ -22,7 +22,7 @@ test('an environmental trap result opens the lock and trap tool from the event o
   await roller.getByRole('link', { name: /자물쇠 · 함정 처리/ }).click();
   const tool = page.getByRole('dialog', { name: '자물쇠 · 함정 처리' });
   await tool.getByRole('button', { name: '환경 함정', exact: true }).click();
-  await expect(tool.getByLabel('Perception 탐지 결과')).toBeVisible();
+  await expect(tool.getByRole('group', { name: '탐지 판정' }).getByLabel('Perception 수치')).toBeVisible();
   await expect(tool.getByLabel('잠김 여부 D20')).toHaveCount(0);
 });
 

@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { gearCount, type PaperChange } from '../../lib/play-inventory';
+import { isGrowthSkill, skillGrowthKey, skillGrowthName, useClearSkillGrowth, usePendingSkillGrowth, useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
 import '../../styles/play-survival.css';
@@ -46,6 +47,8 @@ function CheckInputs({ label, value, result, onChange }: {
   onChange: (next: CheckDraft) => void;
 }) {
   const invalid = !!value.target.trim() && encounterInteger(value.target) === null;
+  const recordCritical = useRecordSkillCritical();
+  const growthEligible = isGrowthSkill(label);
   return (
     <>
       <div className="survival-fields">
@@ -62,8 +65,12 @@ function CheckInputs({ label, value, result, onChange }: {
         </label>
       </div>
       {invalid && <p className="field-err" role="alert">보정 수치는 정수로 입력하세요.</p>}
-      <JournalRoll die="D100" label={label} value={value.roll} onValue={(roll) => onChange({ ...value, roll })}
-        resultText={result ? `${CHECK_LABEL[result.outcome]}${result.flippedRead ? ` · 뒤집은 값 ${result.read.value}` : ''}` : '판정에 쓸 보정 수치를 입력하세요.'} />
+      <JournalRoll die="D100" label={label} value={value.roll} onValue={(roll) => {
+        const next = { ...value, roll };
+        onChange(next);
+        const rolled = resolveDraft(next);
+        if (rolled) recordCritical(label, rolled);
+      }} resultText={result ? `${CHECK_LABEL[result.outcome]}${result.flippedRead ? ` · 뒤집은 값 ${result.read.value}` : ''}${growthEligible && (result.outcome === 'critical' || result.outcome === 'fumble') ? ' · 야영 성장 표시' : ''}` : '판정에 쓸 보정 수치를 입력하세요.'} />
     </>
   );
 }
@@ -255,31 +262,44 @@ const EMPTY_GROWTH: GrowthDraft = { name: '', score: '', roll: null, gain: null 
 function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: SaveRecord }) {
   const [draft, setDraft] = usePlayDraftState<GrowthDraft>('skill-growth', EMPTY_GROWTH);
   const commitRoll = usePlayRoll();
+  const pending = usePendingSkillGrowth();
+  const clearGrowth = useClearSkillGrowth();
+  const scoreField = useRef<HTMLInputElement>(null);
   const { name, score, roll, gain } = draft;
-  const skill = name.trim().replace(/\s+/g, ' ');
-  const key = skill.toLowerCase();
-  const duplicate = recorded.includes(key);
+  const skill = skillGrowthName(name);
+  const key = skillGrowthKey(name);
+  const duplicate = recorded.some((record) => skillGrowthKey(record) === key);
+  const pendingSkill = skill !== undefined && pending.includes(skill);
   const current = encounterInteger(score);
   const valid = current !== null && current >= 0 && current <= 80;
   const uncapped = valid && current < 80;
   const above = uncapped && roll !== null && roll > current;
   const increase = !uncapped || roll === null ? null : above ? gain : 1;
   const next = increase !== null && current !== null ? Math.min(80, current + increase) : null;
-  const change = next !== null && current !== null ? `${skill} ${current} → ${next} (+${next - current})` : '';
+  const change = next !== null && current !== null ? `${skill ?? name.trim()} ${current} → ${next} (+${next - current})` : '';
 
   return (
     <section className="survival-card" aria-label="야영 기술 성장">
       <h3>야영 기술 성장</h3>
       <p className="survival-notice">종이 시트에서 성장 표시한 기술을 야영 중 기술마다 한 번 처리합니다.</p>
+      {pending.length > 0 && <div className="survival-growth-options" role="group" aria-label="성장 대기 기술">
+        {pending.map((item) => <button type="button" key={item} className="btn ghost"
+          onClick={() => {
+            setDraft((old) => skillGrowthKey(old.name) === skillGrowthKey(item) ? old : { ...EMPTY_GROWTH, name: item });
+            scoreField.current?.focus();
+          }}>{item}</button>)}
+      </div>}
       <div className="survival-fields">
         <label className="field"><span>기술 이름</span>
-          <input maxLength={80} value={name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="예 Medicine" />
+          <input maxLength={80} value={name} onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+            placeholder="예 Medicine" aria-invalid={!!name.trim() && !skill || undefined} />
         </label>
         <label className="field"><span>현재 Skill</span>
-          <input inputMode="numeric" value={score} placeholder="0–80" aria-invalid={!!score.trim() && !valid || undefined}
+          <input ref={scoreField} inputMode="numeric" value={score} placeholder="0–80" aria-invalid={!!score.trim() && !valid || undefined}
             onChange={(event) => setDraft({ ...draft, score: event.target.value, roll: null, gain: null })} />
         </label>
       </div>
+      {!!name.trim() && !skill && <p className="field-err" role="alert">성장 대상 기술 이름을 입력하세요.</p>}
       {!!score.trim() && !valid && <p className="field-err" role="alert">현재 Skill은 0–80 사이의 정수로 입력하세요.</p>}
       {valid && !uncapped && <p className="survival-notice" role="status">성장 상한 80에 도달했습니다.</p>}
       {uncapped && <JournalRoll die="D100" label="기술 성장" value={roll} onValue={(value) => setDraft({ ...draft, roll: value, gain: null })}
@@ -291,10 +311,15 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
           <strong role="status">{change.trim()}</strong>
           <button className="btn ghost" type="button" disabled={!skill || duplicate} onClick={() => commitRoll(() => {
             onRecord({ kind: 'growth', key, summary: `기술 성장 · ${change}`, changes: [`${change} (성장 표시 지우기)`] });
+            if (skill) clearGrowth(skill);
             setDraft(EMPTY_GROWTH);
           })}>기술 성장 기록</button>
         </div>
       )}
+      {pendingSkill && <button className="btn ghost survival-action" type="button" onClick={() => commitRoll(() => {
+        clearGrowth(skill);
+        setDraft(EMPTY_GROWTH);
+      })}>종이 시트에서 성장 표시를 지웠어요</button>}
       <div className="play-wrap-links"><XRef id="skill-improvement">기술 성장 규칙</XRef></div>
     </section>
   );

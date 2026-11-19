@@ -89,3 +89,55 @@ test('manual Rot and camp skill checks record their adjustments with aligned fie
   await expect(sheet).toContainText('Health +3 (부패병 야영 효과)');
   await expect(sheet).toContainText('Medicine 78 → 80 (+2) (성장 표시 지우기)');
 });
+
+test('PC skill doubles stay marked until camp, and undo restores the mark', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto('/play');
+  await page.getByRole('button', { name: '휴식·정리', exact: true }).click();
+  await page.getByRole('button', { name: '치료·성장', exact: true }).click();
+  const treatment = page.getByRole('region', { name: '지속 피해와 붕대 처치' });
+  const undo = page.getByRole('button', { name: '직전 굴림 되돌리기' });
+  const skillRoll = treatment.getByRole('group', { name: 'Medicine D100' });
+  await treatment.getByLabel('보정 Medicine').fill('45');
+  await physicalRoll(treatment, 'Medicine D100', '22');
+  await expect(skillRoll.getByRole('status')).toContainText('대성공 · 야영 성장 표시');
+  await undo.click();
+  await page.getByRole('button', { name: '야영', exact: true }).click();
+  const reminder = page.getByRole('group', { name: '야영 성장 대기', exact: true });
+  await expect(reminder).toHaveCount(0);
+
+  await page.getByRole('button', { name: '치료·성장', exact: true }).click();
+  await physicalRoll(treatment, 'Medicine D100', '66');
+  await expect(skillRoll.getByRole('status')).toContainText('대실패 · 야영 성장 표시');
+  await physicalRoll(treatment, 'Medicine D100', '44');
+  const survival = page.getByRole('region', { name: '치료·성장 도구' });
+  await survival.getByRole('button', { name: '부패병', exact: true }).click();
+  const rot = page.getByRole('region', { name: '부패병 판정' });
+  await rot.getByLabel('보정 Endurance').fill('30');
+  await physicalRoll(rot, 'Endurance D100', '00');
+  await expect(rot.getByRole('group', { name: 'Endurance D100' }).getByRole('status')).toContainText('대실패');
+  await page.getByRole('button', { name: '야영', exact: true }).click();
+  await expect(reminder).toContainText('Medicine');
+  await expect(reminder).not.toContainText('Endurance');
+
+  await page.getByRole('button', { name: '저널 기록 보기' }).click();
+  await page.getByRole('button', { name: '다음 장소', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: '휴식·정리', exact: true }).click();
+  await page.getByRole('button', { name: '야영', exact: true }).click();
+  await reminder.getByRole('button', { name: '대기 중인 기술 성장으로' }).click();
+  const growth = page.getByRole('region', { name: '야영 기술 성장' });
+  const pending = growth.getByRole('group', { name: '성장 대기 기술' });
+  await expect(pending.getByRole('button')).toHaveCount(1);
+  await pending.getByRole('button', { name: 'Medicine', exact: true }).click();
+  await expect(growth.getByLabel('기술 이름')).toHaveValue('Medicine');
+  await expect(growth.getByLabel('현재 Skill')).toBeFocused();
+  await growth.getByLabel('현재 Skill').fill('45');
+  await physicalRoll(growth, '기술 성장 D100', '46');
+  await physicalRoll(growth, '성장량 D4', '3');
+  await growth.getByRole('button', { name: '기술 성장 기록' }).click();
+  await expect(pending).toHaveCount(0);
+  await undo.click();
+  await expect(pending.getByRole('button', { name: 'Medicine', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});

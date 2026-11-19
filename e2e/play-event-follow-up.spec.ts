@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { detectTrap, skillRoll } from './helpers/skill-roll';
 
 async function physical(locator: Locator, name: string, value: string) {
   const input = locator.getByRole('textbox', { name, exact: true });
@@ -52,11 +53,11 @@ test('force and deep-search darkness follow-ups stay independent after archiving
   await actions.getByText('문·함정 조사', { exact: true }).click();
   await actions.getByRole('combobox', { name: '조사할 대상' }).selectOption('present');
   const door = actions.getByRole('region', { name: '문 조사' });
-  await door.getByLabel('Perception 탐지 결과').selectOption('success');
+  await detectTrap(door);
   await physical(door, '함정 여부 D10', '6');
   await physical(door, '잠김 여부 D20', '15');
   await door.getByLabel('개방 방법').selectOption('force');
-  await door.getByRole('button', { name: '강제 개방 성공', exact: true }).click();
+  await skillRoll(door, '강제 개방 판정', 'Athletics', 50, 38);
   const force = door.getByRole('region', { name: '강제 개방 긴장 굴림' });
   await physical(force, '긴장 주사위 굴린 값', '2');
   const forceDarkness = force.getByRole('region', { name: '행동 후 짙어지는 어둠' });

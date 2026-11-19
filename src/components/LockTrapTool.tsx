@@ -54,7 +54,6 @@ export function LockTrapTool({ embedded }: { embedded?: EmbeddedLock } = {}) {
 }
 
 function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: EmbeddedLock }) {
-  const id = useId();
   const [detection, setDetection] = usePlayDraftState<Detection>('lock-detection', '');
   const [touched, setTouched] = usePlayDraftState('lock-touched', false);
   const [trapRaw, setTrapRaw] = usePlayDraftState('lock-trap-roll', '');
@@ -104,16 +103,8 @@ function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: Emb
         <h3>조사</h3>
         {environment && <p>이벤트 등으로 환경 함정이 있는 장소에서 조사합니다.</p>}
         <div className="lock-trap-fields">
-          <div className="field">
-            <label htmlFor={`${id}-detect`}>Perception 탐지 결과</label>
-            <select id={`${id}-detect`} value={detection} onChange={(event) => applyDetection(event.target.value as Detection)}>
-              <option value="">판정 결과 선택</option>
-              <option value="success">성공</option>
-              <option value="failure">실패</option>
-            </select>
-          </div>
-          <div className="lock-trap-links"><XRef id="t-difficulty">탐지 난이도 D8</XRef></div>
           <RollCheck label="탐지" skill="Perception" randomDifficulty onResult={applyDetection} />
+          <div className="lock-trap-links"><XRef id="t-difficulty">탐지 난이도 D8</XRef></div>
           {trap === 'choose' && (
             <div className="lock-trap-wide lock-trap-choices">
               <p>대상을 그대로 두거나 건드려 함정 여부를 확인할 수 있습니다.</p>
@@ -221,6 +212,7 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
   const [method, setMethod] = usePlayDraftState<TrapMethod>('method', '');
   const [result, setResult] = usePlayDraftState<Outcome | null>('result', null);
   const [avoided, setAvoided] = usePlayDraftState<Outcome | null>('avoided', null);
+  const [attempt, setAttempt] = usePlayDraftState('check-attempt', 0);
   const roll = readOracleValue(kind.trim(), 10);
   const row = tableById.get('t-traps')?.rows.find((item) => item.min === roll);
   const triggered = !known || method === 'trigger' || result === 'failure';
@@ -230,6 +222,7 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
       : avoided && row ? `함정 ${avoided === 'success' ? '회피 성공' : `회피 실패 · ${row.ko}`}` : '';
   useEffect(() => { onReport?.({ text, xp }); }, [onReport, text, xp]);
   const clearChoice = () => {
+    setAttempt((previous) => previous + 1);
     setResult(null);
     setAvoided(null);
     onDisarmed(false);
@@ -271,15 +264,14 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
               </select>
             </div>
           )}
-          {!triggered && (method === 'disarm' || method === 'bypass') && (
+          {(method === 'disarm' || method === 'bypass') && (
             <>
               {method === 'disarm'
                 ? <p className="lock-trap-links">Thieves’ Toolkit을 사용해 Thievery 판정 <XRef id="t-difficulty">해제 난이도 D8</XRef></p>
                 : <p>{row.cols?.avoid} +20으로 우회 판정</p>}
-              <ResultButtons label={method === 'disarm' ? '해제' : '우회'} onResult={applyResponse} />
-              <RollCheck key={method} label={method === 'disarm' ? '해제' : '우회'}
+              <RollCheck key={attempt} slot={String(attempt)} label={method === 'disarm' ? '해제' : '우회'}
                 skill={method === 'disarm' ? 'Thievery' : row.cols?.avoid ?? 'Skill'} randomDifficulty={method === 'disarm'}
-                modifier={method === 'bypass' ? 20 : 0} onResult={applyResponse} />
+                modifier={method === 'bypass' ? 20 : 0} readOnly={result !== null} onResult={applyResponse} />
             </>
           )}
           {result === 'success' && method === 'disarm' && <p className="lock-trap-note" role="status">함정 해제 · XP +10</p>}
@@ -289,8 +281,8 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
           {triggered && (
             <>
               <p>함정 발동 · {row.cols?.avoid} {known ? '+20으로' : '탐지 보정 없이'} 회피 판정</p>
-              <ResultButtons label="회피" onResult={applyAvoidance} />
-              <RollCheck label="회피" skill={row.cols?.avoid ?? 'Skill'} modifier={known ? 20 : 0} onResult={applyAvoidance} />
+              <RollCheck key={attempt} slot={String(attempt)} label="회피" skill={row.cols?.avoid ?? 'Skill'} modifier={known ? 20 : 0}
+                readOnly={avoided !== null} onResult={applyAvoidance} />
               {avoided && (
                 <div className="lock-trap-note" role="status">
                   <p>{avoided === 'success' ? '회피 성공. 발동한 함정은 해제됩니다.' : '회피 실패. 위의 함정 효과를 적용한 뒤 함정은 해제됩니다.'}</p>
@@ -305,28 +297,21 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
   );
 }
 
-function ResultButtons({ label, onResult }: { label: string; onResult: (result: Outcome) => void }) {
-  return (
-    <div className="lock-trap-links" role="group" aria-label={`${label} 결과`}>
-      <button type="button" className="btn ghost" onClick={() => onResult('success')}>{label} 성공</button>
-      <button type="button" className="btn ghost" onClick={() => onResult('failure')}>{label} 실패</button>
-    </div>
-  );
-}
-
-function RollCheck({ label, skill, randomDifficulty, modifier, onResult }: {
+function RollCheck({ label, skill, randomDifficulty, modifier, slot = 'main', readOnly, onResult }: {
   label: string;
   skill: string;
   randomDifficulty?: boolean;
   modifier?: number;
+  slot?: string;
+  readOnly?: boolean;
   onResult: (result: Outcome) => void;
 }) {
   return (
-    <details className="fold lock-trap-physical lock-trap-wide">
-      <summary>{label} D100 직접 판정</summary>
+    <div className="lock-trap-physical lock-trap-wide">
       <PhysicalSkillRoll label={`${label} 판정`} skill={skill} randomDifficulty={randomDifficulty} modifier={modifier}
-        slot={`check-${label}`} onResult={(result) => onResult(skillCheckSucceeded(result) ? 'success' : 'failure')} />
-    </details>
+        slot={slot === 'main' ? `check-${label}` : `check-${label}-${slot}`} readOnly={readOnly}
+        onResult={(result) => onResult(skillCheckSucceeded(result) ? 'success' : 'failure')} />
+    </div>
   );
 }
 
@@ -377,22 +362,21 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
           </select>
         </div>
       )}
-      {!opened && method === 'pick' && (
+      {method === 'pick' && (
         <>
-          <p>Lockpick을 사용해 Thievery +{lockpickDifficulty(pickFailures)}로 판정합니다.</p>
+          {!opened && <p>Lockpick을 사용해 Thievery +{lockpickDifficulty(pickFailures)}로 판정합니다.</p>}
           {pickFailures > 0 && <p className="lock-trap-note" role="status">Lockpick 파손 {pickFailures}개 · 재시도 난이도 한 단계 완화(최대 +30)</p>}
-          <ResultButtons label="자물쇠 따기" onResult={applyPick} />
-          <RollCheck label="자물쇠 따기" skill="Thievery" modifier={lockpickDifficulty(pickFailures)} onResult={applyPick} />
+          <RollCheck label="자물쇠 따기" skill="Thievery" modifier={lockpickDifficulty(pickFailures)} readOnly={opened} onResult={applyPick} />
         </>
       )}
       {!opened && method === 'force' && !forceResult && (
         <>
           <label className="lock-trap-check"><input type="checkbox" checked={crowbar} onChange={(event) => setCrowbar(event.target.checked)} /> Crowbar 사용 (+10)</label>
           <p role="status">{forceFailures + 1}번째 시도 · Athletics +{forceOpeningBonus(forceFailures, crowbar)}</p>
-          <ResultButtons label="강제 개방" onResult={applyForce} />
-          <RollCheck label="강제 개방" skill="Athletics" modifier={forceOpeningBonus(forceFailures, crowbar)} onResult={applyForce} />
         </>
       )}
+      {method === 'force' && <RollCheck key={attempt} slot={attempt} label="강제 개방" skill="Athletics"
+        modifier={forceOpeningBonus(forceFailures, crowbar)} readOnly={forceResult !== null} onResult={applyForce} />}
       {forceResult && (
         <section className="lock-trap-step" aria-label="강제 개방 시도의 긴장 주사위">
           <h4 ref={tensionHeading} tabIndex={-1}>{forceFailures + 1}번째 시도의 긴장 주사위</h4>

@@ -6,6 +6,7 @@ import { tableRowSource } from '../lib/overlay';
 import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { CopyButton, XRef } from './bits';
 import { IDie } from './icons';
+import { RoomShapeDiagram } from './RoomShapeDiagram';
 import { rangeText, rowTitle, showLabel } from './TableView';
 
 interface Props {
@@ -30,7 +31,8 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
   const commitRoll = usePlayRoll();
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
-  const original = row && (sourceForRow?.(row) ?? (t.mode === 'local-only' ? tableRowSource(t.id, row.min) : undefined));
+  const showLocalSource = t.mode === 'local-only' || t.group === 'flavor' || t.id === 't-events';
+  const original = row && (sourceForRow?.(row) ?? (showLocalSource ? tableRowSource(t.id, row.min) : undefined));
   const digits = value !== null && sides === 100 ? d100FromValue(value) : null;
   const rollValue = (n: number) => {
     setInvalid(false);
@@ -134,6 +136,12 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
                     </div>
                   ))}
                 </dl>
+              )}
+              {t.id === 't-room-shape' && row && (
+                <figure className="room-shape-result">
+                  <RoomShapeDiagram roll={row.min} />
+                  <figcaption>출입구 배치 예시</figcaption>
+                </figure>
               )}
             </div>
           </>

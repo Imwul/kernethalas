@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { skillRoll } from './helpers/skill-roll';
 
 async function enterRoll(journal: Locator, step: string, value: string) {
   const group = journal.getByRole('group', { name: step, exact: true });
@@ -11,7 +12,9 @@ test('a potion only reveals its kind after identification and records aging in o
   await page.goto('/atlas/p-potion');
   const journal = page.getByRole('region', { name: '물약 기록' });
   const method = journal.getByRole('combobox', { name: '물약 감정' });
-  await method.selectOption('failed');
+  await method.selectOption('medicine-check');
+  const medicine = await skillRoll(journal, '물약 감정 Medicine 판정', 'Medicine', 40, 88);
+  await expect(medicine.getByRole('status')).toContainText('Harmful Treatment');
   await expect(journal.getByText('마셔 본 뒤 물약 종류를 정할 수 있습니다.')).toBeVisible();
   await expect(journal.getByRole('group', { name: '물약 종류 D20' })).toHaveCount(0);
   await method.selectOption('drank');
@@ -49,7 +52,11 @@ test('a magic weapon needs attunement before rarity and fills table follow-ups f
   await expect(rarity).toHaveCount(0);
 
   await enterRoll(journal, '마법 아이템 종류 D8', '5');
-  await journal.getByRole('combobox', { name: '아이템 조율' }).selectOption('reason');
+  await journal.getByRole('combobox', { name: '아이템 조율' }).selectOption('reason-roll');
+  await skillRoll(journal, '감정에 사용할 Reason 판정', 'Reason', 40, 32);
+  await expect(rarity).toHaveCount(0);
+  const reason = await skillRoll(journal, '감정에 사용할 Reason 판정', 'Reason', 40, 33);
+  await expect(reason.getByRole('status')).toContainText('Brilliant Deduction');
   await enterRoll(journal, '아이템 희귀도 D10', '1');
   await enterRoll(journal, '속성 1 D20', '20');
   await expect(line).toContainText('속성 확인 중');

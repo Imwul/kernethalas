@@ -8,9 +8,11 @@ import { readOracleValue } from '../../lib/oracle';
 import { activeDarkness } from '../../lib/play-domain';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { gearCount, type GearEffect, type PaperChange } from '../../lib/play-inventory';
+import { useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
 import { LockTrapTool, type PlayLockReport } from '../LockTrapTool';
 import { JournalRoll } from '../LootJournal';
+import { PhysicalSkillRoll, SkillCriticalDetails, skillCheckSucceeded } from '../PhysicalSkillRoll';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
 import { ExplorationFollowUp, type FollowUpReport } from './ExplorationFollowUp';
 import { PlayRoll } from './PlayRoll';
@@ -318,6 +320,7 @@ function ActionDarknessFollowUp({ headingId, title, recordKey, row, count, onRep
 function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => void; onCombat: () => void }) {
   const id = useId();
   const commitRoll = usePlayRoll();
+  const recordCritical = useRecordSkillCritical();
   const [check, setCheck] = usePlayDraftState<{ skill: string; roll: number; edge: Edge } | null>('scavenge-check', null);
   const [draftSkill, setSkill] = useState<string | null>(null);
   const [draftRoll, setRoll] = useState<string | null>(null);
@@ -366,6 +369,7 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
     }
     commitRoll(() => {
       setCheck({ skill: skill.trim(), roll, edge });
+      recordCritical('Scavenge', resolveCheck(d100FromValue(roll), skillNumber, edge));
       setBonus(false);
       setTableRoll(null);
       resetRewards();
@@ -395,7 +399,10 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
         <button className="btn ghost" type="button" onClick={() => applyCheck(Number.isSafeInteger(skillNumber) ? rollDie(100) : null)}>D100 굴리기</button>
         {invalid && <p className="field-err" id={`${id}-scavenge-error`} role="alert">Skill 정수와 1–100 사이의 주사위(또는 00)를 입력하세요.</p>}
       </form>
-      {checkOutcome && <p className="play-explore-note" role="status">뒤지기 {CHECK_LABELS[checkOutcome.outcome]}</p>}
+      {checkOutcome && <div className="play-explore-note" role="status">
+        뒤지기 {CHECK_LABELS[checkOutcome.outcome]}
+        <SkillCriticalDetails skill="Scavenge" outcome={checkOutcome.outcome} />
+      </div>}
       {checkOutcome?.outcome === 'fumble' && <button className="btn primary play-explore-action-btn" type="button" onClick={onCombat}>뒤지기 조우로</button>}
       {allowsTable && (
         <>
@@ -405,11 +412,9 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => v
           }} /> 대성공 보정 +5 적용</label>}
           <JournalRoll die="D20" label="뒤지기 결과" value={tableRoll} onValue={(roll) => { setTableRoll(roll); resetRewards(); }}
             resultText={effective === null ? '' : `${bonus ? `보정 ${effective} · ` : ''}${row?.ko ?? '표 범위를 벗어났습니다. 보정을 확인하세요.'}`} />
-          {row?.min === 1 && (
-            <label className="field"><span>참혹한 유해 Resolve 결과</span><select value={resolve} onChange={(event) => setResolve(event.target.value as typeof resolve)}>
-              <option value="">판정 결과 선택</option><option value="success">성공</option><option value="failure">실패 · Sanity −1</option>
-            </select></label>
-          )}
+          {row?.min === 1 && <PhysicalSkillRoll key={rewards} label="참혹한 유해 Resolve 판정" skill="Resolve"
+            slot={`scavenge-resolve-${rewards}`} onResult={(result) => setResolve(skillCheckSucceeded(result) ? 'success' : 'failure')}
+            onClear={() => setResolve('')} />}
           {reward?.dice.map((die, index) => (
             <JournalRoll key={`${rewards}-${index}`} die={die} label={`${reward.item === '₵' ? '동전' : reward.item} ${reward.dice.length > 1 ? `${index + 1}번째` : '수량'}`}
               value={quantity[index] ?? null} onValue={(roll) => setQuantity((current) => reward.dice.map((_, place) => place === index ? roll : current[place] ?? null))} />

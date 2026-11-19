@@ -19,6 +19,7 @@ export interface ExplorationReport {
   area: EncounterPlace | null;
   place: string | null;
   shape: string | null;
+  description: string | null;
   nextTension: string | null;
   darkness: string | null;
   event: string | null;
@@ -52,6 +53,10 @@ const PLAY_SHAPE_TABLE = { ...SHAPE_TABLE, notes: undefined };
 const ENCOUNTER_TABLE = tableById.get('t-encounter-check')!;
 const EVENT_TABLE = tableById.get('t-events')!;
 const DARKNESS_TABLE = tableById.get('t-growing-darkness')!;
+const PLACE_DESCRIPTIONS = {
+  room: tableById.get('t-room-description')!,
+  corridor: tableById.get('t-corridor-description')!,
+};
 
 const PLACE_LABELS = { shape: '모양으로 결정', room: '방', corridor: '통로' } as const;
 type PlaceChoice = keyof typeof PLACE_LABELS;
@@ -80,6 +85,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, init
   const [revisit, setRevisit] = usePlayDraftState('revisit', false);
   const [choice, setChoice] = usePlayDraftState<PlaceChoice>('place-choice', 'shape');
   const [shapeRoll, setShapeRoll] = usePlayDraftState<number | null>('shape-roll', null);
+  const [descriptions, setDescriptions] = usePlayDraftState<Record<EncounterPlace, number | null>>('place-description', { room: null, corridor: null });
   const [lair, setLair] = usePlayDraftState('lair', false);
   const [arrival, setArrival] = usePlayDraftState<'lair' | 'exit' | null>('domain-arrival', null);
   const [fixedIntroRoom, setFixedIntroRoom] = usePlayDraftState('intro-fixed-room', false);
@@ -103,6 +109,10 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, init
   const shapeRow = !intro && choice === 'shape' && shapeRoll !== null ? SHAPE_TABLE.rows.find(({ min }) => min === shapeRoll) : undefined;
   const place = choice === 'shape' ? (intro || shapeRoll === null ? null : shapeRoll <= 25 ? 'corridor' : 'room') : choice;
   const placeLabel = place ? PLACE_LABELS[place] : null;
+  const descriptionRoll = place ? descriptions[place] : null;
+  const description = place && descriptionRoll !== null ? PLACE_DESCRIPTIONS[place].rows.find(({ min, max }) =>
+    descriptionRoll >= min && descriptionRoll <= max) : undefined;
+  const descriptionReport = description ? `${placeLabel} · ${description.ko}` : null;
   const namedPlace = domainPlaceLabel(domainPlaceId, domainPlaceName);
   const lairRoom = !!place && (domainProgress.lair?.id === domainPlaceId
     || (revisit && arrival === 'lair' && !!domainProgress.lair)
@@ -144,7 +154,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, init
   const showIntroEncounter = intro && (darknessAmbush || encountered === true || introEncounterRequested);
 
   useEffect(() => {
-    onReport({ area: place, place: placeReport, shape: shapeReport, nextTension,
+    onReport({ area: place, place: placeReport, shape: shapeReport, description: descriptionReport, nextTension,
       darkness: darknessReport ? [darknessReport, ...resolvedDarkness.items.map(({ text }) => text)].join(' · ') : null,
       event: eventReport ? [eventReport, ...resolvedEvent.items.map(({ text }) => text)].join(' · ') : null,
       encounter: encounterReport, actions: [
@@ -157,7 +167,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, init
         ...(roomLightCost !== null && tension ? [{ id: 'room-light', text: `광원 −${roomLightCost}`, gear: gearCount('광원', -roomLightCost) }] : []),
         ...resolvedDarkness.items, ...resolvedEvent.items, ...actions.sheet,
       ] });
-  }, [onReport, place, placeReport, shapeReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
+  }, [onReport, place, placeReport, shapeReport, descriptionReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
     firstEntry, domainProgress.lair?.id, domainProgress.exit?.id, domainPlaceId, namedPlace]);
   useEffect(() => { onDarknessChange?.(darknessReport ? darknessRoll : null); }, [onDarknessChange, darknessReport, darknessRoll]);
   useEffect(() => {
@@ -245,6 +255,13 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, init
               </label>
             )}
           </div>
+          {!revisit && <details className="fold">
+            <summary>{placeLabel} 환경 묘사</summary>
+            <div className="play-explore-action-body">
+              <PlayRoll label={`${placeLabel} 환경 묘사 굴림`} table={PLACE_DESCRIPTIONS[place]}
+                value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))} />
+            </div>
+          </details>}
           {onDomainProgress && <PlayDomainProgress progress={domainProgress} place={place} placeId={domainPlaceId} placeName={namedPlace}
             revisit={revisit} onChange={onDomainProgress} atLair={lairRoom} atExit={exitHere} onLairMark={markLair}
             onExitMark={(marked) => onDomainProgress(marked

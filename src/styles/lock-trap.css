@@ -58,5 +58,4 @@
 }
 .lock-trap-check { display: inline-flex; align-items: center; gap: var(--s1); min-height: 44px; }
 .lock-trap-check input { accent-color: var(--copper-ink); }
-details.lock-trap-physical { margin-block-start: 0; min-width: 0; }
-.lock-trap-physical > summary { min-height: 44px; word-break: keep-all; overflow-wrap: anywhere; }
+.lock-trap-physical { min-width: 0; }

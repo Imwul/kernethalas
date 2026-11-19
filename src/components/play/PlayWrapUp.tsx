@@ -5,6 +5,7 @@ import { creatureSpoilsTables } from '../../lib/creature-combat';
 import { journalRow } from '../../lib/loot-journal';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../../lib/play-draft';
 import { gearCount, type GearEffect, type GearItem, type PaperChange } from '../../lib/play-inventory';
+import { usePendingSkillGrowth } from '../../lib/skill-growth';
 import { XRef } from '../bits';
 import { CampCalculator, type CampReport } from '../CampCalculator';
 import { JournalRoll, LootJournal } from '../LootJournal';
@@ -81,6 +82,7 @@ export function PlayWrapUp({
   onCampEncounter, campEncounterResolved, campDarkness, campAttunementBlocked,
   afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush,
 }: Props) {
+  const pendingGrowth = usePendingSkillGrowth();
   const [pane, setPane] = usePlayDraftState<Pane>('pane', 'loot');
   const [survivalPane, setSurvivalPane] = usePlayDraftState<SurvivalPane>('survival-pane', 'treatment');
   const [camp, setCamp] = useState<CampReport>(EMPTY_CAMP);
@@ -294,6 +296,12 @@ export function PlayWrapUp({
         </div>
       </div>
       <div className="play-wrap-slot" hidden={active !== 'camp'}>
+        {pendingGrowth.length > 0 && (
+          <div className="play-wrap-links" role="group" aria-label="야영 성장 대기">
+            <p className="play-wrap-note">{pendingGrowth.join(' · ')}</p>
+            <button className="btn ghost" type="button" onClick={() => openSurvival('growth')}>대기 중인 기술 성장으로</button>
+          </div>
+        )}
         <CampCalculator onEncounter={onCampEncounter} encounterResolved={campEncounterResolved} domainDarkness={campDarkness}
           attunementBlocked={campAttunementBlocked} onReport={setCamp} />
         <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest와 Once per Camp Rest</XRef> 능력의 사용 가능 여부를 확인하세요.</p>

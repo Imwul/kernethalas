@@ -2,13 +2,17 @@ import { useId, useState } from 'react';
 import { procById } from '../content';
 import { d100FromValue, resolveAttack, resolveCheck, resolveOpposed, type AttackResult, type Edge } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraftState } from '../lib/play-draft';
+import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { isSkillDouble } from '../lib/skill-criticals';
+import { isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
 
 interface SideState {
   skill: string;
   rollv: string;
   edge: Edge;
+  growthSkill?: string;
+  growthRecorded?: boolean;
 }
 
 interface CreatureAttack {
@@ -21,6 +25,8 @@ interface CreatureAttack {
 type SideId = 'a' | 'b' | 'pc-attack' | 'pc-defense' | 'enemy-attack' | 'enemy-defense';
 
 const CHECK_LABELS = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패(펌블)' } as const;
+const WEAPON_SKILLS = ['Bladed Weapons', 'Bludgeoning Weapons', 'Shafted Weapons', 'Unarmed Combat & Fist Weapons'] as const;
+const DEFENSE_SKILLS = ['Dodge', ...WEAPON_SKILLS] as const;
 const ATTACK_LABELS = {
   hit: '공격자 명중',
   'critical-hit': 'Critical Strike',
@@ -54,7 +60,11 @@ function Side({ label, s, set }: { label: string; s: SideState; set: (v: Partial
           <label htmlFor={`${id}-roll`}><span className="sr-only">{label} </span>D100</label>
           <input id={`${id}-roll`} inputMode="numeric" value={s.rollv} placeholder="1–100 / 00"
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-roll-error` : undefined}
-            onChange={(e) => set({ rollv: e.target.value })} />
+            onChange={(e) => {
+              const rollv = e.target.value;
+              const sameRoll = readOracleValue(rollv.trim(), 100) === readOracleValue(s.rollv.trim(), 100);
+              set({ rollv, growthRecorded: sameRoll && s.growthRecorded });
+            }} />
           {invalid && <p className="field-err" id={`${id}-roll-error`}>1–100 사이의 정수 또는 00을 입력하세요.</p>}
         </div>
         <div className="field">
@@ -87,6 +97,9 @@ function HitLocation({ enemyAttacks, onHitLocation }: { enemyAttacks: boolean; o
 }
 
 export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?: boolean; creature?: CreatureAttack }) {
+  const play = usePlayDraft();
+  const commit = usePlayRoll();
+  const record = useRecordSkillCritical();
   const [mode, setMode] = useState<'single' | 'attack' | 'opposed'>('attack');
   const [enemy, setEnemy] = useState(false);
   const [inputs, setInputs] = usePlayDraftState<Partial<Record<SideId, Partial<SideState>>>>('attack-inputs', {});
@@ -108,6 +121,11 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, a.edge);
   const cb = bRoll === null || bSkill === null ? null : resolveCheck(d100FromValue(bRoll), bSkill, b.edge);
   const result: AttackResult | null = attack && ca && cb ? resolveAttack(ca, cb) : null;
+  const pc = enemyAttacks ? b : a;
+  const pcKey = enemyAttacks ? bKey : aKey;
+  const pcCheck = enemyAttacks ? cb : ca;
+  const pcDouble = result && pcCheck && isSkillDouble(pcCheck.outcome) ? pcCheck.outcome : null;
+  const growthSkill = pc.growthSkill ?? '';
   let verdict: { t: string; d: string } | null = null;
   if (mode === 'single' && ca) verdict = { t: CHECK_LABELS[ca.outcome], d: `읽은 값 ${ca.read.value}${ca.flippedRead ? ' (뒤집음)' : ''} / Skill ${ca.skill}` };
   if (result) verdict = { t: ATTACK_LABELS[result.outcome], d: result.reason };
@@ -152,6 +170,27 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
           <span className="muted">직접 굴린 D100을 입력하세요. 공격 기본 +10, Speed와 그 밖의 보정을 확인하세요.</span>
         )}
       </div>
+      {pcDouble && <p className="checkcalc-note">PC {enemyAttacks ? '방어' : '공격'} · {pcDouble === 'critical' ? '대성공' : '대실패'}</p>}
+      {play && pcDouble && pcCheck && (
+        <div className="checkcalc-follow-ups" style={{ alignItems: 'end' }}>
+          <label className="field"><span>PC {enemyAttacks ? '방어' : '공격'}에 사용한 기술</span>
+            <select value={growthSkill} disabled={pc.growthRecorded}
+              onChange={(event) => setSide(pcKey, { growthSkill: event.target.value })}>
+              <option value="">기술 선택</option>
+              {(enemyAttacks ? DEFENSE_SKILLS : WEAPON_SKILLS).map((skill) => (
+                <option key={skill} value={skill}>{skill === 'Unarmed Combat & Fist Weapons' ? 'Unarmed / Fist Weapons' : skill}</option>
+              ))}
+            </select>
+          </label>
+          <button className="btn ghost" type="button" disabled={!isGrowthSkill(growthSkill) || pc.growthRecorded}
+            onClick={() => commit(() => {
+              setSide(pcKey, { growthRecorded: true });
+              record(growthSkill, pcCheck, null);
+            })}>
+            야영 성장 {pc.growthRecorded ? '표시됨' : '표시'}
+          </button>
+        </div>
+      )}
       {result && (result.outcome === 'hit' || result.outcome === 'critical-hit' || result.outcome === 'defended' || result.attackerFumble) && (
         <div className="checkcalc-follow-ups">
           {(result.outcome === 'hit' || result.outcome === 'critical-hit') && (

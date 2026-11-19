@@ -174,10 +174,10 @@ function TargetControls({ ability, target, draft, level, spent, onChange }: {
       {!exceptional && <>
         {(ability.check === 'attack' || ability.check === 'unopposed') && <PhysicalSkillRoll
           label={ability.check === 'attack' ? 'PC 공격 판정' : '방어 불가 공격 판정'} skill={ability.weaponSkill}
-          modifier={ability.modifier} slot="attack" onResult={(attack) => onChange({ attack, roll: undefined, confirmed: false })}
+          modifier={ability.modifier} slot="attack" context="attack" onResult={(attack) => onChange({ attack, roll: undefined, confirmed: false })}
           onClear={() => onChange({ attack: undefined, roll: undefined, confirmed: false })} />}
         {defense && <PhysicalSkillRoll label={ability.check === 'attack' ? '대상 방어 판정' : `대상 ${defense.stat} 판정`}
-          skill={defense.stat} initialSkill={initialSkill} slot="defense"
+          skill={defense.stat} initialSkill={initialSkill} slot="defense" context="npc"
           onResult={(result) => onChange({ defense: result, roll: undefined, confirmed: false })}
           onClear={() => onChange({ defense: undefined, roll: undefined, confirmed: false })} />}
         {attackResult?.outcome === 'reroll' && <p className="mastery-note" role="status">{attackResult.reason}</p>}

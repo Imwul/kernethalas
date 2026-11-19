@@ -1,5 +1,7 @@
 import type { OracleTable, TableRow } from '../schema';
+import { CREATURE_NAME_ALIASES } from '../creature-names';
 import { core, req, opt, cond, ed } from '../helpers';
+import { corridorDescriptionCues, roomDescriptionCues } from './place-description-cues';
 
 const ROOM_SHAPE_EXITS = [2,4,1,3,2,4,6,2,2,2,2,1,2,4,3,2,2,2,3,3,3,4,2,2,5,2,4,4,8,2,1,2,2,4,1,2,4,1,2,1,2,3,1,3,2,2,2,2,5,2,8,4,1,1,2,2,2,2,2,1,2,3,3,4,3,2,2,2,5,6,8,2,1,2,2,2,1,1,3,2,2,2,4,1,1,2,1,2,1,1,4,3,2,2,2,1,2,1,3,3];
 const r = (min: number, max: number, ko: string, label?: string, extra?: Partial<TableRow>): TableRow => ({ min, max, ko, label, ...extra });
@@ -10,6 +12,11 @@ export const ENCOUNTER_PLACES = {
   corridor: { label: '통로', threshold: 15 },
 } as const;
 export type EncounterPlace = keyof typeof ENCOUNTER_PLACES;
+
+export function roomShapeForRoll(value: number): { place: EncounterPlace; exits: number } | undefined {
+  const exits = ROOM_SHAPE_EXITS[value - 1];
+  return exits === undefined ? undefined : { place: value <= 25 ? 'corridor' : 'room', exits };
+}
 
 /** Resolve only the selected place. With no selection the published table compares both. */
 export function encounterRowsForPlace(place: EncounterPlace): TableRow[] {
@@ -22,14 +29,13 @@ export function encounterRowsForPlace(place: EncounterPlace): TableRow[] {
   ];
 }
 
-/** 1..N single rows with a page pointer — for flavor tables shipped as local-only */
-const localRows = (count: number, page: string): TableRow[] =>
-  Array.from({ length: count }, (_, i) => r(i + 1, i + 1, `분위기 묘사 — 규칙 효과 없음(묘사 원문 ${page})`));
-
 const CREATURES_A = ['Abyssal Vexator', 'Amalgam', 'Armor Construct', 'Astral Beast', 'Bladewings', 'Bloodstalker', 'Bone Golem', 'Bone Spiders', 'Cavebound Leech', 'Corpse Ants', 'Death Sage', 'Desiccated Cryptguards', 'Dwerax', 'Fangvine', 'Flayed Knight', 'Fleshmelt Slime', 'Giant Spider', 'Hive Larvae', 'Hive Warrior', 'Hollow Shambler'];
 const CREATURES_B = ['Living Moss', 'Necropede', 'Netherfiend', 'Plaguebringer', 'Pyreborn', 'Ratkin Marauders', 'Razorjaw', 'Reanimated Homunculus', 'Rotwalkers', 'Stone Warden', 'Swarmer', 'Tomb Crawler', 'Umbra Fiend', 'Unfettered Familiar', 'Vaelorian Magus', 'Vinekin', 'Voidweaver', 'Vorleg', 'Wraithskull', 'Wrath Elemental'];
 export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const crRow = (name: string, i: number) => r(i + 1, i + 1, name, name, { next: [n(`cr-${slug(name)}`)] });
+const crRow = (name: string, i: number) => {
+  const id = `cr-${slug(name)}`;
+  return r(i + 1, i + 1, CREATURE_NAME_ALIASES[id]?.[0] ?? name, name, { next: [n(id)] });
+};
 
 const OVERSEERS = ['Carnage Devourer', 'Dreadlord', 'Glacial Burrower', 'Gorehoof', 'Infernal Archon', 'Infernal Tormentor', 'Pyroclasmic Possessor', 'Veilshifter', 'Venomcloud Siren', 'Zephyrous Shadow'];
 
@@ -43,7 +49,7 @@ export const explorationTables: OracleTable[] = [
     group: 'exploration',
     usage: '새 도메인의 첫 방·통로에서 한 번. 이어서 Overseer Influence를 굴린다.',
     mode: 'summary',
-    rows: OVERSEERS.map((name, i) => r(i + 1, i + 1, name, name, { next: [n(`cr-${slug(name)}`)] })),
+    rows: OVERSEERS.map(crRow),
     related: [req('overseer-influence'), opt('overseers')],
     source: [core(179)],
     verification: 'verified',
@@ -61,12 +67,12 @@ export const explorationTables: OracleTable[] = [
       r(1, 1, 'Critical Strike 면역.', 'Tough'),
       r(2, 2, '레벨 5마다 Health +D6.', 'Vital'),
       r(3, 3, '피해 +1.', 'Frenzied'),
-      r(4, 4, 'Combat Skill +10.', 'Skilled'),
-      r(5, 5, 'Magic Resistance +10.', 'Magebane'),
+      r(4, 4, '전투 기술(Combat Skill) +10.', 'Skilled'),
+      r(5, 5, '마법 저항(Magic Resistance) +10.', 'Magebane'),
       r(6, 6, '무작위 피해 유형 1개에 Resistant.', 'Resistant', { next: [n('t-damage-type')] }),
       r(7, 7, '한 번에 5 이상 피해를 입히면 대상은 Resolve 실패 시 Sanity 1 손실.', 'Corrupting'),
       r(8, 8, '죽을 때 Arcane 1 피해.', 'Unstable'),
-      r(9, 9, 'Mind +20.', 'Alert'),
+      r(9, 9, '정신(Mind) +20.', 'Alert'),
       r(10, 10, 'Penetrating (1) 특성 획득(같은 특성과 중첩).', 'Piercing', { next: [n('creature-traits')] }),
     ],
     notes: [
@@ -94,7 +100,7 @@ export const explorationTables: OracleTable[] = [
       });
     }),
     notes: [
-      { type: 'clarification', text: '책은 모양이 중요하지 않으며 원하는 대로(사각형·원이라도) 그려도 된다고 한다(96쪽). 그래서 도형 그림은 싣지 않고 결과마다 종류와 출입구 수만 담았다. 출입구 수는 97쪽 도형의 문 표시와 타일 가장자리까지 열린 통로 끝을 센 값이다.' },
+      { type: 'clarification', text: '룰북의 출입구 수를 바탕으로 만든 예시 그림이다. 모양과 출입구 위치는 지도에 맞춰 바꾸어도 된다(96–97쪽).' },
       { type: 'clarification', text: '이 결과로 도메인에 더 갈 곳이 없어지면(출입구 1개 = 들어온 문뿐), 출입구가 둘 이상인 결과가 나올 때까지 다시 굴린다.' },
       { type: 'clarification', text: '공식 지도 타일은 문 위치를 표시하므로 문 존재 여부 표(Is There a Door?)는 굴리지 않아도 된다. 직접 그린 지도라면 출입구마다 그 표를 굴려도 된다(99쪽).' },
     ],
@@ -109,9 +115,9 @@ export const explorationTables: OracleTable[] = [
     aliases: ['corridor description', '통로 묘사', '분위기'],
     dice: 'D20',
     group: 'flavor',
-    usage: '선택 사항. 분위기용으로 규칙 효과는 없다.',
-    mode: 'local-only',
-    rows: localRows(20, '100–101쪽'),
+    usage: '선택 사항. 통로의 분위기를 잡는 한국어 묘사 요약이다. 규칙 효과는 없다.',
+    mode: 'summary',
+    rows: corridorDescriptionCues.map((cue, i) => r(i + 1, i + 1, cue)),
     related: [opt('room-shape')],
     source: [core(100, 101)],
     verification: 'verified',
@@ -123,9 +129,9 @@ export const explorationTables: OracleTable[] = [
     aliases: ['room description', '방 묘사', '분위기'],
     dice: 'D100',
     group: 'flavor',
-    usage: '선택 사항. 분위기용으로 규칙 효과는 없다.',
-    mode: 'local-only',
-    rows: localRows(100, '102–107쪽'),
+    usage: '선택 사항. 방의 분위기를 잡는 한국어 묘사 요약이다. 규칙 효과는 없다.',
+    mode: 'summary',
+    rows: roomDescriptionCues.map((cue, i) => r(i + 1, i + 1, cue)),
     related: [opt('room-shape')],
     source: [core(102, 103, 104, 105, 106, 107)],
     verification: 'verified',
@@ -159,7 +165,7 @@ export const explorationTables: OracleTable[] = [
       { key: 'corridor', ko: '통로' },
     ],
     rows: [
-      r(1, ENCOUNTER_PLACES.room.threshold - 1, '조우 없음', undefined, { cols: { room: '없음 → 방이면 Events', corridor: '없음' }, next: [n('t-events', '방일 때만')] }),
+      r(1, ENCOUNTER_PLACES.room.threshold - 1, '조우 없음', undefined, { cols: { room: '없음 → 이벤트 굴림', corridor: '없음' }, next: [n('t-events', '방일 때만')] }),
       r(ENCOUNTER_PLACES.room.threshold, ENCOUNTER_PLACES.corridor.threshold - 1, '방: 조우 / 통로: 없음', undefined, { cols: { room: '조우', corridor: '없음' }, next: [n('t-encounter-general', '방일 때만')] }),
       r(ENCOUNTER_PLACES.corridor.threshold, 20, '조우', undefined, { cols: { room: '조우', corridor: '조우' }, next: [n('t-encounter-general')] }),
     ],
@@ -174,9 +180,9 @@ export const explorationTables: OracleTable[] = [
     aliases: ['combat encounters', 'encounter table', '전투 조우', '조우 표', 'monster table'],
     dice: 'D6',
     group: 'creatures',
-    usage: '전투 조우가 발생하면 먼저 굴려 Table A/B를 고른다.',
+    usage: '전투 조우가 발생하면 먼저 굴려 조우 표 A와 B 중 하나를 고른다.',
     mode: 'summary',
-    rows: [r(1, 3, 'Table A', 'A', { next: [n('t-encounter-a')] }), r(4, 6, 'Table B', 'B', { next: [n('t-encounter-b')] })],
+    rows: [r(1, 3, '조우 표 A', undefined, { next: [n('t-encounter-a')] }), r(4, 6, '조우 표 B', undefined, { next: [n('t-encounter-b')] })],
     related: [req('encounter-check'), opt('creature-stat-block')],
     source: [core(133)],
     verification: 'verified',
@@ -219,14 +225,14 @@ export const explorationTables: OracleTable[] = [
     usage: '방에 들어가 전투 조우가 없을 때. 통로에서는 굴리지 않는다. “전리품” = Spoils 표.',
     mode: 'summary',
     rows: [
-      r(1, 10, '함정이 있다 — Traps 표, 자물쇠·함정 절차.', 'Trap', { next: [n('p-locks-traps', '환경 함정'), n('t-traps'), n('locks-traps')] }),
-      r(11, 20, '값진 것이 있다 — Spoils 표.', 'Spoils', { next: [n('t-spoils')] }),
-      r(21, 30, '상인을 만난다.', 'Trader', { next: [n('traders')] }),
-      r(31, 31, '희생 제단(Dyxemis): Health 1을 바치면 D10+2 방·통로 동안 최대 Toughness +5.', 'Altar — Dyxemis'),
-      r(32, 32, '희생 제단(Voteus): Health 1 → D10+2 방·통로 동안 모든 공격 판정 +10.', 'Altar — Voteus'),
-      r(33, 33, '희생 제단(Udall): Health 1 → D10+2 방·통로 동안 피해 풀 +D4 Fire.', 'Altar — Udall'),
-      r(34, 34, '희생 제단(Koias): Health 1 → D10+2 방·통로 동안 최대 Aether +5.', 'Altar — Koias'),
-      r(35, 35, '희생 제단(Keasis): Health 1 → Sanity D4 회복.', 'Altar — Keasis'),
+      r(1, 10, '이 방에 환경 함정이 있다. 함정 표(D10)로 종류를 정하고 자물쇠·함정 절차를 따른다.', undefined, { next: [n('p-locks-traps', '환경 함정'), n('t-traps'), n('locks-traps')] }),
+      r(11, 20, '방 안에서 값진 물건을 발견했다. 전리품 표(Spoils)를 굴린다.', undefined, { next: [n('t-spoils')] }),
+      r(21, 30, '방 안에서 상인을 만난다.', undefined, { next: [n('traders')] }),
+      r(31, 31, '고통의 신 디제미스(Dyxemis)의 제단. Health 1을 바치면 다음 D10+2곳(방·통로) 동안 최대 Toughness +5.'),
+      r(32, 32, '전쟁의 여신 보테우스(Voteus)의 제단. Health 1을 바치면 다음 D10+2곳(방·통로) 동안 모든 공격 판정 +10.'),
+      r(33, 33, '격노의 여신 우달(Udall)의 제단. Health 1을 바치면 다음 D10+2곳(방·통로) 동안 피해 풀에 D4 Fire를 더한다.'),
+      r(34, 34, '마법의 신 코이아스(Koias)의 제단. Health 1을 바치면 다음 D10+2곳(방·통로) 동안 최대 Aether +5.'),
+      r(35, 35, '평화의 여신 케아시스(Keasis)의 제단. Health 1을 바치면 Sanity를 D4만큼 회복한다.'),
       r(36, 36, '진동과 낙석 — Endurance 실패 시 Exhaustion +2.'),
       r(37, 37, '동전을 버리라는 속삭임 — Resolve 실패 시 D100₵ 손실.'),
       r(38, 38, '뼈 무더기 — Resolve(실패 Sanity 1), 이어서 Dodge: 성공 XP +10 & Spoils, 실패 2D6 Bludgeoning.', undefined, { next: [n('t-spoils')] }),
@@ -237,7 +243,7 @@ export const explorationTables: OracleTable[] = [
       r(43, 43, '시체의 부적 — Perception 성공 시 무기에 달면 그 방 한정 피해 풀 +D4 Fire.'),
       r(44, 44, '피가 흐르는 벽 — Reason: 성공 XP +10, 실패 2D4 Acid.'),
       r(45, 45, '피가 빨린 시체 — Perception으로 Spoils. 또한 Dodge 실패 시 Bleeding (1).', undefined, { next: [n('t-spoils'), n('bleeding')] }),
-      r(46, 46, '중상을 입은 남자 — 도우면 Bandage 1 + Medicine, 성공 XP +20. 돕지 못하거나 외면하면 Sanity 1 손실.'),
+      r(46, 46, '중상을 입은 남자. 돕기로 하면 Bandage 1개를 소비하고 Medicine을 판정한다. 성공하면 XP +20. 도울 수 없거나 외면하면 Sanity 1 손실.'),
       r(47, 47, '피로 그린 문양 — 해독하려면 Reason: 성공 XP +20, 실패 시 Resolve 없이 Sanity D4 손실.'),
       r(48, 48, '검은 웅덩이 — 손을 넣으면 Acrobatics: 성공 Spoils, 실패 Growing Darkness.', undefined, { next: [n('t-spoils'), n('t-growing-darkness')] }),
       r(49, 49, '벽의 구멍 — 팔을 넣으면 Athletics: 성공 Spoils, 실패 2D6 Slashing.', undefined, { next: [n('t-spoils')] }),
@@ -252,14 +258,14 @@ export const explorationTables: OracleTable[] = [
       r(58, 58, '심판하는 석상 — 심판을 받으면 Resolve 성공 시 Spoils 2회. 부수면 활성 Growing Darkness 하나 제거.', undefined, { next: [n('t-spoils')] }),
       r(59, 59, '고요한 샘 — Exhaustion −D4.'),
       r(60, 60, '떠도는 유령 불꽃 — 들어올 때마다 Dodge 실패 시 Sanity 1 손실.'),
-      r(61, 61, '두루마리 더미 — Reason 성공 시 이 도메인 Overseer의 약점을 알아 첫 라운드에 Stunned.'),
+      r(61, 61, '남아 있는 두루마리를 읽기로 하면 Reason을 판정한다. 성공하면 이 도메인 Overseer의 약점을 알아내 전투 첫 라운드에 그 Overseer를 Stunned 상태로 만들 수 있다.'),
       r(62, 62, '검술 모자이크 — Reason 성공 시 Bladed Weapons +1.'),
       r(63, 63, '분노한 망령 — Resolve: 성공 XP +10, 실패 Sanity 1 & Exhaustion +1.'),
       r(64, 64, '도굴꾼 야영지 — Perception 성공 시 Torch D4, Crafting Supplies D10.'),
       r(65, 65, '이름 없는 신의 제단 — 더럽히려면 Athletics: 성공 Growing Darkness 하나 제거, 실패 전투 조우.', undefined, { next: [n('t-encounter-general')] }),
-      r(66, 66, '수백의 언데드 — Stealth: 성공 XP +20, 실패 시 벨트 아이템 하나(없으면 손에 든 것)를 던져 버려야 함.'),
+      r(66, 66, '수백의 언데드가 지나간다. Stealth 성공 시 XP +20. 실패하면 주의를 돌리기 위해 벨트의 물건 하나를 던져 버린다. 벨트가 없으면 손에 든 물건을 버린다.'),
       r(67, 67, '거룩한 문양 — Tension Die를 D8로 초기화.', undefined, { next: [n('tension-die')] }),
-      r(68, 68, '명상 장소 — Resolve: 성공 Sanity D4 회복, 실패 Sanity 1 손실.'),
+      r(68, 68, '명상 장소. 명상하기로 하면 Resolve를 판정한다. 성공하면 Sanity를 D4만큼 회복하고 실패하면 1 잃는다.'),
       r(69, 69, '“훔친 것을 내놔라” 영혼 — Resolve: 성공 XP +10, 실패 D100₵ 도난.'),
       r(70, 70, '어둠의 영 빙의 — Resolve: 성공 XP +20. 실패 시 새 방마다 Sanity 1 손실, 마법 아이템 하나를 파괴하면 해제.'),
       r(71, 71, '마법 회로 장치 — 이 방에 들어올 때마다 Acrobatics 실패 시 2D6 Force.'),
@@ -268,7 +274,7 @@ export const explorationTables: OracleTable[] = [
       r(74, 74, '연금술 실험실 — Perception 성공 시 Potion D4개, 실패해도 1개.', undefined, { next: [n('t-potions')] }),
       r(75, 75, '흩어진 짐과 시체 — Perception: 성공 Spoils, 실패 전투 조우.', undefined, { next: [n('t-spoils'), n('t-encounter-general')] }),
       r(76, 76, '퍼즐 벽 — Reason 성공 시 2D100₵.'),
-      r(77, 77, '내장 구덩이 — Perception: 성공 Spoils, 실패 Sanity 1 손실.', undefined, { next: [n('t-spoils')] }),
+      r(77, 77, '내장으로 가득한 구덩이. 안을 뒤지기로 하면 Perception을 판정한다. 성공하면 전리품 표를 굴리고 실패하면 Sanity 1을 잃는다.', undefined, { next: [n('t-spoils')] }),
       r(78, 78, '녹슨 감옥 문 — 열려면 Athletics, 성공 시 Spoils.', undefined, { next: [n('t-spoils')] }),
       r(79, 79, '이상한 약초 — Medicine 성공 시 먹으면 2D6 Wounds 회복하는 약초 1회분.'),
       r(80, 80, '깊은 진흙 — 건너려면 Athletics, 실패할 때마다 Exhaustion +1.'),
@@ -277,7 +283,7 @@ export const explorationTables: OracleTable[] = [
       r(83, 83, '정화의 여신 Hesie — Sanity D6 회복.'),
       r(84, 84, '보이지 않는 힘 — 원하는 무기 Skill 판정: 성공 XP +10, 실패 D12 Bludgeoning.'),
       r(85, 85, '악마 머리 분수 — 마시면 2D6 Infernal, Sanity D6 회복.'),
-      r(86, 86, '두 개의 문 — 왼쪽: Lair 주사위 한 단계 감소. 오른쪽: 검은 샘(마시면 Growing Darkness 자동 & Toughness D10 회복).', undefined, { next: [n('lair-check'), n('t-growing-darkness')] }),
+      r(86, 86, '모양 표의 결과와 별개로 들어온 문 외에 왼쪽 문과 오른쪽 문이 있다. 왼쪽으로 가면 은신처 주사위를 한 단계 내린다. 오른쪽의 검은 샘을 마시기로 하면 짙어지는 어둠을 굴리고 Toughness를 D10만큼 회복한다.', undefined, { next: [n('lair-check'), n('t-growing-darkness')] }),
       r(87, 87, '반짝이는 연못 — Athletics: 성공 3D20₵, 실패 Sanity 1 손실.'),
       r(88, 88, '폭포의 방 — Perception: 성공 시 빠져나감, 실패 시 기습당함(전투 조우).', undefined, { next: [n('t-encounter-general')] }),
       r(89, 89, '검은 열매 — 먹으면 D6: 1–3 Exhaustion −5, 4–6 2D4 Poison.'),
@@ -293,7 +299,7 @@ export const explorationTables: OracleTable[] = [
       r(99, 99, '화산열 — Exhaustion +D6.'),
       r(100, 100, '네크로로드의 영 — Resolve: 성공 XP +100, 실패 Madness.', undefined, { next: [n('t-madness')] }),
     ],
-    notes: [{ type: 'clarification', text: '각 결과는 기계적 효과만 요약한 것. 분위기 묘사와 정확한 표현은 원문(108–115쪽).' }],
+    notes: [{ type: 'clarification', text: '방에서 바로 처리할 수 있도록 상황과 규칙 효과를 한국어로 요약했다. 원문은 룰북 108–115쪽을 참조한다.' }],
     related: [req('events'), cond('p-locks-traps', '함정이 나왔을 때'), opt('locks-traps'), opt('traders'), ed('p-scavenge', '이벤트를 처리한 뒤 방에서 선택')],
     source: [core(108, 109, 110, 111, 112, 113, 114, 115)],
     verification: 'verified',
@@ -310,12 +316,12 @@ export const explorationTables: OracleTable[] = [
     rows: [
       r(1, 1, '참혹한 유해 — Resolve 실패 시 Sanity 1 손실.'),
       r(2, 2, '아무것도 없음.'),
-      r(3, 3, 'D20₵.'),
-      r(4, 11, 'Crafting Supplies D4.'),
-      r(12, 12, '2D20₵.'),
-      r(13, 18, 'Cooking Ingredients D4.'),
-      r(19, 19, 'D100₵.'),
-      r(20, 20, 'Spoils 표.', undefined, { next: [n('t-spoils')] }),
+      r(3, 3, '동전 D20개.'),
+      r(4, 11, '제작 재료(Crafting Supplies) D4개.'),
+      r(12, 12, '동전 2D20개.'),
+      r(13, 18, '요리 재료(Cooking Ingredients) D4개.'),
+      r(19, 19, '동전 D100개.'),
+      r(20, 20, '전리품 표를 굴린다.', undefined, { next: [n('t-spoils')] }),
     ],
     related: [req('scavenging')],
     source: [core(116)],
