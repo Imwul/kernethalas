@@ -3,6 +3,7 @@ import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { gearCount, type PaperChange } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
 import '../../styles/play-survival.css';
@@ -11,7 +12,7 @@ export type SurvivalPane = 'treatment' | 'rot' | 'growth';
 
 export interface SurvivalReport {
   summary: string;
-  sheet: { id: string; text: string }[];
+  sheet: PaperChange[];
 }
 
 interface SurvivalRecord {
@@ -307,7 +308,10 @@ export function PlaySurvival({ pane, onPane, onReport }: {
   const [records, setRecords] = usePlayDraftState<SurvivalRecord[]>('records', []);
   const report = useMemo(() => ({
     summary: records.map(({ summary }) => summary).join(' · '),
-    sheet: records.flatMap(({ changes }, index) => changes.map((text, part) => ({ id: `survival:${index}:${part}`, text }))),
+    sheet: records.flatMap(({ kind, changes }, index) => changes.map((text, part) => ({
+      id: `survival:${index}:${part}`, text,
+      gear: kind === 'treatment' && text === 'Bandage −1 (붕대 처치)' ? gearCount('Bandage', -1) : undefined,
+    }))),
   }), [records]);
   useEffect(() => { onReport(report); }, [onReport, report]);
   const onRecord: SaveRecord = (record) => setRecords((previous) => [...previous, record]);

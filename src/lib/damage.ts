@@ -23,6 +23,30 @@ export interface DamageReactions {
   restored: boolean;
 }
 
+interface ListedDamageReactions {
+  vulnerable: readonly string[];
+  resistsNonMagicalPhysical: boolean;
+  restored: readonly string[];
+}
+
+export function listedDamageReactions(type: DamageType | '', magical: boolean, defenses?: ListedDamageReactions): DamageReactions {
+  return {
+    vulnerable: defenses?.vulnerable.includes(type) ?? false,
+    resistant: !!type && !!defenses?.resistsNonMagicalPhysical && isPhysicalDamage(type) && !magical,
+    immune: false,
+    restored: defenses?.restored.includes(type) ?? false,
+  };
+}
+
+export function damageReactionText(reactions: DamageReactions) {
+  if (reactions.immune) return '면역 · 피해 0';
+  const multiplier = reactions.vulnerable && reactions.resistant ? '취약·저항 상쇄'
+    : reactions.vulnerable ? '취약 · 피해 ×2' : reactions.resistant ? '저항 · 피해 절반(올림)' : '';
+  return reactions.restored
+    ? [multiplier, '적용량만큼 회복'].filter(Boolean).join(' · ')
+    : multiplier || '보통 피해';
+}
+
 export function splitPcDamage(amount: number, toughness: number, directHealth: boolean) {
   const toughnessLoss = directHealth ? 0 : Math.min(amount, toughness);
   return { toughnessLoss, healthLoss: amount - toughnessLoss };

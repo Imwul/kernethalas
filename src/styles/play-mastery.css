@@ -1,0 +1,85 @@
+.play-mastery-card,
+.mastery-cast,
+.mastery-rule,
+.mastery-target,
+.mastery-result {
+  display: grid;
+  gap: var(--s3);
+  min-inline-size: 0;
+}
+
+.play-mastery-card {
+  max-inline-size: 54rem;
+  padding: var(--s3);
+  border-block: 1px solid var(--rule);
+  background: var(--paper);
+  font: 14px/1.5 var(--f-ui);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.play-mastery-card :is(h3, h5, p) { margin: 0; }
+.play-mastery-card h3 { font: 400 1.2rem/1.35 var(--f-ko-display); }
+.play-mastery-card h5 { font: 600 15px/1.35 var(--f-ui); }
+.play-combat > .play-mastery-fold { margin-block: 0; }
+.play-mastery-fold > summary { min-block-size: 44px; }
+.play-mastery-card .field { min-inline-size: 0; }
+.play-mastery-card :is(input:not([type='checkbox']), select, textarea) { inline-size: 100%; min-block-size: 44px; }
+.play-mastery-card .btn { min-block-size: 44px; }
+.play-mastery-card [data-play-dice] { font-variant-numeric: tabular-nums; }
+
+.mastery-form-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--s2) var(--s3);
+  align-items: end;
+  min-inline-size: 0;
+}
+
+.mastery-form-fields > p { grid-column: 1 / -1; }
+.mastery-number { inline-size: min(100%, 25rem); }
+.mastery-rule {
+  gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  background: var(--bone);
+  border-inline-start: 2px solid var(--copper);
+}
+.mastery-rule > strong { font: 600 1.125rem/1.35 var(--f-ko-display); }
+.mastery-cost { color: var(--copper-ink); font-weight: 700; }
+.mastery-note { color: var(--ink-2); }
+.mastery-action { justify-self: start; }
+.mastery-target { padding-block: var(--s3); border-block-start: 1px solid var(--rule-soft); }
+.mastery-target-result { font-weight: 600; }
+
+.mastery-tick {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  min-inline-size: 0;
+  min-block-size: 44px;
+}
+.mastery-tick input { flex: none; accent-color: var(--copper-ink); }
+.mastery-target-picks {
+  margin: 0;
+  padding: var(--s1) var(--s2);
+  min-inline-size: 0;
+  border: 1px solid var(--rule);
+}
+.mastery-target-picks legend { padding-inline: var(--s1); }
+.mastery-feature > summary > span { overflow-wrap: anywhere; }
+
+.mastery-result {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: end;
+  padding: var(--s2);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--bone);
+}
+.mastery-result ul, .mastery-records { margin: 0; padding-inline-start: 1.5rem; }
+.mastery-records li + li { margin-block-start: var(--s1); }
+
+@media (max-width: 450px) {
+  .mastery-result { grid-template-columns: minmax(0, 1fr); }
+  .mastery-result .btn { justify-self: start; }
+  .play-mastery-card { padding: var(--s2); }
+}

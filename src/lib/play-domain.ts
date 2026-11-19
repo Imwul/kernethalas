@@ -1,6 +1,7 @@
 import { tableById } from '../content';
 import { creatureById } from '../content/entries/creatures';
 import type { OracleTable } from '../content/schema';
+import type { DomainProgress } from './domain-progress';
 
 export type TensionSides = 8 | 6 | 4;
 export type DarknessEvent = { id: string; roll: number };
@@ -16,6 +17,7 @@ export type PlayDomainRecord = {
   darkness: DarknessEvent[];
   encounterSetId?: string;
   retreats?: RetreatedEncounter[];
+  progress?: DomainProgress;
 };
 
 export const EMPTY_INFLUENCE: InfluenceRoll = { roll: null, damageRoll: null };

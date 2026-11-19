@@ -18,6 +18,23 @@
 .play-wrap-links { display: flex; flex-wrap: wrap; gap: 0 var(--s3); }
 .play-wrap-links .xref { display: inline-flex; min-height: 44px; align-items: center; }
 .play-wrap-armor > .usage-die { margin: 0 var(--s2) var(--s2); }
+.play-fight-armor { display: grid; gap: var(--s2); min-width: 0; }
+.play-fight-armor .field { max-width: 28rem; }
+.play-fight-checklist {
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
+}
+.play-fight-checklist h3 { margin: 0 0 var(--s1); font: 700 15px/1.4 var(--f-ui); }
+.play-fight-checklist dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+.play-fight-checklist div { display: grid; gap: 2px; min-width: 0; }
+.play-fight-checklist dt { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
+.play-fight-checklist dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .play-breather-option {
   display: flex;
   align-items: center;

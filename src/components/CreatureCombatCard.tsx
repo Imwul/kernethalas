@@ -1,18 +1,22 @@
 import { useRef } from 'react';
 import { tableById, titleOf } from '../content';
+import { creatureActionRule } from '../content/creature-action-rules';
 import { creatureDefenses } from '../content/creature-defenses';
 import { armorKo, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
 import type { Entry } from '../content/schema';
 import { calculateCreatureAdaptation, readCreatureLevel } from '../lib/creature-adaptation';
+import { DAMAGE_TYPES, isPhysicalDamage, listedDamageReactions, type DamageType } from '../lib/damage';
 import { creatureActionTable, creatureHitImpact, creatureHitTable, creatureSpoilsTables } from '../lib/creature-combat';
 import { creatureActionSource } from '../lib/overlay';
-import { PlayDraftScope, usePlayDraftState } from '../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { OracleBody } from '../views/Oracle';
 import { XRef } from './bits';
 import { CheckCalculator } from './CheckCalculator';
 import { CreatureAdaptation } from './CreatureAdaptation';
+import { CreatureActionResolution } from './CreatureActionResolution';
 import { CreatureTraitSummary } from './CreatureTraitSummary';
 import { DamageCalculator } from './DamageCalculator';
+import { DamageTypeGuide } from './DamageTypeGuide';
 import { EncounterStart } from './EncounterStart';
 import '../styles/creature-combat.css';
 
@@ -27,6 +31,8 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
   const [mode, setMode] = usePlayDraftState<'action' | 'hit' | 'check' | 'damage'>('creature-mode', 'action');
   const [enemyAttacking, setEnemyAttacking] = usePlayDraftState('creature-attacking', false);
   const [actionValue, setActionValue] = usePlayDraftState<number | null>('creature-action', null);
+  const [actionRevision, setActionRevision] = usePlayDraftState('creature-action-revision', 0);
+  const clearScope = useClearPlayDraftScope();
   const [hitValue, setHitValue] = usePlayDraftState<number | null>('creature-hit', null);
   const [pcTarget, setPcTarget] = usePlayDraftState('creature-is-pc-target', false);
   const [pcHitValue, setPcHitValue] = usePlayDraftState<number | null>('creature-pc-hit', null);
@@ -38,9 +44,8 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
   const adjustment = calculateCreatureAdaptation(creature, readCreatureLevel(levelText));
   const { value: combatSkill, unknown: unknownCS } = adjustment.stats.combatSkill;
   const action = creatureActionTable(creature, entry);
-  const physicalAction = actionValue !== null && creature.actions.some(
-    ({ min, max, tag }) => min <= actionValue && actionValue <= max && tag === 'Physical',
-  );
+  const selectedAction = actionValue === null ? undefined : creature.actions.find(({ min, max }) => min <= actionValue && actionValue <= max);
+  const actionScope = `action-follow-up-${actionRevision}`;
   const hit = creatureHitTable(creature, entry, adjustment.armorBonuses);
   const hitDie = (pcTarget ? PC_HIT_TABLE : hit)?.dice;
   const hitRow = hitValue === null ? undefined : hit?.rows.find(({ min, max }) => min <= hitValue && hitValue <= max);
@@ -70,7 +75,8 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
         {ruthlessness && <div><dt>라운드당 턴</dt><dd>{Number(ruthlessness[1]) + 1} <XRef id="ruthlessness">{ruthlessness[0]}</XRef></dd></div>}
       </dl>
       <CreatureDefenseSummary defenses={defenses} />
-      <CreatureTraitSummary traits={defenses.otherTraits} />
+      <CreatureDamageGuide defenses={defenses} />
+      <CreatureTraitSummary traits={ruthlessness ? [...defenses.otherTraits, ruthlessness[0]] : defenses.otherTraits} />
       {showEncounterStart && <details className="fold creature-encounter">
         <summary>조우 시작</summary>
         <EncounterStart creature={creature} />
@@ -92,14 +98,23 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
           </div>
         )}
         <div hidden={mode !== 'action'}>
-          <OracleBody t={action} value={actionValue} onValue={setActionValue} compact collapseTableBeforeRoll
+          <OracleBody t={action} value={actionValue} onValue={(value) => {
+            clearScope(actionScope);
+            setActionRevision((revision) => revision + 1);
+            setActionValue(value);
+          }} compact collapseTableBeforeRoll
             rollLabel={`${action.dice} 굴리기`} sourceForRow={(row) => row.label ? creatureActionSource(creature.id, row.label) : undefined} />
-          {physicalAction && (
+          {selectedAction?.tag === 'Physical' && (
             <button type="button" className="btn ghost creature-action-check" onClick={() => {
               setEnemyAttacking(true);
               setMode('check');
               checkTab.current?.focus();
             }}>적 공격 판정</button>
+          )}
+          {selectedAction && selectedAction.tag !== 'Physical' && (
+            <PlayDraftScope name={actionScope} key={actionScope}>
+              <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} />
+            </PlayDraftScope>
           )}
         </div>
         <div hidden={mode !== 'hit'}>
@@ -174,6 +189,32 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
         )}
       </details>
     </section>
+  );
+}
+
+function CreatureDamageGuide({ defenses }: { defenses: ReturnType<typeof creatureDefenses> }) {
+  const [type, setType] = usePlayDraftState<DamageType | ''>('creature-damage-preview', '');
+  const [magical, setMagical] = usePlayDraftState('creature-damage-preview-magical', false);
+  return (
+    <details className="fold creature-damage-guide">
+      <summary>피해 유형과 대상 반응</summary>
+      <div className="creature-resolution-body">
+        <div className="creature-guide-controls">
+          <label className="field"><span>공격 전 피해 유형</span>
+            <select value={type} onChange={(event) => setType(event.target.value as DamageType | '')}>
+              <option value="">유형 선택</option>
+              {DAMAGE_TYPES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </label>
+          {defenses.resistsNonMagicalPhysical && type && isPhysicalDamage(type) && (
+            <label className="damage-check"><input type="checkbox" checked={magical}
+              onChange={(event) => setMagical(event.target.checked)} />마법 피해</label>
+          )}
+        </div>
+        {type && <DamageTypeGuide type={type} reactions={listedDamageReactions(type, magical, defenses)}
+          immuneConditions={defenses.immuneConditions} />}
+      </div>
+    </details>
   );
 }
 

@@ -1,4 +1,5 @@
 import type { RollResult } from './dice';
+import { gearCount, type GearEffect } from './play-inventory';
 
 type Answer = 'success' | 'failure' | string | number;
 export type FollowAnswers = Partial<Record<string, Answer>>;
@@ -7,23 +8,26 @@ type FollowAction =
   | { kind: 'check'; id: string; skill: string }
   | { kind: 'choice'; id: string; label: string; options: [string, string][] }
   | { kind: 'count'; id: string; label: string; initial?: number }
-  | { kind: 'roll'; id: string; label: string; dice: string | ((answers: FollowAnswers) => string); text: (roll: RollResult) => string }
-  | { kind: 'paper'; id: string; text: string | ((answers: FollowAnswers) => string) }
+  | { kind: 'roll'; id: string; label: string; dice: string | ((answers: FollowAnswers) => string); text: (roll: RollResult) => string; gear?: (roll: RollResult) => GearEffect }
+  | { kind: 'paper'; id: string; text: string | ((answers: FollowAnswers) => string); gear?: GearEffect }
   | { kind: 'table'; id: string; table: string }
   | { kind: 'spoils'; id: string }
   | { kind: 'link'; id: string; dest: string }
   | { kind: 'combat' | 'trader'; id: string; label: string };
 export type FollowStep = FollowAction & { when?: Condition };
 
-const paper = (id: string, text: Extract<FollowAction, { kind: 'paper' }>['text']): FollowStep => ({ kind: 'paper', id, text });
+const paper = (id: string, text: Extract<FollowAction, { kind: 'paper' }>['text'], gear?: GearEffect): FollowStep => ({ kind: 'paper', id, text, gear });
 const check = (id: string, skill: string): FollowStep => ({ kind: 'check', id, skill });
 const choice = (id: string, label: string, options: [string, string][]): FollowStep => ({ kind: 'choice', id, label, options });
 const count = (id: string, label: string, initial?: number): FollowStep => ({ kind: 'count', id, label, initial });
 const rolled = (id: string, label: string, dice: string, text: (total: number) => string): FollowStep => ({
   kind: 'roll', id, label, dice, text: ({ total }) => text(total),
 });
-const delta = (id: string, label: string, dice: string, name: string, sign: '+' | '−'): FollowStep =>
-  rolled(id, label, dice, (total) => `${name} ${sign}${total}`);
+const EQUIPMENT_DELTAS = new Set(['동전', '광원', '물약', 'Torch', 'Crafting Supplies']);
+const delta = (id: string, label: string, dice: string, name: string, sign: '+' | '−'): FollowStep => ({
+  kind: 'roll', id, label, dice, text: ({ total }) => `${name} ${sign}${total}`,
+  gear: EQUIPMENT_DELTAS.has(name) ? ({ total }) => gearCount(name, sign === '+' ? total : -total) : undefined,
+});
 const damage = (dice: string, type: string): FollowStep => rolled('damage', '받는 피해', dice, (total) => `${type} 피해 ${total}`);
 const sanity = (dice = 'D4', sign: '+' | '−' = '−'): FollowStep => delta('sanity', 'Sanity 변화', dice, 'Sanity', sign);
 const xp = (value: number): FollowStep => paper('xp', `XP +${value}`);
@@ -69,7 +73,7 @@ const EVENT_STEPS: Record<number, FollowStep[]> = {
   43: test('Perception', [paper('weapon', '부적을 달면 이 방의 무기 피해 풀 +D4 Fire')]),
   44: test('Reason', [xp(10)], [damage('2D4', 'Acid')]),
   45: [...test('Perception', [spoils()], [], 'perception'), ...test('Dodge', [], [paper('condition', 'Bleeding (1)')])],
-  46: optional('부상자 돕기', [paper('bandage', 'Bandage −1'), ...test('Medicine', [xp(20)], [paper('failed', 'Sanity −1')])], [paper('ignored', 'Sanity −1')]),
+  46: optional('부상자 돕기', [paper('bandage', 'Bandage −1', gearCount('Bandage', -1)), ...test('Medicine', [xp(20)], [paper('failed', 'Sanity −1')])], [paper('ignored', 'Sanity −1')]),
   47: optional('문양 해독하기', test('Reason', [xp(20)], [sanity()])),
   48: optional('웅덩이에 손 넣기', test('Acrobatics', [spoils()], [darkness()])),
   49: optional('구멍에 팔 넣기', test('Athletics', [spoils()], [damage('2D6', 'Slashing')])),
@@ -99,7 +103,7 @@ const EVENT_STEPS: Record<number, FollowStep[]> = {
   71: test('Acrobatics', [], [damage('2D6', 'Force')]),
   72: test('Perception', [spoils()]),
   73: test('Stealth', [sanity('D4', '+')], [paper('exhaustion', 'Exhaustion +2'), darkness()]),
-  74: test('Perception', [delta('potions', '물약 수량', 'D4', '물약', '+'), link('t-potions')], [paper('potion', '물약 +1'), link('t-potions')]),
+  74: test('Perception', [delta('potions', '물약 수량', 'D4', '물약', '+'), link('t-potions')], [paper('potion', '물약 +1', gearCount('물약', 1)), link('t-potions')]),
   75: test('Perception', [spoils()], [combat()]),
   76: test('Reason', [delta('coins', '동전 획득', '2D100', '동전', '+')]),
   77: test('Perception', [spoils()], [paper('sanity', 'Sanity −1')]),

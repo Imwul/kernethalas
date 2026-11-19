@@ -7,7 +7,7 @@ export function CreatureTraitSummary({ traits }: { traits: string[] }) {
 
   return (
     <section className="creature-traits" aria-label="생물 특성 효과">
-      <h3>특성</h3>
+      <h3>상시·발동 특성</h3>
       <ul>
         {traits.map((trait) => {
           const rule = describeCreatureTrait(trait);

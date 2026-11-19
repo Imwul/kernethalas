@@ -3,6 +3,7 @@ import { CAMP_ACTIVITIES, CAMP_BARRICADE, campTotals, resolveCampCheck, type Cam
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { gearCount, type PaperChange } from '../lib/play-inventory';
 import { XRef } from './bits';
 import { JournalRoll } from './LootJournal';
 import '../styles/camp-calculator.css';
@@ -68,7 +69,7 @@ type CampBenefit = 'full' | 'half';
 
 export interface CampReport {
   summary: string;
-  sheet: { id: string; text: string }[];
+  sheet: PaperChange[];
 }
 
 const EMPTY_REPORT: CampReport = { summary: '', sheet: [] };
@@ -134,9 +135,9 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
   const needsEncounter = !!(onEncounter && result && !result.passed && !recordedEncounter);
   const report = useMemo<CampReport>(() => {
     if (!plan || !result) return EMPTY_REPORT;
-    const sheet = [
-      ...Object.entries(plan.spent).map(([item, amount]) => ({ id: `camp:spend:${item}`, text: `${item} −${amount} (야영)` })),
-      ...Object.entries(plan.produced).map(([item, amount]) => ({ id: `camp:produce:${item}`, text: `${item} +${amount} (야영)` })),
+    const sheet: PaperChange[] = [
+      ...Object.entries(plan.spent).map(([item, amount]) => ({ id: `camp:spend:${item}`, text: `${item} −${amount} (야영)`, gear: gearCount(item, -amount) })),
+      ...Object.entries(plan.produced).map(([item, amount]) => ({ id: `camp:produce:${item}`, text: `${item} +${amount} (야영)`, gear: gearCount(item, amount) })),
     ];
     if (plan.exhaustion) sheet.push({ id: 'camp:activity-exhaustion', text: `Exhaustion ${signed(plan.exhaustion)} (야영 활동)` });
     if (plan.sleepHealth) sheet.push({ id: 'camp:sleep-health', text: `Health +${plan.sleepHealth} (취침)` });

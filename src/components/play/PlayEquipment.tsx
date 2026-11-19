@@ -4,14 +4,14 @@ import {
   type CarryType, type TradeDirection, type TradeLine,
 } from '../../lib/play-equipment';
 import { usePlayDraftState } from '../../lib/play-draft';
+import { gearCount, ledgerCarry, type GearItem, type PaperChange } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import '../../styles/play-equipment.css';
 
-type SheetItem = { id: string; text: string };
-
 interface EquipmentProps {
-  onSheetChange?: (items: SheetItem[]) => void;
+  onSheetChange?: (items: PaperChange[]) => void;
   onJournalChange?: (line: string) => void;
+  inventory?: GearItem[];
 }
 
 const displayNumber = new Intl.NumberFormat('ko-KR');
@@ -32,7 +32,7 @@ function readCounts(raw: RawCounts) {
   return counts;
 }
 
-function CarryingCalculator() {
+function CarryingCalculator({ inventory }: { inventory?: GearItem[] }) {
   const heading = useId();
   const [draft, setDraft] = usePlayDraftState('carrying', EMPTY_CARRY);
   const { current, loot, backpack, pouches } = draft;
@@ -54,6 +54,11 @@ function CarryingCalculator() {
   return (
     <section className="play-equipment-panel" aria-labelledby={heading}>
       <h3 id={heading}>소지칸 검산</h3>
+      {!!inventory?.length && <button className="btn ghost" type="button" onClick={() => {
+        const { totals, backpack: hasBackpack, pouches: pouchCount } = ledgerCarry(inventory);
+        const currentCounts = Object.fromEntries(CARRY_TYPES.map(({ id }) => [id, String(totals[id])])) as RawCounts;
+        setDraft((previous) => ({ ...previous, current: currentCounts, backpack: hasBackpack, pouches: pouchCount }));
+      }}>장부에서 보유 수량 가져오기</button>}
       <div className="play-carry-options">
         <label className="play-equipment-check">
           <input type="checkbox" checked={backpack} onChange={(event) => setDraft({ ...draft, backpack: event.target.checked })} />
@@ -111,16 +116,16 @@ const EMPTY_TRADE: TradeDraft = { direction: 'buy', choice: '', quantity: '1', n
 
 function tradeReport(lines: TradeLine[]) {
   const totals = tradeTotals(lines);
-  const items: SheetItem[] = [];
+  const items: PaperChange[] = [];
   if (!totals || !lines.length) return { items, journal: '' };
   const names = new Map<string, number>();
   for (const { name, quantity, direction } of lines) {
     const change = direction === 'buy' ? quantity : -quantity;
     names.set(name, (names.get(name) ?? 0) + change);
   }
-  if (totals.net) items.push({ id: 'equipment:coins', text: `동전 ${signed(totals.net)}₵ (거래)` });
+  if (totals.net) items.push({ id: 'equipment:coins', text: `동전 ${signed(totals.net)}₵ (거래)`, gear: gearCount('동전', totals.net) });
   for (const [name, change] of names) {
-    if (change) items.push({ id: `equipment:item:${name}`, text: `${name} ${signed(change)} (거래)` });
+    if (change) items.push({ id: `equipment:item:${name}`, text: `${name} ${signed(change)} (거래)`, gear: gearCount(name, change) });
   }
   const cash = totals.net ? `동전 ${signed(totals.net)}₵` : '동전 변동 없음';
   return { items, journal: `${cash} · ${lines.map(({ direction, name, quantity }) =>
@@ -260,7 +265,7 @@ function MerchantCalculator({ onSheetChange, onJournalChange }: EquipmentProps) 
 export function PlayEquipment(props: EquipmentProps) {
   return (
     <div className="play-equipment">
-      <CarryingCalculator />
+      <CarryingCalculator inventory={props.inventory} />
       <MerchantCalculator {...props} />
     </div>
   );

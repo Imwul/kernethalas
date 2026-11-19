@@ -1,6 +1,6 @@
 import { DICE_CHAIN, tableSides } from './dice';
 
-type UsageDie = (typeof DICE_CHAIN)[number];
+export type UsageDie = (typeof DICE_CHAIN)[number];
 
 interface UsageDieProfile {
   title: string;

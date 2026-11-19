@@ -15,12 +15,13 @@ export function skillCheckSucceeded(result: CheckResult) {
   return result.outcome === 'success' || result.outcome === 'critical';
 }
 
-export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty = false, slot = 'skill-roll', onResult, onClear }: {
+export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty = false, slot = 'skill-roll', initialSkill = '', onResult, onClear }: {
   label: string;
   skill: string;
   modifier?: number;
   randomDifficulty?: boolean;
   slot?: string;
+  initialSkill?: string;
   onResult: (result: CheckResult) => void;
   onClear?: () => void;
 }) {
@@ -28,7 +29,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   const [confirmed, setConfirmed] = usePlayDraftState<{ inputs: Inputs; result: CheckResult } | null>(slot, null);
   const [draft, setDraft] = useState<Partial<Inputs>>({});
   const [invalid, setInvalid] = useState(false);
-  const inputs = { ...EMPTY, ...confirmed?.inputs, roll: '', ...draft };
+  const inputs = { ...EMPTY, skill: initialSkill, ...confirmed?.inputs, roll: '', ...draft };
   const difficultyDie = readOracleValue(inputs.difficulty.trim(), 8);
   const difficulty = randomDifficulty && difficultyDie !== null ? DIFFICULTY[difficultyDie - 1] ?? 0 : 0;
   const update = (patch: Partial<Inputs>) => {

@@ -4,6 +4,7 @@ import { rollDie, tableSides } from '../lib/dice';
 import { journalPropertyText, journalRarity, journalRow, journalRowName, potionJournalLine, propertyCount } from '../lib/loot-journal';
 import { automaticRollSides, readOracleValue, rollTable } from '../lib/oracle';
 import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { gearCount, type GearEffect } from '../lib/play-inventory';
 import { CopyButton, XRef } from './bits';
 import '../styles/loot-journal.css';
 
@@ -77,7 +78,9 @@ function JournalLine({ text }: { text: string }) {
 
 type PotionMethod = '' | 'medicine' | 'failed' | 'drank' | 'stone';
 
-function PotionJournal({ onJournalChange }: { onJournalChange?: (text: string) => void }) {
+type JournalResult = (text: string, gear?: GearEffect) => void;
+
+function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult }) {
   const [method, setMethod] = usePlayDraftState<PotionMethod>('potion-method', '');
   const [kindRoll, setKindRoll] = usePlayDraftState<number | null>('potion-kind', null);
   const [ageRoll, setAgeRoll] = usePlayDraftState<number | null>('potion-age', null);
@@ -85,7 +88,11 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: (text: string) =
   const aging = journalRow('t-potion-aging', ageRoll);
   const identified = method !== '' && method !== 'failed';
   const text = potion && aging ? potionJournalLine(potion, aging, method === 'drank') : '';
-  useEffect(() => { onJournalChange?.(text); }, [onJournalChange, text]);
+  useEffect(() => {
+    onJournalChange?.(text, potion && aging && text && method !== 'drank'
+      ? { kind: 'count', name: `${journalRowName(potion)} 물약${aging.min === 11 ? '' : ` (노화 ${ageRoll})`}`, amount: 1, weight: 'light' }
+      : undefined);
+  }, [onJournalChange, text, potion, aging, method, ageRoll]);
 
   const chooseMethod = (next: PotionMethod) => {
     setMethod(next);
@@ -147,7 +154,7 @@ const EMPTY_MAGIC_DRAFT: MagicDraft = {
   item: null, base: null, detail: null, mastery: null, attuned: '', rarity: null, properties: [], peculiarity: '',
 };
 
-function MagicItemJournal({ onJournalChange }: { onJournalChange?: (text: string) => void }) {
+function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult }) {
   const [draft, setDraft] = usePlayDraftState<MagicDraft>('magic-item', EMPTY_MAGIC_DRAFT);
   const item = journalRow('t-item', draft.item);
   const baseId = item?.next?.find(({ id }) => id === 't-random-weapon' || id === 't-random-armor')?.id;
@@ -189,7 +196,7 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: (text: string
       rarity && propertySlots.some(({ complete }) => !complete) ? '속성 확인 중' : '',
       note,
     ].filter(Boolean).join(' · '));
-  useEffect(() => { onJournalChange?.(text || ''); }, [onJournalChange, text]);
+  useEffect(() => { onJournalChange?.(text || '', text && itemName ? gearCount(text, 1) : undefined); }, [onJournalChange, text, itemName]);
 
   return (
     <section className="loot-journal" aria-label="마법 아이템 기록">
@@ -256,6 +263,6 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: (text: string
   );
 }
 
-export function LootJournal({ kind, onJournalChange }: { kind: 'potion' | 'magic-item'; onJournalChange?: (text: string) => void }) {
+export function LootJournal({ kind, onJournalChange }: { kind: 'potion' | 'magic-item'; onJournalChange?: JournalResult }) {
   return kind === 'potion' ? <PotionJournal onJournalChange={onJournalChange} /> : <MagicItemJournal onJournalChange={onJournalChange} />;
 }

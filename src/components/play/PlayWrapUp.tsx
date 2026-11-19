@@ -4,19 +4,15 @@ import { creatureById, type CreatureRecord } from '../../content/entries/creatur
 import { creatureSpoilsTables } from '../../lib/creature-combat';
 import { journalRow } from '../../lib/loot-journal';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../../lib/play-draft';
+import { gearCount, type GearEffect, type GearItem, type PaperChange } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import { CampCalculator, type CampReport } from '../CampCalculator';
 import { JournalRoll, LootJournal } from '../LootJournal';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
-import { UsageDieTool } from '../UsageDieTool';
 import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
+import { armorRollChanges, PlayFightArmor, type ArmorRolls } from './PlayFightArmor';
 import { PlaySurvival, type SurvivalPane, type SurvivalReport } from './PlaySurvival';
 import '../../styles/play-wrapup.css';
-
-interface SheetItem {
-  id: string;
-  text: string;
-}
 
 interface Props {
   creature: CreatureRecord | null;
@@ -25,9 +21,10 @@ interface Props {
   victoryCreatures?: CreatureRecord[];
   victoryLabels?: readonly string[];
   victoryXp?: number;
+  inventory?: GearItem[];
   onBattleJournalChange?: (text: string) => void;
   onJournalChange: (text: string) => void;
-  onSheetChange?: (items: SheetItem[]) => void;
+  onSheetChange?: (items: PaperChange[]) => void;
   onCampEncounter?: (planKey: string) => void;
   campEncounterResolved?: boolean | string | readonly string[];
   campDarkness?: boolean;
@@ -52,7 +49,8 @@ const MANUAL_SOURCES = ['t-spoils', 't-resources', 't-container-loot', 't-valuab
 const EMPTY_CAMP: CampReport = { summary: '', sheet: [] };
 const EMPTY_SURVIVAL: SurvivalReport = { summary: '', sheet: [] };
 const EMPTY_LOOT = { journal: '', sheet: '' };
-type LootReport = typeof EMPTY_LOOT;
+type LootReport = typeof EMPTY_LOOT & { gear?: GearEffect };
+const EMPTY_ARMOR: ArmorRolls = {};
 interface LootSlot {
   tableId: string;
   id: string;
@@ -79,6 +77,7 @@ const manualSlots: LootSlot[] = MANUAL_SOURCES.map((tableId) => ({ tableId, id: 
 
 export function PlayWrapUp({
   creature, combatEnded, battleId = 'battle', victoryCreatures, victoryLabels, victoryXp, onBattleJournalChange, onJournalChange, onSheetChange,
+  inventory = [],
   onCampEncounter, campEncounterResolved, campDarkness, campAttunementBlocked,
   afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush,
 }: Props) {
@@ -94,12 +93,19 @@ export function PlayWrapUp({
   const [darknessRoll, setDarknessRoll] = usePlayDraftState<number | null>('breather-darkness-roll', null);
   const [darknessFollow, setDarknessFollow] = useState(EMPTY_FOLLOW_UP);
   const [recovery, setRecovery] = usePlayDraftState<number | null>(`${battleId}:recovery`, null);
+  const [sanity, setSanity] = usePlayDraftState<Record<string, number>>(`${battleId}:overseer-sanity`, {});
   const [armorReport, setArmorReport] = usePlayDraftState(`${battleId}:armor-report`, '');
+  const [armorRolls, setArmorRolls] = usePlayDraftState<ArmorRolls>(`${battleId}:armor-checks`, EMPTY_ARMOR);
   const [armorOpen, setArmorOpen] = usePlayDraftState(`${battleId}:armor-open`, false);
   const clearScope = useClearPlayDraftScope();
   const active = !combatEnded && pane === 'recovery' ? 'loot' : pane;
   const victoryIds = combatEnded ? (victoryCreatures ?? (creature ? [creature] : [])).map(({ id }) => id).join(',') : '';
   const victoryNames = victoryLabels?.join('\n') ?? '';
+  const bosses = useMemo(() => victoryIds.split(',').flatMap((id, index) => {
+    const entry = creatureById.get(id);
+    return entry?.group === 'overseer' ? [{ id: `${id}:${index}`, name: victoryNames.split('\n')[index] || entry.name }] : [];
+  }), [victoryIds, victoryNames]);
+  const armorChanges = useMemo(() => armorRollChanges(battleId, armorRolls), [battleId, armorRolls]);
   const groups = useMemo(() => sourcesForBattle(victoryIds, battleId, victoryNames), [victoryIds, battleId, victoryNames]);
   const battleSlots = useMemo(() => groups.flatMap(({ tables }) => tables), [groups]);
 
@@ -110,7 +116,7 @@ export function PlayWrapUp({
   const updateLoot = useCallback((id: string, report: LootReport) => {
     setLootReports((previous) => {
       const old = previous[id] ?? EMPTY_LOOT;
-      if (old.journal === report.journal && old.sheet === report.sheet) return previous;
+      if (JSON.stringify(old) === JSON.stringify(report)) return previous;
       return { ...previous, [id]: report };
     });
   }, [setLootReports]);
@@ -128,6 +134,8 @@ export function PlayWrapUp({
   const manualLoot = lootText(manualSlots);
   const battleLine = [
     combatEnded && recovery !== null ? `전투 후 Toughness +${recovery}` : '',
+    ...bosses.flatMap(({ id, name }) => sanity[id] ? [`${name} 처치 Sanity +${sanity[id]}`] : []),
+    ...armorChanges.map(({ text }) => text),
     combatLoot ? `전리품 ${combatLoot}` : '',
   ].filter(Boolean).join(' · ');
   const sharedLine = [
@@ -140,25 +148,30 @@ export function PlayWrapUp({
   ].filter(Boolean).join(' · ');
 
   const sheet = useMemo(() => {
-    const result: SheetItem[] = [...camp.sheet, ...survival.sheet,
-      ...darknessItems.map(({ id, text }) => ({ id: `breather:${id}`, text }))];
+    const result: PaperChange[] = [...camp.sheet, ...survival.sheet,
+      ...darknessItems.map((item) => ({ ...item, id: `breather:${item.id}` }))];
     if (breatherRoll !== null) result.push(
       { id: 'breather:toughness', text: `Toughness +${breatherRoll + 2} (숨 고르기)` },
       { id: 'breather:health', text: 'Health +1 (숨 고르기)' },
       { id: 'breather:exhaustion', text: 'Exhaustion −2 (숨 고르기)' },
-      { id: 'breather:light', text: '광원 −5 (숨 고르기)' },
+      { id: 'breather:light', text: '광원 −5 (숨 고르기)', gear: gearCount('광원', -5) },
     );
     if (combatEnded) {
       if (recovery !== null) result.push({ id: `${battleId}:toughness`, text: `Toughness +${recovery} (전투 종료)` });
-      result.push({ id: `${battleId}:armor`, text: armorReport || '사용한 방어구 내구도 판정' });
+      result.push(...armorChanges);
+      if (armorReport || armorChanges.length === 0) result.push({ id: `${battleId}:armor`, text: armorReport || '사용한 방어구 내구도 판정' });
+      for (const { id, name } of bosses) if (sanity[id]) {
+        result.push({ id: `${battleId}:sanity:${id}`, text: `Sanity +${sanity[id]} (${name} 처치)` });
+      }
       if (victoryIds && victoryXp) result.push({ id: `${battleId}:xp`, text: `XP +${victoryXp} (승리)` });
     }
     for (const { id, owner } of [...manualSlots, ...battleSlots]) {
-      const loot = lootReports[id]?.sheet;
-      if (loot) result.push({ id, text: owner ? `${loot} · ${owner} 처치 보상` : loot });
+      const loot = lootReports[id];
+      if (loot?.sheet) result.push({ id, text: owner ? `${loot.sheet} · ${owner} 처치 보상` : loot.sheet, gear: loot.gear });
     }
     return result;
-  }, [camp.sheet, survival.sheet, darknessItems, breatherRoll, combatEnded, recovery, battleId, armorReport, victoryIds, victoryXp, battleSlots, lootReports]);
+  }, [camp.sheet, survival.sheet, darknessItems, breatherRoll, combatEnded, recovery, battleId, armorReport,
+    armorChanges, bosses, sanity, victoryIds, victoryXp, battleSlots, lootReports]);
 
   useEffect(() => { onBreatherDarknessChange?.(darknessForDomain); }, [onBreatherDarknessChange, darknessForDomain]);
   useEffect(() => { onBreatherTensionChange?.(nextTension); }, [onBreatherTensionChange, nextTension]);
@@ -170,14 +183,16 @@ export function PlayWrapUp({
     if (!combatEnded) {
       setRecovery(null);
       setArmorOpen(false);
+      if (Object.keys(armorRolls).length) setArmorRolls(EMPTY_ARMOR);
       if (armorReport) {
         setArmorReport('');
         clearScope(`${battleId}:armor`);
       }
     }
-  }, [combatEnded, setRecovery, setArmorOpen, armorReport, setArmorReport, battleId, clearScope]);
+  }, [combatEnded, setRecovery, setArmorOpen, armorReport, setArmorReport, armorRolls, setArmorRolls, battleId, clearScope]);
   useEffect(() => {
     if (victoryIds) return;
+    if (Object.keys(sanity).length) setSanity({});
     const removed = Object.keys(lootReports).filter((id) => id.startsWith(`${battleId}:loot:`));
     if (!removed.length) return;
     removed.forEach(clearScope);
@@ -186,7 +201,7 @@ export function PlayWrapUp({
       removed.forEach((id) => delete remaining[id]);
       return remaining;
     });
-  }, [victoryIds, battleId, lootReports, clearScope, setLootReports]);
+  }, [victoryIds, battleId, lootReports, clearScope, setLootReports, sanity, setSanity]);
 
   const applyDarkness = (value: number | null) => {
     if (darknessRoll !== value) {
@@ -207,6 +222,16 @@ export function PlayWrapUp({
   };
   return (
     <section className="play-wrapup" aria-label="휴식과 전리품 정리">
+      {combatEnded && <section className="play-fight-checklist" aria-label="전투 종료 처리 목록">
+        <h3>전투 직후</h3>
+        <dl>
+          <div><dt>Toughness</dt><dd>{recovery === null ? 'D4 회복' : `+${recovery}`}</dd></div>
+          <div><dt>방어구</dt><dd>{armorChanges.length ? `${armorChanges.length}개 판정` : armorReport || '사용한 장비 내구도 확인'}</dd></div>
+          {bosses.length > 0 && <div><dt>Overseer 처치</dt><dd>{bosses.every(({ id }) => sanity[id])
+            ? `Sanity +${bosses.reduce((total, { id }) => total + sanity[id], 0)}` : 'Sanity D4 회복'}</dd></div>}
+          {!!victoryXp && <div><dt>승리 보상</dt><dd>XP +{victoryXp} · 전리품</dd></div>}
+        </dl>
+      </section>}
       <div className="seg play-wrap-nav" role="group" aria-label="정리할 항목">
         <button type="button" aria-pressed={active === 'loot'} onClick={() => setPane('loot')}>전리품</button>
         <button type="button" aria-pressed={active === 'breather'} onClick={() => setPane('breather')}>숨 고르기</button>
@@ -220,6 +245,7 @@ export function PlayWrapUp({
       <div className="play-wrap-slot" hidden={active !== 'breather'}>
         <JournalRoll die="D10" label="숨 고르기 회복" value={breatherRoll} onValue={setBreather} resultText={breather} />
         <p className="play-wrap-note">광원 5 소모, 긴장 주사위 한 단계 하락.</p>
+        <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest</XRef> 능력을 다시 쓸 수 있습니다.</p>
         {breather && (
           <>
             <label className="play-breather-option"><input type="checkbox" checked={keepTension} onChange={(event) => {
@@ -270,6 +296,7 @@ export function PlayWrapUp({
       <div className="play-wrap-slot" hidden={active !== 'camp'}>
         <CampCalculator onEncounter={onCampEncounter} encounterResolved={campEncounterResolved} domainDarkness={campDarkness}
           attunementBlocked={campAttunementBlocked} onReport={setCamp} />
+        <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest와 Once per Camp Rest</XRef> 능력의 사용 가능 여부를 확인하세요.</p>
         <div className="play-wrap-links">
           <button className="btn ghost" type="button" onClick={() => openSurvival('growth')}>야영 기술 성장</button>
           <button className="btn ghost" type="button" onClick={() => openSurvival('rot')}>부패병 판정</button>
@@ -282,10 +309,13 @@ export function PlayWrapUp({
         <div className="play-wrap-slot" hidden={active !== 'recovery'}>
           <JournalRoll key={battleId} die="D4" label="전투 후 Toughness 회복" value={recovery} onValue={setRecovery}
             resultText={recovery !== null ? `Toughness +${recovery}` : undefined} />
+          {bosses.map(({ id, name }) => <JournalRoll key={`${battleId}:${id}`} die="D4" label={`${name} 처치 후 Sanity 회복`}
+            value={sanity[id] ?? null} onValue={(value) => setSanity((previous) => ({ ...previous, [id]: value }))}
+            resultText={sanity[id] ? `Sanity +${sanity[id]}` : undefined} />)}
           <details className="fold play-wrap-armor" open={armorOpen} onToggle={(event) => setArmorOpen(event.currentTarget.open)}>
             <summary>사용한 방어구 내구도</summary>
             <PlayDraftScope key={battleId} name={`${battleId}:armor`}>
-              <UsageDieTool rule="armor-integrity" onReport={setArmorReport} />
+              <PlayFightArmor items={inventory} rolls={armorRolls} onRoll={setArmorRolls} onReport={setArmorReport} />
             </PlayDraftScope>
           </details>
           <div className="play-wrap-links">
@@ -337,13 +367,14 @@ function SpoilsSlotBody({ slot, onReport }: { slot: LootSlot; onReport: (id: str
   return <SpoilsRollBody tableId={slot.tableId} onReport={publish} />;
 }
 
-export function SpoilsRoll({ tableId, onReport, onSheetChange }: {
-  tableId: string; onReport: (text: string) => void; onSheetChange?: (text: string) => void;
+export function SpoilsRoll({ tableId, onReport, onSheetChange, onGearChange }: {
+  tableId: string; onReport: (text: string) => void; onSheetChange?: (text: string) => void; onGearChange?: (gear: GearEffect | undefined) => void;
 }) {
   const publish = useCallback((report: LootReport) => {
     onReport(report.journal);
     onSheetChange?.(report.sheet);
-  }, [onReport, onSheetChange]);
+    onGearChange?.(report.gear);
+  }, [onReport, onSheetChange, onGearChange]);
   return <SpoilsRollBody tableId={tableId} onReport={publish} />;
 }
 
@@ -351,7 +382,7 @@ function SpoilsRollBody({ tableId, onReport }: { tableId: string; onReport: (rep
   const [value, setValue] = usePlayDraftState<number | null>('roll', null);
   const [follow, setFollow] = usePlayDraftState('follow', '');
   const [followOpen, setFollowOpen] = usePlayDraftState('follow-open', false);
-  const [followReport, setFollowReport] = usePlayDraftState('follow-report', EMPTY_LOOT);
+  const [followReport, setFollowReport] = usePlayDraftState<LootReport>('follow-report', EMPTY_LOOT);
   const [quantity, setQuantity] = usePlayDraftState<number | null>('quantity', null);
   const [gemValues, setGemValues] = usePlayDraftState<(number | null)[]>('gem-values', []);
   const clearScope = useClearPlayDraftScope();
@@ -379,12 +410,29 @@ function SpoilsRollBody({ tableId, onReport }: { tableId: string; onReport: (rep
     : quantityItem ? quantity !== null ? `${quantityItem} +${quantity}` : ''
     : gemCount ? gems !== null ? `장신구 가치 ${gems}₵` : ''
     : choices.length ? '' : counted ? `${counted[1]} +${counted[2]}` : outcome;
-  useEffect(() => { onReport({ journal, sheet }); }, [onReport, journal, sheet]);
-  const onItemReport = useCallback((text: string) => {
-    setFollowReport((previous) => previous.journal === text && previous.sheet === text ? previous : { journal: text, sheet: text });
+  const quantityName = quantityItem ?? counted?.[1];
+  const quantityValue = quantityItem ? quantity : counted ? Number(counted[2]) : null;
+  const acquisition = useMemo(() => {
+    if (!sheet) return undefined;
+    if (follow) return followReport.gear;
+    if (quantityName && quantityValue) return gearCount(quantityName, quantityValue);
+    if (gems !== null) return { kind: 'count', name: `${row?.label ?? '보석'} (${gems}₵)`, amount: 1, weight: 'gems' } satisfies GearEffect;
+    if (row && !choices.length) {
+      const single = row.label ?? (tableId === 't-fragments' ? row.ko.split(':')[0] : undefined);
+      if (single && (['t-mundane', 't-valuable', 't-container-loot', 't-fragments', 't-relics', 't-lore-books'].includes(tableId)
+        || tableId.startsWith('t-random-') && row.label === row.ko)) {
+        return tableId === 't-fragments' ? { kind: 'count', name: single, amount: 1, weight: 'light' } satisfies GearEffect : gearCount(single, 1);
+      }
+    }
+    return undefined;
+  }, [sheet, follow, followReport.gear, quantityName, quantityValue, gems, row, choices.length, tableId]);
+  useEffect(() => { onReport({ journal, sheet, gear: acquisition }); }, [onReport, journal, sheet, acquisition]);
+  const onItemReport = useCallback((text: string, gear?: GearEffect) => {
+    setFollowReport((previous) => JSON.stringify(previous) === JSON.stringify({ journal: text, sheet: text, gear })
+      ? previous : { journal: text, sheet: text, gear });
   }, [setFollowReport]);
   const onNestedReport = useCallback((report: LootReport) => {
-    setFollowReport((previous) => previous.journal === report.journal && previous.sheet === report.sheet ? previous : report);
+    setFollowReport((previous) => JSON.stringify(previous) === JSON.stringify(report) ? previous : report);
   }, [setFollowReport]);
   const clearFollow = () => {
     clearScope('follow-up');

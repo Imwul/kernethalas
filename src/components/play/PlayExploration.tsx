@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { tableById } from '../../content';
+import { creatureById } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, type EncounterPlace } from '../../content/tables/exploration';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../../lib/play-draft';
+import { DEFAULT_DOMAIN_PROGRESS, domainPlaceLabel, introEncounterCreature, markDomainPlace, removeDomainMark, stepDomainDie, type DomainProgress } from '../../lib/domain-progress';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { gearCount } from '../../lib/play-inventory';
 import { XRef } from '../bits';
+import { JournalRoll } from '../LootJournal';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
 import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
+import { PlayDomainExit, PlayDomainProgress, type DomainDestination } from './PlayDomainProgress';
 import { PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport } from './PlayExplorationActions';
 import { PlayRoll } from './PlayRoll';
 import '../../styles/play-exploration.css';
@@ -31,6 +36,13 @@ interface Props {
   onActionDarknessChange?: (rolls: number[]) => void;
   darknessEffectCount?: number;
   onTrader?: () => void;
+  domainProgress?: DomainProgress;
+  onDomainProgress?: (progress: DomainProgress) => void;
+  domainPlaceId?: string;
+  domainPlaceName?: string;
+  domainDestinations?: DomainDestination[];
+  domainDefeated?: boolean;
+  onLeaveDomain?: (id: number | 'new') => void;
 }
 
 const SHAPE_TABLE = tableById.get('t-room-shape')!;
@@ -60,11 +72,18 @@ const PLAY_ENCOUNTERS = {
 const EMPTY_ACTIONS: ExplorationActionReport = { text: '', sheet: [], nextTension: null, darknessRolls: [] };
 
 export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension = 8, lightCost = 1,
-  onDarknessChange, onActionDarknessChange, darknessEffectCount, onTrader }: Props) {
+  onDarknessChange, onActionDarknessChange, darknessEffectCount, onTrader,
+  domainProgress = DEFAULT_DOMAIN_PROGRESS, onDomainProgress, domainPlaceId = '1', domainPlaceName,
+  domainDestinations, domainDefeated, onLeaveDomain }: Props) {
   const [revisit, setRevisit] = usePlayDraftState('revisit', false);
   const [choice, setChoice] = usePlayDraftState<PlaceChoice>('place-choice', 'shape');
   const [shapeRoll, setShapeRoll] = usePlayDraftState<number | null>('shape-roll', null);
   const [lair, setLair] = usePlayDraftState('lair', false);
+  const [arrival, setArrival] = usePlayDraftState<'lair' | 'exit' | null>('domain-arrival', null);
+  const [fixedIntroRoom, setFixedIntroRoom] = usePlayDraftState('intro-fixed-room', false);
+  const [introEncounterRoll, setIntroEncounterRoll] = usePlayDraftState<number | null>('intro-encounter-roll', null);
+  const [introEncounterRequested, setIntroEncounterRequested] = usePlayDraftState('intro-encounter-requested', false);
+  const [eventLairApplied, setEventLairApplied] = usePlayDraftState('event-lair-applied', false);
   const [tension, setTension] = usePlayDraftState<TensionResult | null>('entry-tension', null);
   const [enteredLightCost, setEnteredLightCost] = usePlayDraftState<number | null>('entry-light-cost', null);
   const [darknessRoll, setDarknessRoll] = usePlayDraftState<number | null>('entry-darkness', null);
@@ -74,16 +93,26 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
   const [darknessFollow, setDarknessFollow] = useState(EMPTY_FOLLOW_UP);
   const [eventFollow, setEventFollow] = useState(EMPTY_FOLLOW_UP);
   const clear = useClearPlayDraftScope();
+  const commit = usePlayRoll();
 
-  const shapeRow = choice === 'shape' && shapeRoll !== null ? SHAPE_TABLE.rows.find(({ min }) => min === shapeRoll) : undefined;
-  const place = choice === 'shape' ? (shapeRoll === null ? null : shapeRoll <= 25 ? 'corridor' : 'room') : choice;
+  const intro = domainProgress.mode === 'intro';
+  const introCreatureId = introEncounterRoll !== null ? introEncounterCreature(introEncounterRoll) : null;
+  const introCreature = introCreatureId ? creatureById.get(introCreatureId) : undefined;
+  const shapeRow = !intro && choice === 'shape' && shapeRoll !== null ? SHAPE_TABLE.rows.find(({ min }) => min === shapeRoll) : undefined;
+  const place = choice === 'shape' ? (intro || shapeRoll === null ? null : shapeRoll <= 25 ? 'corridor' : 'room') : choice;
   const placeLabel = place ? PLACE_LABELS[place] : null;
-  const lairRoom = !revisit && place === 'room' && lair;
+  const namedPlace = domainPlaceLabel(domainPlaceId, domainPlaceName);
+  const lairRoom = !!place && (domainProgress.lair?.id === domainPlaceId
+    || (revisit && arrival === 'lair' && !!domainProgress.lair)
+    || (!domainProgress.lair && !revisit && place === 'room' && lair));
+  const exitHere = !!place && (domainProgress.exit?.id === domainPlaceId || (revisit && arrival === 'exit' && !!domainProgress.exit));
+  const firstEntry = domainProgress.entryPlaceId === domainPlaceId;
+  const introSkip = intro && fixedIntroRoom;
   const darknessRow = tension?.darkness && darknessRoll !== null
     ? DARKNESS_TABLE.rows.find(({ min, max }) => min <= darknessRoll && darknessRoll <= max) : undefined;
   const darknessAmbush = darknessRow?.next?.some(({ id }) => id === 't-encounter-general');
   const tensionReady = !!tension && (!tension.darkness || !!darknessRow);
-  const mustCheckEncounter = !!place && !revisit && !lairRoom && !darknessAmbush && tensionReady;
+  const mustCheckEncounter = !!place && !revisit && !lairRoom && !introSkip && !darknessAmbush && tensionReady;
   const encountered = place && mustCheckEncounter && encounterRoll !== null
     ? encounterRoll >= ENCOUNTER_PLACES[place].threshold : null;
   const mayRollEvent = place === 'room' && encountered === false;
@@ -102,20 +131,30 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
     ? `D100 ${eventRoll} · ${eventRow.label ?? eventRow.ko}` : null;
   const resolvedDarkness = darknessRow ? darknessFollow : EMPTY_FOLLOW_UP;
   const resolvedEvent = eventRow ? eventFollow : EMPTY_FOLLOW_UP;
+  const eventLairEffect = eventRoll === 86 && resolvedEvent.items.some(({ id }) => id === 'event-86-lair');
+  const loweredLair = !domainProgress.lair ? stepDomainDie(domainProgress, 1) : domainProgress;
   const priorDarknessRolls = useMemo(() => [darknessRow ? darknessRoll : null, resolvedEvent.darkness]
     .filter((roll): roll is number => roll !== null), [darknessRow, darknessRoll, resolvedEvent.darkness]);
   const encounterReport = !place || !tensionReady ? null
-    : darknessAmbush || encountered === true ? 'encounter' : lairRoom ? 'overseer' : (encountered === false || revisit) ? 'none' : null;
+    : darknessAmbush || encountered === true ? 'encounter' : lairRoom ? 'overseer' : (encountered === false || revisit || introSkip) ? 'none' : null;
+  const showIntroEncounter = intro && (darknessAmbush || encountered === true || introEncounterRequested);
 
   useEffect(() => {
     onReport({ place: placeReport, shape: shapeReport, nextTension,
       darkness: darknessReport ? [darknessReport, ...resolvedDarkness.items.map(({ text }) => text)].join(' · ') : null,
       event: eventReport ? [eventReport, ...resolvedEvent.items.map(({ text }) => text)].join(' · ') : null,
-      encounter: encounterReport, actions: actions.text, sheet: [
-        ...(roomLightCost !== null && tension ? [{ id: 'room-light', text: `광원 −${roomLightCost}` }] : []),
+      encounter: encounterReport, actions: [
+        firstEntry ? '새 도메인 첫 진입 · XP +50' : '',
+        domainProgress.lair?.id === domainPlaceId ? `은신처 발견 · ${namedPlace}` : '',
+        domainProgress.exit?.id === domainPlaceId ? `출구 발견 · ${namedPlace}` : '',
+        actions.text,
+      ].filter(Boolean).join(' / '), sheet: [
+        ...(firstEntry ? [{ id: 'domain-entry-xp', text: 'XP +50 · 새 도메인 첫 진입' }] : []),
+        ...(roomLightCost !== null && tension ? [{ id: 'room-light', text: `광원 −${roomLightCost}`, gear: gearCount('광원', -roomLightCost) }] : []),
         ...resolvedDarkness.items, ...resolvedEvent.items, ...actions.sheet,
       ] });
-  }, [onReport, placeReport, shapeReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent]);
+  }, [onReport, placeReport, shapeReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
+    firstEntry, domainProgress.lair?.id, domainProgress.exit?.id, domainPlaceId, namedPlace]);
   useEffect(() => { onDarknessChange?.(darknessReport ? darknessRoll : null); }, [onDarknessChange, darknessReport, darknessRoll]);
   useEffect(() => {
     onActionDarknessChange?.(resolvedEvent.darkness === null ? actions.darknessRolls : [resolvedEvent.darkness, ...actions.darknessRolls]);
@@ -135,7 +174,18 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
     }
     setEventRoll(value);
   };
-  const startEventCombat = () => onCombat('encounter', `event-${eventRoll}`);
+  const startEncounter = (source?: string) => {
+    const scriptedEnemy = source === `event-${eventRoll}` && eventRow?.next?.some(({ id }) => creatureById.has(id));
+    if (intro && !scriptedEnemy) setIntroEncounterRequested(true);
+    else onCombat('encounter', source);
+  };
+  const startEventCombat = () => startEncounter(`event-${eventRoll}`);
+  const markLair = (marked: boolean) => {
+    setLair(marked);
+    onDomainProgress?.(marked
+      ? markDomainPlace(domainProgress, 'lair', { id: domainPlaceId, name: namedPlace })
+      : removeDomainMark(domainProgress, 'lair', domainPlaceId));
+  };
 
   return (
     <section className="play-exploration" aria-label="장소 탐험">
@@ -153,7 +203,7 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
         <div className="play-explore-choice">
           <span aria-hidden="true">장소 종류</span>
           <div className="seg" role="group" aria-label="장소 종류">
-            {(['shape', 'room', 'corridor'] as const).filter((option) => !revisit || option !== 'shape').map((option) => (
+            {(['shape', 'room', 'corridor'] as const).filter((option) => !(revisit || intro) || option !== 'shape').map((option) => (
               <button key={option} type="button" aria-pressed={choice === option}
                 onClick={() => setChoice(option)}>{PLACE_LABELS[option]}</button>
             ))}
@@ -161,7 +211,7 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
         </div>
       </div>
 
-      {!revisit && choice === 'shape' && (
+      {!revisit && !intro && choice === 'shape' && (
         <>
           <PlayRoll label="방·통로 모양" table={PLAY_SHAPE_TABLE} value={shapeRoll} onValue={setShapeRoll} />
           {shapeRow?.ko.includes('막다른 곳') && (
@@ -170,25 +220,36 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
         </>
       )}
 
+      {intro && !place && <p className="play-explore-note">종이 지도에서 들어간 방 또는 통로를 선택하세요. <XRef id="first-domain-rules" /></p>}
+
       {place && (
         <>
           <div className="play-explore-context">
             <p>{revisit ? `정리한 ${placeLabel} 재방문` : `새 ${placeLabel}`}
               {roomLightCost !== null && <> · <XRef id="lightsource">광원 {roomLightCost} 소모</XRef>{roomLightCost === 1 && <span> (짙어지는 어둠 69–70 적용 중이면 2)</span>}</>}
             </p>
-            {!revisit && (
+            {!onDomainProgress && !revisit && (
               <div className="play-explore-links">
                 {place === 'room' && <XRef id="lair-check">은신처 판정 · 미발견</XRef>}
                 <XRef id="domain-exit-check">출구 판정 · 은신처 발견 후</XRef>
                 <XRef id="first-domain-rules">도입 도메인 규칙</XRef>
               </div>
             )}
-            {place === 'room' && !revisit && (
+            {!onDomainProgress && place === 'room' && !revisit && (
               <label className="play-explore-lair">
-                <input type="checkbox" checked={lair} onChange={(event) => setLair(event.target.checked)} /> 이 방이 Overseer 은신처
+                <input type="checkbox" checked={lair} onChange={(event) => markLair(event.target.checked)} /> 이 방이 Overseer 은신처
               </label>
             )}
           </div>
+          {onDomainProgress && <PlayDomainProgress progress={domainProgress} place={place} placeId={domainPlaceId} placeName={namedPlace}
+            revisit={revisit} onChange={onDomainProgress} atLair={lairRoom} atExit={exitHere} onLairMark={markLair}
+            onExitMark={(marked) => onDomainProgress(marked
+              ? markDomainPlace(domainProgress, 'exit', { id: domainPlaceId, name: namedPlace })
+              : removeDomainMark(domainProgress, 'exit', domainPlaceId))}
+            recordedArrival={arrival} onArrival={setArrival} />}
+          {intro && !revisit && !lairRoom && <label className="play-explore-lair">
+            <input type="checkbox" checked={fixedIntroRoom} onChange={(event) => setFixedIntroRoom(event.target.checked)} /> 지도 지시로 이곳의 조우·이벤트 생략
+          </label>}
           <section className="play-explore-step" aria-label="긴장 주사위">
             <h3>긴장 주사위</h3>
             <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
@@ -214,12 +275,28 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
             <ExplorationFollowUp key={eventRoll} kind="event" row={eventRow?.min}
               darknessEffectCount={darknessEffectCount} onReport={setEventFollow} onCombat={startEventCombat} onTrader={onTrader} />
           </PlayDraftScope>
+          {eventLairEffect && !intro && !domainProgress.lair && onDomainProgress && (
+            eventLairApplied
+              ? <p className="play-explore-note">왼쪽 문 효과를 적용했습니다. 다음 은신처 주사위 {domainProgress.lairDie}.</p>
+              : loweredLair === domainProgress
+                ? <p className="play-explore-note">D4에서 이 이벤트의 추가 하락은 룰북에 명시되지 않습니다. 은신처가 있는 곳을 알게 되면 직접 표시할 수 있습니다.</p>
+                : <button className="btn ghost play-explore-action-btn" type="button" onClick={() => commit(() => {
+                  onDomainProgress(loweredLair);
+                  setEventLairApplied(true);
+                })}>왼쪽 문 효과 적용 · 다음 은신처 {loweredLair.lairDie}</button>
+          )}
           {entryNextTension && <PlayExplorationActions room={place === 'room'} initialSides={entryNextTension}
             darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
-            onReport={setActionReport} onCombat={(source) => onCombat('encounter', source)} />}
+            onReport={setActionReport} onCombat={startEncounter} />}
+          {showIntroEncounter && <section className="play-explore-step" aria-label="도입 도메인 조우">
+            <JournalRoll die="D20" label="도입 도메인 전투 조우" value={introEncounterRoll} onValue={setIntroEncounterRoll}
+              resultText={introCreature?.name} />
+            {introCreature && <button className="btn primary play-explore-action-btn" type="button"
+              onClick={() => onCombat('encounter', `intro-encounter-${introEncounterRoll}`)}>도입 도메인 조우로</button>}
+          </section>}
           {tensionReady && (
             <div className="play-explore-next">
-              {darknessAmbush && (
+              {darknessAmbush && !intro && (
                 <>
                   <p>적에게 기습당했습니다. 전투 시작 방식에서 기습당함을 선택하세요.</p>
                   <button type="button" className="btn primary" onClick={() => onCombat('encounter')}>매복 조우로</button>
@@ -227,17 +304,18 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
               )}
               {lairRoom && !darknessAmbush && (
                 <>
-                  <p>은신처 방에서는 일반 조우 판정을 생략합니다.</p>
-                  <button type="button" className="btn primary" onClick={() => onCombat('overseer')}>Overseer 조우로</button>
+                  <p>{domainDefeated ? '이 도메인의 Overseer를 처치했습니다.' : '은신처 방에서는 일반 조우 판정을 생략합니다.'}</p>
+                  {!domainDefeated && <button type="button" className="btn primary" onClick={() => onCombat('overseer')}>Overseer 조우로</button>}
                 </>
               )}
-              {encountered === true && <button type="button" className="btn primary" onClick={() => onCombat('encounter')}>조우 표로</button>}
+              {encountered === true && !intro && <button type="button" className="btn primary" onClick={() => onCombat('encounter')}>조우 표로</button>}
               {eventCanStartCombat && <button type="button" className="btn ghost" onClick={startEventCombat}>이벤트에서 전투가 났다면 조우 표로</button>}
-              {!darknessAmbush && (revisit || lairRoom || (encountered === false && (!mayRollEvent || eventRow))) && (
+              {!darknessAmbush && (revisit || lairRoom || introSkip || (encountered === false && (!mayRollEvent || eventRow))) && (
                 <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} onClick={onWrapUp}>정리로</button>
               )}
             </div>
           )}
+          {exitHere && tensionReady && onLeaveDomain && <PlayDomainExit mode={domainProgress.mode} onLeave={onLeaveDomain} destinations={domainDestinations} />}
         </>
       )}
     </section>

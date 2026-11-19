@@ -1,0 +1,21 @@
+.damage-type-guide {
+  min-width: 0;
+  padding: var(--s2) var(--s3);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--bone);
+  font: 14px/1.5 var(--f-ui);
+  overflow-wrap: anywhere;
+}
+.damage-type-guide header { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); align-items: baseline; }
+.damage-type-guide header strong { color: var(--copper-ink); }
+.damage-type-guide header span, .damage-type-guide p { color: var(--ink-2); }
+.damage-type-guide p, .damage-type-guide dl, .damage-type-guide dd { margin: 0; }
+.damage-type-guide dl > div {
+  display: grid;
+  grid-template-columns: minmax(4.75rem, max-content) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--s2);
+  padding-block: 2px;
+}
+.damage-type-guide dl { margin-block-start: var(--s1); }
+.damage-type-guide dt { font-weight: 700; }

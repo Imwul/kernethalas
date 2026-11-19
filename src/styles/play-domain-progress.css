@@ -1,0 +1,23 @@
+.play-domain-progress, .play-domain-progress-body, .play-domain-exit, .play-domain-exit-form {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+}
+.play-domain-progress > .fold { margin: 0; }
+.play-domain-progress summary { min-height: 44px; align-items: center; }
+.play-domain-progress-body { padding-block-end: var(--s2); }
+.play-domain-progress-body .play-explore-lair { overflow-wrap: anywhere; }
+.play-domain-progress-body .play-explore-lair input { flex: none; }
+.play-domain-arrival, .play-domain-exit .field { max-inline-size: 24rem; min-width: 0; }
+.play-domain-arrival select, .play-domain-exit select, .play-domain-exit .btn { min-height: 44px; }
+.play-domain-exit { border: 1px solid var(--rule); background: var(--paper); padding: var(--s2); }
+.play-domain-exit > .btn { justify-self: start; }
+.play-domain-exit p { margin: 0; }
+.play-domain-progress :is(p, .usage-die-effect, summary), .play-domain-coordinate {
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.play-domain-coordinate { margin: 0; }
+.play-domain-options { display: grid; gap: var(--s2); min-width: 0; }
+.play-domain-options h3 { margin: 0; }
+.play-domain-options .play-explore-next { gap: var(--s1) var(--s2); }

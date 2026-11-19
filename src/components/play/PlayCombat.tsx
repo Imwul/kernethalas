@@ -7,6 +7,7 @@ import { rollDie, tableSides } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { automaticRollSides, readOracleValue, rollTable } from '../../lib/oracle';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import type { PaperChange } from '../../lib/play-inventory';
 import { CreatureCombatCard } from '../CreatureCombatCard';
 import { EncounterStart } from '../EncounterStart';
 import { XRef } from '../bits';
@@ -14,6 +15,7 @@ import { IDie } from '../icons';
 import { PlayCreatureSearch } from './PlayCreatureSearch';
 import { EncounterLibraryControls, PlayCustomEncounterEditor } from './PlayCustomEncounter';
 import { PlayFlee } from './PlayFlee';
+import { PlayMastery } from './PlayMastery';
 import { PlayTargetAllocation } from './PlayTargetAllocation';
 import '../../styles/play-combat.css';
 
@@ -127,6 +129,8 @@ interface PlayCombatProps {
   customSetId?: string;
   onCustomSetSelect: (id: string) => void;
   onCustomSetsChange: (sets: EncounterSet[]) => void;
+  onMasterySheetChange?: (items: PaperChange[]) => void;
+  onMasteryJournalChange?: (line: string) => void;
 }
 
 export type EncounterSeed = { creatureIds: string[]; description: string };
@@ -139,7 +143,7 @@ function restoredLineup(seed: EncounterSeed | undefined) {
 }
 
 export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatureChange, onTargetsChange, onBattleEnd, onFlee, fled,
-  seed, customSets, customSetId, onCustomSetSelect, onCustomSetsChange }: PlayCombatProps) {
+  seed, customSets, customSetId, onCustomSetSelect, onCustomSetsChange, onMasterySheetChange, onMasteryJournalChange }: PlayCombatProps) {
   const methodId = useId();
   const addTargetId = useId();
   const [method, setMethod] = usePlayDraftState<EncounterMethod>('method', initialKind === 'overseer' ? 't-overseer' : 'encounter');
@@ -329,6 +333,13 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           )}
         </div>
       )}
+      <details className="fold play-mastery-fold">
+        <summary>Mastery 능력과 마법 전투</summary>
+        <PlayDraftScope name="mastery">
+          <PlayMastery targets={selected ? [selected, ...targets.filter((target) => target.id !== selected.id)] : targets}
+            onSheetChange={onMasterySheetChange} onJournalChange={onMasteryJournalChange} />
+        </PlayDraftScope>
+      </details>
     </section>
   );
 }

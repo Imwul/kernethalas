@@ -1,5 +1,6 @@
 import { tableById } from '../content';
 import { creatureActionKo } from '../content/creature-actions';
+import { creatureActionRule } from '../content/creature-action-rules';
 import type { CreatureRecord } from '../content/entries/creatures';
 import type { Entry, OracleTable } from '../content/schema';
 import { adaptationArmorBonus, type ArmorBonus } from './creature-adaptation';
@@ -7,11 +8,6 @@ import { adaptationArmorBonus, type ArmorBonus } from './creature-adaptation';
 const ACTION_FOLLOW_ON: Record<string, Record<number, string>> = {
   'cr-infernal-archon': { 3: 'cr-lesser-demon' },
 };
-const ACTION_KIND = {
-  Physical: 'Physical · 공격 판정',
-  Magical: 'Magical · 저항은 행동 설명 참조',
-};
-
 const SPOILS_TABLES: Record<string, string[]> = {
   'Spoils table': ['t-spoils'],
   'Resources table': ['t-resources'],
@@ -36,12 +32,15 @@ export function creatureActionTable(creature: CreatureRecord, entry: Entry): Ora
     columns: [{ key: 'kind', ko: '처리' }],
     rows: creature.actions.map((action, index) => {
       const next = ACTION_FOLLOW_ON[creature.id]?.[action.min];
+      const { resistance, after } = creatureActionRule(creature, action);
+      const check = action.tag === 'Physical' ? '공격 판정' : resistance ? `${resistance} 판정` : '행동 효과 적용';
+      const kind = [action.tag, check, after && `추가 ${after}`].filter(Boolean).join(' · ');
       return {
         min: action.min,
         max: action.max,
         label: action.name,
         ko: effects[index] ?? '',
-        cols: { kind: action.tag ? ACTION_KIND[action.tag] : '행동 설명대로 적용' },
+        cols: { kind },
         ...(next ? { next: [{ id: next, note: '소환수 능력치' }] } : {}),
       };
     }),

@@ -7,6 +7,7 @@ import type { LockTarget } from '../../lib/lock-trap';
 import { readOracleValue } from '../../lib/oracle';
 import { activeDarkness } from '../../lib/play-domain';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { gearCount, type GearEffect, type PaperChange } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import { LockTrapTool, type PlayLockReport } from '../LockTrapTool';
 import { JournalRoll } from '../LootJournal';
@@ -15,7 +16,8 @@ import { ExplorationFollowUp, type FollowUpReport } from './ExplorationFollowUp'
 import { PlayRoll } from './PlayRoll';
 import { SpoilsRoll } from './PlayWrapUp';
 
-export interface ActionSheetItem { id: string; text: string }
+export type ActionSheetItem = PaperChange;
+type SearchReport = { text: string; item: string; gear?: GearEffect };
 export interface ExplorationActionReport {
   text: string;
   sheet: ActionSheetItem[];
@@ -61,7 +63,7 @@ function tensionResolved(roll?: ActionRoll) {
 
 function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetItem[] {
   return [
-    ...(report?.lockpicks ? [{ id: `${prefix}-lockpicks`, text: `Lockpick −${report.lockpicks}` }] : []),
+    ...(report?.lockpicks ? [{ id: `${prefix}-lockpicks`, text: `Lockpick −${report.lockpicks}`, gear: gearCount('Lockpick', -report.lockpicks) }] : []),
     ...(report?.xp ? [{ id: `${prefix}-xp`, text: `XP +${report.xp}` }] : []),
   ];
 }
@@ -81,9 +83,10 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
   const [doorReport, setDoorReport] = useState<PlayLockReport | null>(null);
   const [environmentReport, setEnvironmentReport] = useState<PlayLockReport | null>(null);
   const [containerReport, setContainerReport] = useState<PlayLockReport | null>(null);
-  const [scavenge, setScavenge] = useState({ text: '', item: '' });
+  const [scavenge, setScavenge] = useState<SearchReport>({ text: '', item: '' });
   const [lootText, setLootText] = useState('');
   const [lootItem, setLootItem] = useState('');
+  const [lootGear, setLootGear] = useState<GearEffect>();
   const [followUps, setFollowUps] = useState<Record<string, ActionSheetItem[]>>({});
   const panelId = useId();
   const doorPresent = door === 'present' || door === 'roll' && doorRoll !== null && doorRoll <= 5;
@@ -132,14 +135,14 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
       ...lockSheet(doorKey, activeDoor),
       ...lockSheet('environment', environmentReport),
       ...lockSheet('container', activeContainer),
-      ...(room && scavenge.item ? [{ id: 'scavenge-item', text: scavenge.item }] : []),
+      ...(room && scavenge.item ? [{ id: 'scavenge-item', text: scavenge.item, gear: scavenge.gear }] : []),
       ...(room && deepStarted ? [{ id: 'deep-exhaustion', text: '깊은 수색 · Exhaustion +2' }] : []),
-      ...(hasLoot && lootItem ? [{ id: 'container-loot', text: lootItem }] : []),
+      ...(hasLoot && lootItem ? [{ id: 'container-loot', text: lootItem, gear: lootGear }] : []),
       ...darknessRecords.flatMap(({ key }) => (followUps[key] ?? []).map((item) => ({ ...item, id: `${key}-${item.id}` }))),
     ],
     nextTension,
     darknessRolls: rolls.flatMap(({ darkness }) => darkness === null ? [] : [darkness]),
-  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorNumber, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, nextTension, rolls, room, scavenge]);
+  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorNumber, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, rolls, room, scavenge]);
   useEffect(() => { onReport(report); }, [onReport, report]);
 
   const renderTension = (actionId: string, label: string) => {
@@ -236,9 +239,10 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
                 setContentsRevision((previous) => previous + 1);
                 setLootText('');
                 setLootItem('');
+                setLootGear(undefined);
               }} />}
               {hasLoot && <PlayDraftScope name={`container-spoils-${contentsRevision}`}>
-                <SpoilsRoll key={contentsRevision} tableId="t-container-loot" onReport={setLootText} onSheetChange={setLootItem} />
+                <SpoilsRoll key={contentsRevision} tableId="t-container-loot" onReport={setLootText} onSheetChange={setLootItem} onGearChange={setLootGear} />
               </PlayDraftScope>}
               <XRef id="deep-search">깊은 수색 규칙</XRef>
             </div>
@@ -268,7 +272,7 @@ function ActionDarknessFollowUp({ headingId, title, recordKey, row, count, onRep
   );
 }
 
-function Scavenge({ onReport, onCombat }: { onReport: (value: { text: string; item: string }) => void; onCombat: () => void }) {
+function Scavenge({ onReport, onCombat }: { onReport: (value: SearchReport) => void; onCombat: () => void }) {
   const id = useId();
   const commitRoll = usePlayRoll();
   const [check, setCheck] = usePlayDraftState<{ skill: string; roll: number; edge: Edge } | null>('scavenge-check', null);
@@ -283,6 +287,7 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: { text: string; it
   const [rewards, setRewards] = usePlayDraftState('scavenge-rewards-revision', 0);
   const [spoils, setSpoils] = useState('');
   const [spoilsItem, setSpoilsItem] = useState('');
+  const [spoilsGear, setSpoilsGear] = useState<GearEffect>();
   const skill = draftSkill ?? check?.skill ?? '';
   const rawRoll = draftRoll ?? (check ? String(check.roll) : '');
   const edge = draftEdge ?? check?.edge ?? 'none';
@@ -299,7 +304,10 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: { text: string; it
     : reward && amount !== null ? reward.item === '₵' ? `+${amount}₵` : `${reward.item} +${amount}`
       : spoilsRow ? spoilsItem : '';
   const text = row ? item || (spoilsRow && spoils ? spoils : row.ko) : checkOutcome ? CHECK_LABELS[checkOutcome.outcome] : '';
-  useEffect(() => { onReport({ text, item }); }, [onReport, text, item]);
+  const rewardName = reward?.item;
+  const gear = useMemo(() => rewardName && amount !== null && amount > 0 ? gearCount(rewardName === '₵' ? '동전' : rewardName, amount)
+    : spoilsRow ? spoilsGear : undefined, [rewardName, amount, spoilsRow, spoilsGear]);
+  useEffect(() => { onReport({ text, item, gear }); }, [onReport, text, item, gear]);
 
   const resetRewards = () => {
     setQuantity([]);
@@ -364,7 +372,7 @@ function Scavenge({ onReport, onCombat }: { onReport: (value: { text: string; it
               value={quantity[index] ?? null} onValue={(roll) => setQuantity((current) => reward.dice.map((_, place) => place === index ? roll : current[place] ?? null))} />
           ))}
           {spoilsRow && <PlayDraftScope name={`scavenge-spoils-${rewards}`}>
-            <SpoilsRoll key={rewards} tableId="t-spoils" onReport={setSpoils} onSheetChange={setSpoilsItem} />
+            <SpoilsRoll key={rewards} tableId="t-spoils" onReport={setSpoils} onSheetChange={setSpoilsItem} onGearChange={setSpoilsGear} />
           </PlayDraftScope>}
         </>
       )}

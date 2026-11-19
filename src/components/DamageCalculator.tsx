@@ -1,7 +1,8 @@
 import type { creatureDefenses } from '../content/creature-defenses';
-import { calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, splitPcDamage, type DamageReactions, type DamageType } from '../lib/damage';
+import { calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, listedDamageReactions, splitPcDamage, type DamageReactions, type DamageType } from '../lib/damage';
 import { usePlayDraftState } from '../lib/play-draft';
 import { XRef } from './bits';
+import { DamageTypeGuide } from './DamageTypeGuide';
 import '../styles/damage-calculator.css';
 
 interface Impact {
@@ -50,13 +51,7 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
   const armor = readInteger(armorText, 0);
   const extraArmorIgnore = readInteger(ignoreText || '0', 0);
   const reduction = readInteger(reductionText || '0', 0);
-  const reactions = {
-    vulnerable: defenses?.vulnerable.some((damage) => damage === type) ?? false,
-    resistant: !!defenses?.resistsNonMagicalPhysical && type !== '' && isPhysicalDamage(type) && !magical,
-    immune: false,
-    restored: defenses?.restored.some((damage) => damage === type) ?? false,
-    ...reactionOverrides,
-  };
+  const reactions = { ...listedDamageReactions(type, magical, defenses), ...reactionOverrides };
   const weak = activeImpact?.weak ?? (pc && !impact && manualWeak);
   const result = type && roll !== null && modifier !== null && (armor !== null || bypass) && extraArmorIgnore !== null && reduction !== null
     ? calculateDirectDamage({ roll, modifier, armor: armor ?? 0, extraArmorIgnore, reduction, critical, weak, reactions, type })
@@ -132,6 +127,8 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
               }} />마법 피해</label>
             )}
           </div>
+          {type && <DamageTypeGuide type={type} reactions={defenses || Object.keys(reactionOverrides).length ? reactions : undefined}
+            immuneConditions={defenses?.immuneConditions} />}
           <details className="fold damage-extra">
             <summary>추가 피해 보정</summary>
             <div className="damage-fields">

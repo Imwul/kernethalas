@@ -24,6 +24,11 @@
   min-width: 0;
 }
 
+.usage-die-current {
+  align-self: center;
+  font: 14px/1.45 var(--f-ui);
+}
+
 .usage-die-inputs .btn,
 .usage-die-inputs input,
 .usage-die-inputs select {

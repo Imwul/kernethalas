@@ -8,8 +8,9 @@ or roll a die.
 
 **Play mode** (`/play`) brings the current location's exploration, encounters, combat, and wrap-up into one screen.
 Enter dice you rolled at the table or roll in the app. Review the changes to mark on paper, copy a journal line,
-and carry the Tension Die into the next location. The current location and domain effects recover within the browser tab.
-Named custom encounter tables are saved on the device and can be shared as JSON files.
+and carry the Tension Die into the next location. Lair and exit discoveries, the current location, and domain effects
+recover within the browser tab. The gear ledger stores confirmed equipment changes on the device and carries them
+to the next domain. Named custom encounter tables are saved on the device and can be shared as JSON files.
 
 ## Commands
 
@@ -54,8 +55,8 @@ links the two topics; anything else must be `ed(...)` (editorial), which the UI 
 ## Copyright
 
 The Gravebound Edition (p.4) allows free use of its mechanics but reserves its wording and forbids copying or translating the text.
-So every Korean sentence here is an original summary of mechanics. Creature actions ship as name, range and Physical/Magical tag only;
-flavor tables (room/corridor descriptions, magic item peculiarities) ship as numbers and page pointers only. No art is included.
+The Korean rule text and creature action effects use original summaries of mechanics. Flavor tables for room and corridor
+descriptions and magic item peculiarities use numbers and page pointers.
 
 `npm run overlay` reads your own PDF (default `./KerNethalas-Corebook.pdf`, or `npm run overlay --pdf=/path/to/book.pdf`)
 and writes `src/local/source-overlay.json`, which shows the original English next to each summary **in the dev server only**.

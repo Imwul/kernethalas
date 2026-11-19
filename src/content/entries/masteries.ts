@@ -383,6 +383,15 @@ const MASTERIES: MasteryDef[] = [
 export const masteryIds = MASTERIES.map((m) => m.id);
 export const masteryNames = MASTERIES.map((m) => [m.id, m.en] as const);
 
+export const masteryCatalog = MASTERIES.map((m) => ({
+  id: m.id,
+  name: m.en,
+  feature: { name: m.feature[0], text: m.feature[1] },
+  abilities: m.tiers.map(([name, use, text], index) => ({
+    id: `${m.id}:${index + 1}`, tier: index + 1, name, use, text,
+  })),
+}));
+
 export const masteryEntries: Entry[] = MASTERIES.map((m) => {
   const multiAction = m.tiers.some(([, use]) => use.startsWith(STD2));
   return {

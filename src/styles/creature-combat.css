@@ -87,6 +87,30 @@
 .creature-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); }
 .creature-target > span { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
 
+.creature-combat :is(.creature-damage-guide, .creature-action-resolution) { margin-block: 0; min-width: 0; }
+.creature-combat .creature-action-resolution { margin-block-start: var(--s2); }
+.creature-resolution-body { display: grid; min-width: 0; gap: var(--s2); padding: var(--s1) 0 var(--s2); }
+.creature-resolution-body > dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--s1) var(--s3);
+  margin: 0;
+  padding: var(--s2);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--paper);
+}
+.creature-resolution-body > dl > div { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--s2); }
+.creature-resolution-body :is(dd, .creature-resistance-outcome, .creature-action-damage > p) { margin: 0; }
+.creature-resolution-body :is(dl, .creature-resistance-outcome, .creature-action-damage > p) { font: 14px/1.45 var(--f-ui); }
+.creature-resolution-body dt { color: var(--ink-2); }
+.creature-guide-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s2); }
+.creature-guide-controls .field { width: min(100%, 14rem); min-width: 0; }
+.creature-guide-controls select,
+.creature-combat :is(.creature-damage-guide, .creature-action-resolution) > summary,
+.creature-action-damage .loot-roll-form :is(input, button) { min-height: 44px; }
+.creature-action-damage { display: grid; min-width: 0; gap: var(--s1); }
+.creature-action-damage .loot-roll-form .field { min-width: 0; }
+
 @container (width < 355px) {
   .creature-roll-tools > .seg {
     display: grid;
