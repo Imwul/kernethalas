@@ -235,6 +235,11 @@
   white-space: normal;
 }
 
+/* Size a single secondary column by its longest word before wrapping its cells. */
+.oracle-table-sheet .ttable:not(.cols-many) td[data-col] {
+  overflow-wrap: break-word;
+}
+
 .oracle-table-sheet {
   min-width: 0;
   container-type: inline-size;
