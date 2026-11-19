@@ -261,15 +261,15 @@
   stroke-dasharray: 5 3;
 }
 
-.atlas-drawing .plan-svg .atlas-edge-selected .edge {
+.atlas-drawing .plan-svg .edge.atlas-edge-selected {
   stroke: var(--oxblood);
   stroke-width: 2.4;
 }
 
 .atlas-drawing .plan-svg .atlas-edge-selected .edge-label {
   fill: var(--oxblood-ink);
-  font-weight: bold;
 }
+.atlas-drawing .plan-svg .atlas-edge-selected .edge-label-backplate { stroke: var(--oxblood); }
 
 .atlas-inspector {
   min-width: 0;

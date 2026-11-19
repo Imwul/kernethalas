@@ -1,12 +1,6 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ProcNode, Procedure } from '../content/schema';
-
-const NW = 224;
-const NH = 78;
-const CW = 290;
-const RH = 128;
-const PADL = 34;
-const PADT = 18;
+import { planLabels, planNodeBox, planRoutes, planSize } from '../lib/plan-layout';
 
 export const KIND_KO: Record<ProcNode['kind'], string> = {
   start: '시작점',
@@ -54,8 +48,6 @@ function clip(t: string, max: number): string {
   }
   return out;
 }
-
-const pos = (n: ProcNode) => ({ x: PADL + n.col * CW + (CW - NW) / 2, y: PADT + n.row * RH });
 
 function Glyph({ kind, x, y }: { kind: ProcNode['kind']; x: number; y: number }) {
   const g = { className: 'glyph', transform: `translate(${x},${y})` } as const;
@@ -123,19 +115,39 @@ interface Props {
 }
 
 export function Plan({ p, selected, onSelect }: Props) {
-  const rows = Math.max(...p.nodes.map((n) => n.row)) + 1;
-  const W = PADL + p.cols * CW + 10;
-  const H = PADT + rows * RH - (RH - NH) + 24;
+  const { width: W, height: H } = planSize(p);
   const byId = useMemo(() => new Map(p.nodes.map((n) => [n.id, n])), [p]);
+  const routes = useMemo(() => planRoutes(p), [p]);
   const markers = useId();
   const canvasId = useId();
   const canvas = useRef<HTMLDivElement>(null);
+  const drawing = useRef<SVGSVGElement>(null);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [panning, setPanning] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const [fit, setFit] = useState(0.82);
+  const [textWidths, setTextWidths] = useState<Record<string, number>>({});
   const scale = zoom ?? fit;
   const start = p.nodes.find((n) => n.kind === 'start');
+  const labels = useMemo(() => planLabels(p, routes, textWidths), [p, routes, textWidths]);
+
+  useLayoutEffect(() => {
+    let active = true;
+    const measure = () => {
+      if (!active || !drawing.current) return;
+      const widths = Object.fromEntries(Array.from(drawing.current.querySelectorAll<SVGTextElement>('.edge-label'), (text) => [
+        text.dataset.edge!, Math.ceil(text.getComputedTextLength()),
+      ] as const).filter(([, width]) => width > 0));
+      setTextWidths((previous) => JSON.stringify(widths) === JSON.stringify(previous) ? previous : widths);
+    };
+    measure();
+    void document.fonts.ready.then(measure);
+    document.fonts.addEventListener('loadingdone', measure);
+    return () => {
+      active = false;
+      document.fonts.removeEventListener('loadingdone', measure);
+    };
+  }, [routes]);
 
   useEffect(() => {
     const el = canvas.current;
@@ -151,12 +163,12 @@ export function Plan({ p, selected, onSelect }: Props) {
     const el = canvas.current;
     const node = byId.get(id);
     if (!el || !node) return;
-    const { x, y } = pos(node);
+    const { x, y, width, height } = planNodeBox(node);
     const halfWidth = el.clientWidth / 2;
     const halfHeight = el.clientHeight / 2;
     el.scrollTo({
-      left: (x + NW / 2) * scale + 12 - halfWidth,
-      top: (y + NH / 2) * scale + 12 - halfHeight,
+      left: (x + width / 2) * scale + 12 - halfWidth,
+      top: (y + height / 2) * scale + 12 - halfHeight,
     });
   }, [byId, scale]);
 
@@ -164,50 +176,7 @@ export function Plan({ p, selected, onSelect }: Props) {
     if (selected) center(selected);
   }, [center, selected]);
 
-  const edges = p.edges.map((e, i) => {
-    const a = byId.get(e.from)!;
-    const b = byId.get(e.to)!;
-    const pa = pos(a);
-    const pb = pos(b);
-    let d: string;
-    let lx: number;
-    let ly: number;
-    let anchor: 'start' | 'middle' | 'end' = 'middle';
-    if (b.row > a.row) {
-      const sx = pa.x + NW / 2 + (b.col - a.col) * 14;
-      const sy = pa.y + NH;
-      const tx = pb.x + NW / 2 - (b.col - a.col) * 14;
-      const ty = pb.y;
-      const my = sy + Math.min(28, (ty - sy) / 2);
-      if (b.row - a.row > 1) {
-        const lane = pb.x - (CW - NW) / 2;
-        d = `M${sx},${sy} V${my} H${lane} V${ty - 22} H${tx} V${ty - 6}`;
-      } else {
-        d = sx === tx ? `M${sx},${sy} V${ty - 6}` : `M${sx},${sy} V${my} H${tx} V${ty - 6}`;
-      }
-      lx = tx + 6;
-      ly = b.row - a.row > 1 ? ty - 14 : my + 16;
-      anchor = 'start';
-    } else if (b.row === a.row) {
-      const right = b.col > a.col;
-      const sx = right ? pa.x + NW : pa.x;
-      const tx = right ? pb.x - 6 : pb.x + NW + 6;
-      const y = pa.y + NH / 2;
-      d = `M${sx},${y} H${tx}`;
-      lx = (sx + tx) / 2;
-      ly = y - 8;
-    } else {
-      // loop back upward: route along the left margin of the source column
-      const gx = Math.min(pa.x, pb.x) - 22 - i % 3 * 4;
-      const sy = pa.y + NH / 2;
-      const ty = pb.y + NH / 2;
-      d = `M${pa.x},${sy} H${gx} V${ty} H${pb.x - 6}`;
-      lx = gx + 4;
-      ly = (sy + ty) / 2;
-      anchor = 'start';
-    }
-    return { key: `${e.from}-${e.to}-${i}`, d, label: e.label, lx, ly, anchor, hot: selected === e.from || selected === e.to };
-  }).sort((a, b) => Number(a.hot) - Number(b.hot));
+  const edges = routes.map((edge) => ({ ...edge, hot: selected === edge.from || selected === edge.to }));
 
   return (
     <div className="atlas-drawing">
@@ -240,7 +209,7 @@ export function Plan({ p, selected, onSelect }: Props) {
         }}
         onLostPointerCapture={() => { drag.current = null; setPanning(false); }}
       >
-        <svg className="plan-svg" viewBox={`0 0 ${W} ${H}`} style={{ width: Math.round(W * scale) }} role="group" aria-label={`${p.ko} 단계`}>
+        <svg ref={drawing} className="plan-svg" viewBox={`0 0 ${W} ${H}`} style={{ width: Math.round(W * scale) }} role="group" aria-label={`${p.ko} 단계`}>
           <defs>
             <marker id={`${markers}-arrow`} viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,1 L9,5 L0,9 z" fill="var(--slate-2)" />
@@ -249,22 +218,22 @@ export function Plan({ p, selected, onSelect }: Props) {
               <path d="M0,1 L9,5 L0,9 z" fill="var(--oxblood)" />
             </marker>
           </defs>
-          {edges.map((e) => (
-            <g key={e.key} className={e.hot ? 'atlas-edge-selected' : undefined}>
-              <path
-                className="edge"
-                d={e.d}
-                markerEnd={`url(#${markers}-${e.hot ? 'active' : 'arrow'})`}
-              />
-              {e.label && (
-                <text className="edge-label" x={e.lx} y={e.ly} textAnchor={e.anchor}>
-                  {e.label}
-                </text>
-              )}
-            </g>
-          ))}
+          <g aria-hidden="true">
+            {[...edges].sort((a, b) => Number(a.hot) - Number(b.hot)).map((edge) => (
+              <path key={edge.key} className={`edge${edge.hot ? ' atlas-edge-selected' : ''}`} d={edge.d}
+                markerEnd={`url(#${markers}-${edge.hot ? 'active' : 'arrow'})`} />
+            ))}
+          </g>
+          {edges.filter(({ label }) => label).map(({ key, label, hot }) => {
+            const box = labels.get(key);
+            return <g key={key} className={hot ? 'atlas-edge-selected' : undefined} visibility={box ? undefined : 'hidden'}>
+              {box && <rect className="edge-label-backplate" {...box} rx={3} />}
+              <text className="edge-label" data-edge={key} x={box ? box.x + box.width / 2 : 0}
+                y={box ? box.y + box.height / 2 : 0} textAnchor="middle" dominantBaseline="central">{label}</text>
+            </g>;
+          })}
           {p.nodes.map((n) => {
-            const { x, y } = pos(n);
+            const { x, y, width: NW, height: NH } = planNodeBox(n);
             const sel = selected === n.id;
             return (
               <g

@@ -1973,9 +1973,11 @@ details.fold[open] > summary::before {
   font-family: var(--f-ui);
   font-size: 15px;
   fill: var(--copper-ink);
-  paint-order: stroke;
-  stroke: var(--paper);
-  stroke-width: 4px;
+}
+.plan-svg .edge-label-backplate {
+  fill: var(--paper);
+  stroke: var(--rule);
+  stroke-width: .8;
 }
 .plan-svg .node {
   cursor: pointer;
