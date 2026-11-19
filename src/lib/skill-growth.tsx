@@ -62,9 +62,9 @@ export function useRecordSkillCritical() {
   const write = draft?.write;
   const generation = draft?.generation ?? 0;
   const markGrowth = useMarkSkillGrowth();
-  return useCallback((skill: string, result: CheckResult, effectSkill: string | null = skill) => {
+  return useCallback((skill: string, result: CheckResult, effectSkill: string | null = skill, effectOverride?: string) => {
     if (!isSkillDouble(result.outcome)) return;
-    const effect = effectSkill ? skillCriticalEffect(effectSkill, result.outcome) : undefined;
+    const effect = effectOverride ?? (effectSkill ? skillCriticalEffect(effectSkill, result.outcome) : undefined);
     const label = effectSkill && effectSkill !== skill ? `${effectSkill} (${skill})` : skill;
     const line = [label, `D100 ${result.raw.value === 100 ? '00' : result.raw.value}`,
       result.outcome === 'critical' ? '대성공' : '대실패', effect].filter(Boolean).join(' · ');

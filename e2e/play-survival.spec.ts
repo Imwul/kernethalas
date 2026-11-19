@@ -81,6 +81,11 @@ test('manual Rot and camp skill checks record their adjustments with aligned fie
   await score.fill('78');
   await physicalRoll(growth, '기술 성장 D100', '23');
   await expect(growth.getByRole('button', { name: '기술 성장 기록' })).toBeDisabled();
+  await name.fill('Dodge');
+  await expect(score).toHaveValue('');
+  await score.fill('35');
+  await expect(growth.getByRole('group', { name: '기술 성장 D100' }).getByRole('status')).toHaveCount(0);
+  await expect(growth.getByRole('button', { name: '기술 성장 기록' })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(3440);
 
   await page.getByRole('button', { name: '저널 기록 보기' }).click();
@@ -139,5 +144,20 @@ test('PC skill doubles stay marked until camp, and undo restores the mark', asyn
   await expect(pending).toHaveCount(0);
   await undo.click();
   await expect(pending.getByRole('button', { name: 'Medicine', exact: true })).toBeVisible();
+  await growth.getByRole('button', { name: '기술 성장 기록' }).click();
+  await expect(pending).toHaveCount(0);
+
+  await survival.getByRole('button', { name: '붕대·지속 피해', exact: true }).click();
+  await treatment.getByLabel('보정 Medicine').fill('48');
+  await physicalRoll(treatment, 'Medicine D100', '33');
+  await survival.getByRole('button', { name: '기술 성장', exact: true }).click();
+  await pending.getByRole('button', { name: 'Medicine', exact: true }).click();
+  await growth.getByLabel('현재 Skill').fill('48');
+  await physicalRoll(growth, '기술 성장 D100', '48');
+  await growth.getByRole('button', { name: '기술 성장 기록' }).click();
+  await expect(pending).toHaveCount(0);
+  const records = survival.getByRole('list', { name: '이번 장소 치료·성장 결과' });
+  await expect(records).toContainText('Medicine 45 → 48 (+3)');
+  await expect(records).toContainText('Medicine 48 → 49 (+1)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });

@@ -27,6 +27,12 @@ describe('bilingual search', () => {
     expect(top('growing darkness')).toContain('t-growing-darkness');
     expect(top('Necropede')).toContain('cr-necropede');
   });
+  it('finds room and corridor description tables by their Korean play labels', () => {
+    expect(top('방 환경 묘사', 1)).toEqual(['t-room-description']);
+    expect(top('방 환경 설명', 1)).toEqual(['t-room-description']);
+    expect(top('통로 환경 묘사', 1)).toEqual(['t-corridor-description']);
+    expect(top('복도 환경', 1)).toEqual(['t-corridor-description']);
+  });
   it('finds Masteries by English name, Korean gloss, initials and ability', () => {
     expect(top('Flamecaster', 1)).toEqual(['m-flamecaster']);
     expect(top('화염술사', 1)).toEqual(['m-flamecaster']);

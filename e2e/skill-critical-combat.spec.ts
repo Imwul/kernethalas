@@ -11,6 +11,13 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
   await combat.getByText('조우 시작', { exact: true }).click();
 
   const start = combat.getByRole('region', { name: '조우 시작 계산기' });
+  await start.getByRole('combobox', { name: '조우의 공포 특성' }).selectOption('4');
+  await start.getByRole('textbox', { name: 'PC Resolve' }).fill('40');
+  await start.getByRole('textbox', { name: 'Resolve D100' }).fill('88');
+  await expect(start.getByRole('status', { name: 'Resolve 결과' })).toContainText('Sanity 4 + D4 손실');
+  await start.getByRole('button', { name: 'Resolve 더블 저널에 기록', exact: true }).click();
+  await expect(start.getByRole('button', { name: 'Resolve 더블 저널에 기록됨', exact: true })).toBeDisabled();
+
   await start.getByRole('combobox', { name: '조우 시작 방식' }).selectOption('surprise');
   await start.getByRole('textbox', { name: '적 최고 Mind' }).fill('50');
   await start.getByRole('textbox', { name: 'PC 최저 Stealth' }).fill('50');
@@ -50,6 +57,7 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
 
   await page.getByRole('button', { name: '저널', exact: true }).click();
   const journal = page.getByRole('region', { name: '이번 장소 기록' });
+  await expect(journal).toContainText('Resolve · D100 88 · 대실패 · Sanity 4 + D4 손실');
   await expect(journal).toContainText('Initiative (Perception) · D100 22 · 대성공');
   await expect(journal).toContainText('Bladed Weapons · D100 77 · 대실패');
   await expect(journal).toContainText('Dodge · D100 44 · 대성공');
@@ -60,5 +68,6 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
   await wrap.getByRole('button', { name: '야영', exact: true }).click();
   const pending = wrap.getByRole('group', { name: '야영 성장 대기' });
   await expect(pending).toContainText('Stealth · Perception · Bladed Weapons · Dodge');
+  await expect(pending).not.toContainText('Resolve');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });

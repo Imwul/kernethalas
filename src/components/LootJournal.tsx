@@ -86,10 +86,12 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
   const [kindRoll, setKindRoll] = usePlayDraftState<number | null>('potion-kind', null);
   const [ageRoll, setAgeRoll] = usePlayDraftState<number | null>('potion-age', null);
   const [medicineAttempt, setMedicineAttempt] = usePlayDraftState('potion-medicine-attempt', 0);
+  const [medicineChecked, setMedicineChecked] = usePlayDraftState('potion-medicine-checked', false);
   const clear = useClearPlayDraftScope();
   const potion = journalRow('t-potions', kindRoll);
   const aging = journalRow('t-potion-aging', ageRoll);
   const medicine = method === 'medicine' || method === 'failed' || method === 'medicine-check';
+  const checked = medicineChecked || method === 'medicine' || method === 'failed';
   const identified = method === 'medicine' || method === 'drank' || method === 'stone';
   const text = identified && potion && aging ? potionJournalLine(potion, aging, method === 'drank') : '';
   useEffect(() => {
@@ -100,6 +102,8 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
 
   const chooseMethod = (next: PotionMethod) => {
     setMethod(next);
+    if (next === '') setMedicineChecked(false);
+    else if (checked) setMedicineChecked(true);
     if (next === '' || next === 'medicine-check') {
       clear('potion-medicine');
       setMedicineAttempt((previous) => previous + 1);
@@ -117,16 +121,17 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
       <label className="field loot-select">
         <span>물약 감정</span>
         <select value={medicine ? 'medicine-check' : method} onChange={(event) => chooseMethod(event.target.value as PotionMethod)}>
-          <option value="">감정 방법 선택</option>
-          <option value="medicine-check">Medicine 판정</option>
+          <option value="" disabled>감정 방법 선택</option>
+          <option value="medicine-check" disabled={checked}>Medicine 판정</option>
           <option value="drank">마셔 봄</option>
           <option value="stone">Borestian Stone</option>
         </select>
       </label>
       {medicine && <PlayDraftScope name="potion-medicine">
-        <PhysicalSkillRoll key={medicineAttempt} label="물약 감정 Medicine 판정" skill="Medicine" readOnly={method === 'medicine'}
+        <PhysicalSkillRoll key={medicineAttempt} label="물약 감정 Medicine 판정" skill="Medicine" readOnly={checked}
           onResult={(result) => {
             setMethod(skillCheckSucceeded(result) ? 'medicine' : 'failed');
+            setMedicineChecked(true);
             setKindRoll(null);
             setAgeRoll(null);
           }} />

@@ -6,7 +6,7 @@ import { readOracleValue } from '../lib/oracle';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { XRef } from './bits';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
-import { TensionTool } from './TensionTool';
+import { TensionTool, type TensionResult } from './TensionTool';
 import '../styles/lock-trap.css';
 
 const TARGETS = { door: '문', container: '용기', environment: '환경 함정' } as const;
@@ -328,10 +328,12 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   const [forceFailures, setForceFailures] = usePlayDraftState('force-failures', 0);
   const [crowbar, setCrowbar] = usePlayDraftState('crowbar', false);
   const [forceResult, setForceResult] = usePlayDraftState<Outcome | null>('force-result', null);
+  const [standaloneTension, setStandaloneTension] = usePlayDraftState<Record<number, TensionResult>>('force-tension', {});
   const openingMethod = useRef<HTMLSelectElement>(null);
   const tensionHeading = useRef<HTMLHeadingElement>(null);
   const attempt = `${attemptKey}-${forceFailures + 1}`;
-  const tensionReady = !embedded || !forceResult || embedded.tensionReady(attempt);
+  const tension = standaloneTension[forceFailures] ?? null;
+  const tensionReady = !forceResult || (embedded ? embedded.tensionReady(attempt) : tension !== null);
   const openedReport = opened && tensionReady;
   useEffect(() => {
     onReport?.({ opened: openedReport, lockpicks: pickFailures, pendingTension: !tensionReady });
@@ -350,7 +352,7 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
     <section className="lock-trap-step" aria-label="잠긴 대상 열기">
       <h3>잠긴 대상 열기</h3>
       {openedReport && <p className="lock-trap-note" role="status">개방 성공 · XP +10</p>}
-      {!embedded && opened && container && (
+      {!embedded && openedReport && container && (
         <div className="lock-trap-links"><XRef id="t-deep-search">깊은 수색으로 찾은 용기 보상</XRef></div>
       )}
       {!opened && !forceResult && (
@@ -383,7 +385,9 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
           {forceResult === 'failure' && (
             <p>강제 개방 실패. 긴장 주사위 처리 후 Athletics +{forceOpeningBonus(forceFailures + 1, crowbar)}로 재시도할 수 있습니다.</p>
           )}
-          {embedded ? embedded.renderTension(attempt) : <TensionTool key={forceFailures} />}
+          {embedded ? embedded.renderTension(attempt) : <TensionTool key={attempt}
+            initialSides={standaloneTension[forceFailures - 1]?.nextDie ?? 8} value={tension}
+            onResult={(result) => setStandaloneTension((previous) => ({ ...previous, [forceFailures]: result }))} />}
           {forceResult === 'failure' && tensionReady && (
             <div className="lock-trap-links">
               <button type="button" className="btn ghost" onClick={() => {

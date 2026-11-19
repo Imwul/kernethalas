@@ -268,8 +268,8 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
   const { name, score, roll, gain } = draft;
   const skill = skillGrowthName(name);
   const key = skillGrowthKey(name);
-  const duplicate = recorded.some((record) => skillGrowthKey(record) === key);
   const pendingSkill = skill !== undefined && pending.includes(skill);
+  const duplicate = !pendingSkill && recorded.some((record) => skillGrowthKey(record) === key);
   const current = encounterInteger(score);
   const valid = current !== null && current >= 0 && current <= 80;
   const uncapped = valid && current < 80;
@@ -277,6 +277,10 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
   const increase = !uncapped || roll === null ? null : above ? gain : 1;
   const next = increase !== null && current !== null ? Math.min(80, current + increase) : null;
   const change = next !== null && current !== null ? `${skill ?? name.trim()} ${current} → ${next} (+${next - current})` : '';
+  const chooseSkill = (name: string) => {
+    setDraft((previous) => skillGrowthKey(previous.name) === skillGrowthKey(name)
+      ? { ...previous, name } : { ...EMPTY_GROWTH, name });
+  };
 
   return (
     <section className="survival-card" aria-label="야영 기술 성장">
@@ -285,13 +289,13 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
       {pending.length > 0 && <div className="survival-growth-options" role="group" aria-label="성장 대기 기술">
         {pending.map((item) => <button type="button" key={item} className="btn ghost"
           onClick={() => {
-            setDraft((old) => skillGrowthKey(old.name) === skillGrowthKey(item) ? old : { ...EMPTY_GROWTH, name: item });
+            chooseSkill(item);
             scoreField.current?.focus();
           }}>{item}</button>)}
       </div>}
       <div className="survival-fields">
         <label className="field"><span>기술 이름</span>
-          <input maxLength={80} value={name} onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          <input maxLength={80} value={name} onChange={(event) => chooseSkill(event.target.value)}
             placeholder="예 Medicine" aria-invalid={!!name.trim() && !skill || undefined} />
         </label>
         <label className="field"><span>현재 Skill</span>
@@ -305,7 +309,7 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
       {uncapped && <JournalRoll die="D100" label="기술 성장" value={roll} onValue={(value) => setDraft({ ...draft, roll: value, gain: null })}
         resultText={roll === null ? undefined : above ? '현재 Skill 초과 · D4 성장' : '현재 Skill 이하 · +1 성장'} />}
       {above && <JournalRoll die="D4" label="성장량" value={gain} onValue={(value) => setDraft({ ...draft, gain: value })} />}
-      {duplicate && <p className="field-err" role="alert">이번 야영에 이미 기록한 기술입니다.</p>}
+      {duplicate && <p className="field-err" role="alert">이 기술을 다시 성장시키려면 새 성장 표시가 필요합니다.</p>}
       {next !== null && (
         <div className="survival-actions">
           <strong role="status">{change.trim()}</strong>

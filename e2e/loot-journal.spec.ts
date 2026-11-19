@@ -15,9 +15,11 @@ test('a potion only reveals its kind after identification and records aging in o
   await method.selectOption('medicine-check');
   const medicine = await skillRoll(journal, '물약 감정 Medicine 판정', 'Medicine', 40, 88);
   await expect(medicine.getByRole('status')).toContainText('Harmful Treatment');
+  await expect(medicine.getByRole('textbox', { name: '직접 굴린 D100' })).toHaveCount(0);
   await expect(journal.getByText('마셔 본 뒤 물약 종류를 정할 수 있습니다.')).toBeVisible();
   await expect(journal.getByRole('group', { name: '물약 종류 D20' })).toHaveCount(0);
   await method.selectOption('drank');
+  await expect(method.getByRole('option', { name: 'Medicine 판정' })).toBeDisabled();
   await enterRoll(journal, '물약 종류 D20', '7');
   await enterRoll(journal, '물약 노화 D20', '2');
   const line = journal.getByRole('region', { name: '저널용 한 줄' });
@@ -26,6 +28,7 @@ test('a potion only reveals its kind after identification and records aging in o
   await expect(line).not.toContainText('Wounds 즉시 회복');
   await journal.getByRole('button', { name: '새 물약' }).click();
   await expect(line).toHaveCount(0);
+  await expect(method.getByRole('option', { name: 'Medicine 판정' })).toBeEnabled();
 });
 
 test('a magic weapon needs attunement before rarity and fills table follow-ups for each property', async ({ page }) => {

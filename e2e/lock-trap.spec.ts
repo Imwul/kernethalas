@@ -48,14 +48,20 @@ test('every force attempt shows Tension, including success, and a failed attempt
   await skillRoll(opening, '강제 개방 판정', 'Athletics', 45, 62);
   const tension = opening.getByRole('region', { name: '강제 개방 시도의 긴장 주사위' });
   await expect(tension.getByRole('heading')).toHaveText('1번째 시도의 긴장 주사위');
-  await tension.getByRole('button', { name: 'D8 굴리기' }).click();
-  await expect(tension.getByRole('status')).toContainText('다음 긴장 주사위');
+  await expect(tension.getByRole('button', { name: '다음 시도' })).toHaveCount(0);
+  await tension.getByLabel('긴장 주사위 굴린 값').fill('2');
+  await tension.getByLabel('긴장 주사위 굴린 값').press('Enter');
+  await expect(tension.getByRole('status')).toContainText('다음 긴장 주사위 D6');
   await tension.getByRole('button', { name: '다음 시도' }).click();
   await expect(opening.getByRole('status')).toHaveText('2번째 시도 · Athletics +30');
   await skillRoll(opening, '강제 개방 판정', 'Athletics', 45, 62);
-  await expect(opening.getByText('개방 성공 · XP +10')).toBeVisible();
+  await expect(opening.getByText('개방 성공 · XP +10')).toHaveCount(0);
   await expect(tension.getByRole('heading')).toHaveText('2번째 시도의 긴장 주사위');
   await expect(tension.getByRole('status')).toBeEmpty();
+  await expect(tension.getByLabel('긴장 주사위 크기')).toHaveValue('6');
+  await tension.getByLabel('긴장 주사위 굴린 값').fill('3');
+  await tension.getByLabel('긴장 주사위 굴린 값').press('Enter');
+  await expect(opening.getByText('개방 성공 · XP +10')).toBeVisible();
 });
 
 test('physical detection, disarm and lockpick apply the random and retry modifiers', async ({ page }) => {
