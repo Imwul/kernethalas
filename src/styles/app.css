@@ -989,10 +989,6 @@ kbd {
   max-width: var(--measure);
   margin: 0 0 var(--s5);
 }
-.summary::first-letter {
-  font-family: var(--f-ko-display);
-  color: var(--oxblood-ink);
-}
 .block {
   margin: var(--s5) 0;
   max-width: 78ch;
@@ -1960,7 +1956,7 @@ details.fold[open] > summary::before {
 }
 .plan-svg .coord {
   font-family: var(--f-mono);
-  font-size: 11px;
+  font-size: 15px;
   fill: var(--faded);
   letter-spacing: 0.1em;
 }
@@ -2468,7 +2464,34 @@ details.fold[open] > summary::before {
   color: var(--faded);
   display: grid;
   gap: 6px;
+}
+/* centred pages: keep the footer on the same column as the page above it */
+.frame-main:has(> .archive-home) > .footer {
+  max-width: 1240px;
+  margin-inline: auto;
+}
+.frame-main:has(> .reference-record) > .footer {
+  max-width: 1220px;
+  margin-inline: auto;
+}
+.frame-main:has(> .sources-page) > .footer {
+  max-width: 960px;
+  margin-inline: auto;
+}
+.footer > * {
   max-width: 100ch;
+}
+/* the play desk is centred inside a full-width main; keep the footer on its column */
+.frame-main:has(> .play-desk) > .footer {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+@media (min-width: 2000px) {
+  .frame-main:has(> .play-desk) > .footer {
+    max-width: 1940px;
+    margin-inline-start: clamp(0px, calc((100vw - 2360px) / 2), 480px);
+    margin-inline-end: 0;
+  }
 }
 
 .toast {

@@ -44,7 +44,7 @@
   background: var(--bone);
   border-inline-start: 2px solid var(--copper);
 }
-.mastery-rule > strong { font: 600 1.125rem/1.35 var(--f-ko-display); }
+.mastery-rule > strong { font: 400 1.125rem/1.35 var(--f-ko-display); }
 .mastery-cost { color: var(--copper-ink); font-weight: 700; }
 .mastery-note { color: var(--ink-2); }
 .mastery-action { justify-self: start; }

@@ -65,7 +65,7 @@
 }
 
 .creature-adaptation-stats strong {
-  font: 700 clamp(16px, 3vw, 21px)/1.2 var(--f-display-i);
+  font: 400 clamp(16px, 3vw, 21px)/1.2 var(--f-display-i);
 }
 
 .creature-stat-short { text-decoration: none; }

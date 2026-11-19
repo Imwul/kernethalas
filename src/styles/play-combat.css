@@ -45,7 +45,7 @@
 .play-combat-table h3 {
   margin: 0;
   color: var(--ink);
-  font: 700 17px / 1.4 var(--f-ko-display);
+  font: 400 17px / 1.4 var(--f-ko-display);
 }
 
 .play-combat-table-choice {
@@ -59,7 +59,7 @@
 }
 
 .play-combat-table-choice .readout { padding-block: .06em .12em; }
-.play-combat-table-choice strong { font: 700 20px / 1.4 var(--f-ko-display); }
+.play-combat-table-choice strong { font: 400 20px / 1.4 var(--f-ko-display); }
 
 .play-combat-matches {
   display: grid;
