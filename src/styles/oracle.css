@@ -231,7 +231,7 @@
   display: none;
 }
 
-.oracle-table-area .ttable th {
+.oracle-table-area .ttable th:not(:first-child) {
   white-space: normal;
 }
 

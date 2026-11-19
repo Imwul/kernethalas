@@ -14,19 +14,21 @@ for (const viewport of [{ width: 1366, height: 1024 }, { width: 320, height: 800
 
       const problems = await table.evaluate((element) => {
         const issues: string[] = [];
-        for (const row of element.querySelectorAll('tbody tr')) {
-          const [number, result, skill] = Array.from(row.querySelectorAll('td'));
-          if (!number || !result?.textContent?.trim() || !skill?.textContent?.trim()) {
-            issues.push('missing number, result, or avoidance skill');
-            continue;
-          }
+        const cells = Array.from(element.querySelectorAll('td[data-col], th:first-child'));
+        for (const cell of cells) {
           const text = document.createRange();
-          text.selectNodeContents(skill);
+          text.selectNodeContents(cell);
           const fragments = Array.from(text.getClientRects()).filter((rect) => rect.width > 0);
           const lines = new Set(fragments.map(({ top }) => Math.round(top))).size;
-          const cell = skill.getBoundingClientRect();
-          if (lines !== 1 || fragments.some(({ left, right }) => left < cell.left - 1 || right > cell.right + 1)) {
-            issues.push(`row ${number.textContent?.trim()}: ${skill.textContent.trim()} takes ${lines} lines or extends past the cell`);
+          const { left, right } = cell.getBoundingClientRect();
+          if (lines !== 1 || fragments.some((rect) => rect.left < left - 1 || rect.right > right + 1)) {
+            issues.push(`${cell.textContent?.trim()} takes ${lines} lines or extends past its cell`);
+          }
+        }
+        for (const row of element.querySelectorAll('tbody tr')) {
+          const [number, result, skill] = Array.from(row.querySelectorAll('td'));
+          if (!number?.textContent?.trim() || !result?.textContent?.trim() || !skill?.textContent?.trim()) {
+            issues.push('missing number, result, or avoidance skill');
           }
         }
         return issues;
