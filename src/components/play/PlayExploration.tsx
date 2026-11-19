@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { tableById } from '../../content';
 import { creatureById } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
@@ -11,11 +11,12 @@ import { JournalRoll } from '../LootJournal';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
 import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
 import { PlayDomainExit, PlayDomainProgress, type DomainDestination } from './PlayDomainProgress';
-import { PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport } from './PlayExplorationActions';
+import { ExplorationActionLinks, PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport, type ExplorationActionsHandle } from './PlayExplorationActions';
 import { PlayRoll } from './PlayRoll';
 import '../../styles/play-exploration.css';
 
 export interface ExplorationReport {
+  area: EncounterPlace | null;
   place: string | null;
   shape: string | null;
   nextTension: string | null;
@@ -27,6 +28,7 @@ export interface ExplorationReport {
 }
 
 interface Props {
+  actionsRef: RefObject<ExplorationActionsHandle | null>;
   onReport: (report: ExplorationReport) => void;
   onCombat: (kind: 'encounter' | 'overseer', source?: string) => void;
   onWrapUp: () => void;
@@ -71,7 +73,7 @@ const PLAY_ENCOUNTERS = {
 
 const EMPTY_ACTIONS: ExplorationActionReport = { text: '', sheet: [], nextTension: null, darknessRolls: [] };
 
-export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension = 8, lightCost = 1,
+export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, initialTension = 8, lightCost = 1,
   onDarknessChange, onActionDarknessChange, darknessEffectCount, onTrader,
   domainProgress = DEFAULT_DOMAIN_PROGRESS, onDomainProgress, domainPlaceId = '1', domainPlaceName,
   domainDestinations, domainDefeated, onLeaveDomain }: Props) {
@@ -120,6 +122,8 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
     ? EVENT_TABLE.rows.find(({ min, max }) => min <= eventRoll && eventRoll <= max) : undefined;
   const eventCanStartCombat = eventRow?.next?.some(({ id }) => id === 't-encounter-general');
   const entryNextTension = mayRollEvent && eventRoll === 67 ? 8 : tensionReady ? tension?.nextDie : undefined;
+  const entryResolved = tensionReady && !darknessAmbush
+    && (revisit || lairRoom || introSkip || encountered === false && (!mayRollEvent || !!eventRow));
   const actions = !!place && entryNextTension ? actionReport : EMPTY_ACTIONS;
   const next = actions.nextTension ?? entryNextTension;
   const nextTension = next ? `D${next}` : null;
@@ -140,7 +144,7 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
   const showIntroEncounter = intro && (darknessAmbush || encountered === true || introEncounterRequested);
 
   useEffect(() => {
-    onReport({ place: placeReport, shape: shapeReport, nextTension,
+    onReport({ area: place, place: placeReport, shape: shapeReport, nextTension,
       darkness: darknessReport ? [darknessReport, ...resolvedDarkness.items.map(({ text }) => text)].join(' · ') : null,
       event: eventReport ? [eventReport, ...resolvedEvent.items.map(({ text }) => text)].join(' · ') : null,
       encounter: encounterReport, actions: [
@@ -153,7 +157,7 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
         ...(roomLightCost !== null && tension ? [{ id: 'room-light', text: `광원 −${roomLightCost}`, gear: gearCount('광원', -roomLightCost) }] : []),
         ...resolvedDarkness.items, ...resolvedEvent.items, ...actions.sheet,
       ] });
-  }, [onReport, placeReport, shapeReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
+  }, [onReport, place, placeReport, shapeReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
     firstEntry, domainProgress.lair?.id, domainProgress.exit?.id, domainPlaceId, namedPlace]);
   useEffect(() => { onDarknessChange?.(darknessReport ? darknessRoll : null); }, [onDarknessChange, darknessReport, darknessRoll]);
   useEffect(() => {
@@ -273,7 +277,8 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
           )}
           <PlayDraftScope name="event-follow">
             <ExplorationFollowUp key={eventRoll} kind="event" row={eventRow?.min}
-              darknessEffectCount={darknessEffectCount} onReport={setEventFollow} onCombat={startEventCombat} onTrader={onTrader} />
+              darknessEffectCount={darknessEffectCount} onReport={setEventFollow} onCombat={startEventCombat} onTrader={onTrader}
+              onEnvironmentTrap={() => actionsRef.current?.open('environment')} />
           </PlayDraftScope>
           {eventLairEffect && !intro && !domainProgress.lair && onDomainProgress && (
             eventLairApplied
@@ -285,9 +290,6 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
                   setEventLairApplied(true);
                 })}>왼쪽 문 효과 적용 · 다음 은신처 {loweredLair.lairDie}</button>
           )}
-          {entryNextTension && <PlayExplorationActions room={place === 'room'} initialSides={entryNextTension}
-            darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
-            onReport={setActionReport} onCombat={startEncounter} />}
           {showIntroEncounter && <section className="play-explore-step" aria-label="도입 도메인 조우">
             <JournalRoll die="D20" label="도입 도메인 전투 조우" value={introEncounterRoll} onValue={setIntroEncounterRoll}
               resultText={introCreature?.name} />
@@ -310,11 +312,15 @@ export function PlayExploration({ onReport, onCombat, onWrapUp, initialTension =
               )}
               {encountered === true && !intro && <button type="button" className="btn primary" onClick={() => onCombat('encounter')}>조우 표로</button>}
               {eventCanStartCombat && <button type="button" className="btn ghost" onClick={startEventCombat}>이벤트에서 전투가 났다면 조우 표로</button>}
-              {!darknessAmbush && (revisit || lairRoom || introSkip || (encountered === false && (!mayRollEvent || eventRow))) && (
-                <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} onClick={onWrapUp}>정리로</button>
-              )}
             </div>
           )}
+          {entryResolved && <ExplorationActionLinks room={place === 'room'} label="탐험 후속 행동" onSelect={(action) => actionsRef.current?.open(action)} />}
+          {entryNextTension && <PlayExplorationActions actionsRef={actionsRef} room={place === 'room'} initialSides={entryNextTension}
+            darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
+            onReport={setActionReport} onCombat={startEncounter} />}
+          {entryResolved && <div className="play-explore-next">
+            <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} onClick={onWrapUp}>정리로</button>
+          </div>}
           {exitHere && tensionReady && onLeaveDomain && <PlayDomainExit mode={domainProgress.mode} onLeave={onLeaveDomain} destinations={domainDestinations} />}
         </>
       )}

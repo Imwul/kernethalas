@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { tableById } from '../../content';
 import type { TableRow } from '../../content/schema';
 import { d100FromValue, resolveCheck, rollDie, type Edge } from '../../lib/dice';
@@ -25,6 +25,12 @@ export interface ExplorationActionReport {
   darknessRolls: number[];
 }
 
+export type ExplorationAction = 'door' | 'environment' | 'scavenge' | 'deep';
+
+export interface ExplorationActionsHandle {
+  open: (action: ExplorationAction) => void;
+}
+
 interface ActionRoll {
   id: string;
   result: TensionResult;
@@ -39,6 +45,7 @@ interface DoorRecord {
 
 interface Props {
   room: boolean;
+  actionsRef: Ref<ExplorationActionsHandle>;
   initialSides: TensionDie;
   darknessEffectCount?: number;
   priorDarknessRolls?: number[];
@@ -52,6 +59,26 @@ const SCAVENGE_TABLE = tableById.get('t-scavenging')!;
 const CONTAINER_TABLE = tableById.get('t-deep-search')!;
 const CHECK_LABELS = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패' } as const;
 const NO_DARKNESS_ROLLS: number[] = [];
+
+export function ExplorationActionLinks({ room, label, onSelect }: {
+  room: boolean;
+  label: string;
+  onSelect: (action: ExplorationAction) => void;
+}) {
+  const heading = useId();
+  return (
+    <div className="play-explore-step" role="group" aria-labelledby={heading}>
+      <h3 id={heading}>{label}</h3>
+      <div className="play-explore-next">
+        <button type="button" className="btn ghost" onClick={() => onSelect('door')}>자물쇠·함정 처리</button>
+        {room && <>
+          <button type="button" className="btn ghost" onClick={() => onSelect('scavenge')}>방 뒤지기로</button>
+          <button type="button" className="btn ghost" onClick={() => onSelect('deep')}>깊은 수색으로</button>
+        </>}
+      </div>
+    </div>
+  );
+}
 
 function rowAt(rows: TableRow[], value: number | null) {
   return value === null ? undefined : rows.find(({ min, max }) => min <= value && value <= max);
@@ -68,7 +95,7 @@ function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetIt
   ];
 }
 
-export function PlayExplorationActions({ room, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat }: Props) {
+export function PlayExplorationActions({ room, actionsRef, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat }: Props) {
   const [rolls, setRolls] = usePlayDraftState<ActionRoll[]>('action-tension', []);
   const [doorOpen, setDoorOpen] = usePlayDraftState('door-panel', false);
   const [searchOpen, setSearchOpen] = usePlayDraftState('scavenge-panel', false);
@@ -89,6 +116,22 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
   const [lootGear, setLootGear] = useState<GearEffect>();
   const [followUps, setFollowUps] = useState<Record<string, ActionSheetItem[]>>({});
   const panelId = useId();
+  const panel = useRef<HTMLElement>(null);
+
+  useImperativeHandle(actionsRef, () => ({
+    open(action) {
+      if (action === 'door' || action === 'environment') setDoorOpen(true);
+      if (action === 'environment') setEnvironmentOpen(true);
+      if (action === 'scavenge') setSearchOpen(true);
+      if (action === 'deep') setDeepOpen(true);
+      requestAnimationFrame(() => {
+        const summary = panel.current?.querySelector<HTMLElement>(`summary[data-explore-action="${action}"]`);
+        summary?.focus({ preventScroll: true });
+        summary?.scrollIntoView({ block: 'start' });
+      });
+    },
+  }), [setDoorOpen, setEnvironmentOpen, setSearchOpen, setDeepOpen]);
+
   const doorPresent = door === 'present' || door === 'roll' && doorRoll !== null && doorRoll <= 5;
   const readyDeep = room && deepStarted && tensionResolved(rolls.find(({ id }) => id === 'deep'));
   const openContainer = readyDeep && containerReport?.opened;
@@ -195,9 +238,9 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
   );
 
   return (
-    <section className="play-explore-actions" aria-label="선택 탐험 행동">
+    <section className="play-explore-actions" aria-label="선택 탐험 행동" ref={panel}>
       <details className="fold" open={doorOpen} onToggle={(event) => setDoorOpen(event.currentTarget.open)}>
-        <summary>문·함정 조사</summary>
+        <summary data-explore-action="door">문·함정 조사</summary>
         <div className="play-explore-action-body">
           <label className="field"><span>조사할 대상</span>
             <select value={door} onChange={(event) => setDoor(event.target.value as typeof door)}>
@@ -216,7 +259,7 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
             setDoorReport(null);
           }}>다른 문 조사</button>}
           <details className="fold play-environment" open={environmentOpen} onToggle={(event) => setEnvironmentOpen(event.currentTarget.open)}>
-            <summary>환경 함정</summary>
+            <summary data-explore-action="environment">환경 함정</summary>
             {lock('environment', setEnvironmentReport)}
           </details>
         </div>
@@ -224,11 +267,11 @@ export function PlayExplorationActions({ room, initialSides, darknessEffectCount
       {room && (
         <>
           <details className="fold" open={searchOpen} onToggle={(event) => setSearchOpen(event.currentTarget.open)}>
-            <summary>방 뒤지기</summary>
+            <summary data-explore-action="scavenge">방 뒤지기</summary>
             <div className="play-explore-action-body"><Scavenge onReport={setScavenge} onCombat={() => onCombat('scavenge')} /></div>
           </details>
           <details className="fold" open={deepOpen} onToggle={(event) => setDeepOpen(event.currentTarget.open)}>
-            <summary>깊은 수색</summary>
+            <summary data-explore-action="deep">깊은 수색</summary>
             <div className="play-explore-action-body">
               <p className="play-explore-note">방마다 한 번 · 즉시 긴장 주사위 판정 · Exhaustion +2</p>
               {!deepStarted && <button className="btn ghost play-explore-action-btn" type="button" onClick={() => setDeepStarted(true)}>깊은 수색 시작</button>}

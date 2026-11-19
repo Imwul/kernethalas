@@ -7,6 +7,7 @@ import { PlayCombat, type EncounterSeed } from '../components/play/PlayCombat';
 import { PlayDomain } from '../components/play/PlayDomain';
 import { PlayEquipment } from '../components/play/PlayEquipment';
 import { PlayExploration, type ExplorationReport } from '../components/play/PlayExploration';
+import { ExplorationActionLinks, type ExplorationActionsHandle } from '../components/play/PlayExplorationActions';
 import { PlayInventory, useGearLedger } from '../components/play/PlayInventory';
 import { PlayWrapUp } from '../components/play/PlayWrapUp';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
@@ -133,6 +134,7 @@ function PlayDesk() {
   const [customSets, setCustomSets] = useState(readEncounterLibrary);
   const equipment = useRef<HTMLDetailsElement>(null);
   const inventory = useRef<HTMLDetailsElement>(null);
+  const explorationActions = useRef<ExplorationActionsHandle>(null);
   const headings = useRef<Partial<Record<StageId, HTMLHeadingElement>>>({});
   const stage = STAGES.find(({ id }) => id === active) ?? STAGES[0];
   const domain = domains.find(({ id }) => id === domainId) ?? domains[0];
@@ -412,7 +414,7 @@ function PlayDesk() {
               </details>
             )}
             <PlayDraftScope name="explore">
-              <PlayExploration key={revision} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')}
+              <PlayExploration key={revision} actionsRef={explorationActions} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')}
                 initialTension={initialTension} lightCost={previousEffects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
                 onDarknessChange={setDarkness} onActionDarknessChange={setActionDarkness}
                 darknessEffectCount={previousEffects.length} onTrader={openTrader}
@@ -459,6 +461,12 @@ function PlayDesk() {
                 onBreatherAmbush={() => startCombat('encounter', 'breather')}
                 onJournalChange={setWrapSummary} onBattleJournalChange={reportBattleLine} onSheetChange={reportSheet} />
             </PlayDraftScope>
+            {wrapBattle?.outcome && wrapBattle.outcome !== 'fled' && exploration?.area && exploreTension && (
+              <ExplorationActionLinks room={exploration.area === 'room'} label="이 장소 탐험 계속" onSelect={(action) => {
+                setActive('explore');
+                explorationActions.current?.open(action);
+              }} />
+            )}
             <details className="fold play-equipment-fold" key={`equipment-${revision}`} ref={equipment}>
               <summary>소지칸·상인 거래</summary>
               <PlayDraftScope name="equipment">

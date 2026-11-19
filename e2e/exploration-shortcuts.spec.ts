@@ -2,6 +2,30 @@ import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 360, height: 800 } });
 
+test('event and combat steps lead to lock, trap and search procedures', async ({ page }) => {
+  for (const [node, next] of [['event', '선택 행동'], ['combat', /승리 후.*선택 행동/]] as const) {
+    await page.goto(`/atlas/p-explore-room?view=list&node=${node}`);
+    await page.getByRole('button', { name: next, exact: true }).click();
+    const actions = page.locator('#atlas-content-opt');
+    await expect(actions.getByRole('link', { name: /자물쇠 · 함정 처리/ })).toHaveAttribute('href', '/atlas/p-locks-traps');
+    await actions.getByRole('link', { name: /방 뒤지기 · 깊은 수색/ }).click();
+    const search = page.getByRole('dialog', { name: '방 뒤지기 · 깊은 수색' });
+    await search.getByRole('link', { name: /자물쇠 · 함정 처리/ }).click();
+    await expect(page.getByRole('dialog', { name: '자물쇠 · 함정 처리' }).getByRole('heading', { name: '문·용기·함정 판정' })).toBeVisible();
+  }
+});
+
+test('an environmental trap result opens the lock and trap tool from the event oracle', async ({ page }) => {
+  await page.goto('/oracle/t-events?r=4&view=one');
+  const roller = page.getByRole('region', { name: '표 굴리기' });
+  await expect(roller.getByRole('link', { name: /^표 함정$/ })).toBeVisible();
+  await roller.getByRole('link', { name: /자물쇠 · 함정 처리/ }).click();
+  const tool = page.getByRole('dialog', { name: '자물쇠 · 함정 처리' });
+  await tool.getByRole('button', { name: '환경 함정', exact: true }).click();
+  await expect(tool.getByLabel('Perception 탐지 결과')).toBeVisible();
+  await expect(tool.getByLabel('잠김 여부 D20')).toHaveCount(0);
+});
+
 test('an exploration shortcut opens related rolls without leaving the selected step', async ({ page }) => {
   const route = '/atlas/p-explore-room?view=list&node=shape';
   await page.goto(route);

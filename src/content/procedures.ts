@@ -186,7 +186,7 @@ export const procedures: Procedure[] = [
       { id: 'enc', kind: 'check', title: '조우 판정', en: 'D20', body: '방 10+, 통로 15+.', col: 1, row: 5, tables: ['t-encounter-check'], refs: ['encounter-check'], need: 'required' },
       { id: 'combat', kind: 'outcome', title: '전투', body: '일반 도메인은 D6로 Table A/B를 정한다. 룰북의 도입 도메인은 전용 D20 조우 표를 쓴다.', col: 0, row: 6, tables: ['t-encounter-general'], refs: ['combat-overview', 'first-domain-rules'], need: 'conditional' },
       { id: 'event', kind: 'table', title: '이벤트', body: '방이고 조우가 없으면 D100 Events. 통로는 굴리지 않음.', col: 2, row: 6, tables: ['t-events'], refs: ['events'], need: 'conditional' },
-      { id: 'opt', kind: 'step', title: '선택 행동', body: 'Scavenge(방당 1회), 깊은 수색, 문 확인/자물쇠·함정, Breather·Camp.', col: 1, row: 7, refs: ['scavenging', 'deep-search', 'doors', 'locks-traps', 'take-a-breather'], need: 'optional' },
+      { id: 'opt', kind: 'step', title: '선택 행동', body: '문이나 함정이 있으면 자물쇠·함정 절차를 확인한다. 방에서는 뒤지기(보통 방당 1회)나 깊은 수색도 할 수 있다. 필요하면 Breather·Camp.', col: 1, row: 7, refs: ['p-locks-traps', 'p-scavenge', 'scavenging', 'deep-search', 'doors', 'locks-traps', 'take-a-breather'], need: 'optional' },
       { id: 'next', kind: 'loop', title: '다음 장소', body: '정리한 장소에 다시 들어갈 때도 Tension Die를 굴린다. 방이면 광원을 소모한다.', col: 1, row: 8, refs: ['retracing'] },
     ],
     edges: [
@@ -236,7 +236,7 @@ export const procedures: Procedure[] = [
       { id: 'bypass', kind: 'outcome', title: '환경 함정 우회 성공', body: '어느 출구로든 이동하거나 출구의 문을 다룰 수 있다. 수색이나 다른 물체와의 상호작용은 함정을 발동시킨다. 같은 함정을 다시 우회할 때는 Effortless(+20).', col: 2, row: 4, refs: ['locks-traps'], need: 'conditional' },
       { id: 'pick', kind: 'step', title: '자물쇠 따기', body: 'Lockpick + Thievery. 실패: Lockpick 파손, 재시도 난이도 한 단계 쉬워짐.', col: 0, row: 5, refs: ['skills'] },
       { id: 'force', kind: 'step', title: '강제 개방', body: 'Athletics(Crowbar +10). 실패 시 재시도마다 +20 누적. 시도마다 Tension Die.', col: 2, row: 5, refs: ['tension-die'] },
-      { id: 'open', kind: 'outcome', title: '열림', body: '잠긴 문·용기의 개방과 함정의 성공적 해체는 각각 XP +10. 깊은 수색으로 찾은 용기면 D10.', col: 1, row: 6, tables: ['t-deep-search'], refs: ['leveling-up'] },
+      { id: 'open', kind: 'outcome', title: '열림', body: '잠긴 문·용기의 개방과 함정의 성공적 해체는 각각 XP +10. 깊은 수색으로 찾은 용기면 D10.', col: 1, row: 6, tables: ['t-deep-search'], refs: ['p-scavenge', 'leveling-up'] },
     ],
     edges: [
       { from: 'start', to: 'perc' },
@@ -369,7 +369,7 @@ export const procedures: Procedure[] = [
       { id: 'sc', kind: 'check', title: 'Scavenge 판정', body: '대성공: 표 +5 선택 / 대실패: 전투 조우.', col: 0, row: 1, refs: ['scavenging'], tables: ['t-noncombat-crits'] },
       { id: 'sct', kind: 'table', title: 'Scavenging 표', body: 'D20.', col: 0, row: 2, tables: ['t-scavenging'] },
       { id: 'deep', kind: 'step', title: '깊은 수색', body: '즉시 Tension Die + Exhaustion 2.', col: 1, row: 1, refs: ['deep-search', 'tension-die'], need: 'optional' },
-      { id: 'lt', kind: 'step', title: '자물쇠·함정 절차', body: '용기에 대해.', col: 1, row: 2, refs: ['locks-traps'] },
+      { id: 'lt', kind: 'step', title: '자물쇠·함정 절차', body: '찾은 용기에 자물쇠·함정 절차를 적용한다.', col: 1, row: 2, refs: ['p-locks-traps', 'locks-traps'] },
       { id: 'cont', kind: 'table', title: '내용물', body: 'D10: 1–5 빈 것, 6–10 Container Loot.', col: 1, row: 3, tables: ['t-deep-search', 't-container-loot'] },
     ],
     edges: [

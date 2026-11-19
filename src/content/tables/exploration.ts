@@ -1,5 +1,5 @@
 import type { OracleTable, TableRow } from '../schema';
-import { core, req, opt, cond } from '../helpers';
+import { core, req, opt, cond, ed } from '../helpers';
 
 const ROOM_SHAPE_EXITS = [2,4,1,3,2,4,6,2,2,2,2,1,2,4,3,2,2,2,3,3,3,4,2,2,5,2,4,4,8,2,1,2,2,4,1,2,4,1,2,1,2,3,1,3,2,2,2,2,5,2,8,4,1,1,2,2,2,2,2,1,2,3,3,4,3,2,2,2,5,6,8,2,1,2,2,2,1,1,3,2,2,2,4,1,1,2,1,2,1,1,4,3,2,2,2,1,2,1,3,3];
 const r = (min: number, max: number, ko: string, label?: string, extra?: Partial<TableRow>): TableRow => ({ min, max, ko, label, ...extra });
@@ -219,7 +219,7 @@ export const explorationTables: OracleTable[] = [
     usage: '방에 들어가 전투 조우가 없을 때. 통로에서는 굴리지 않는다. “전리품” = Spoils 표.',
     mode: 'summary',
     rows: [
-      r(1, 10, '함정이 있다 — Traps 표, 자물쇠·함정 절차.', 'Trap', { next: [n('t-traps'), n('locks-traps')] }),
+      r(1, 10, '함정이 있다 — Traps 표, 자물쇠·함정 절차.', 'Trap', { next: [n('p-locks-traps', '환경 함정'), n('t-traps'), n('locks-traps')] }),
       r(11, 20, '값진 것이 있다 — Spoils 표.', 'Spoils', { next: [n('t-spoils')] }),
       r(21, 30, '상인을 만난다.', 'Trader', { next: [n('traders')] }),
       r(31, 31, '희생 제단(Dyxemis): Health 1을 바치면 D10+2 방·통로 동안 최대 Toughness +5.', 'Altar — Dyxemis'),
@@ -294,7 +294,7 @@ export const explorationTables: OracleTable[] = [
       r(100, 100, '네크로로드의 영 — Resolve: 성공 XP +100, 실패 Madness.', undefined, { next: [n('t-madness')] }),
     ],
     notes: [{ type: 'clarification', text: '각 결과는 기계적 효과만 요약한 것. 분위기 묘사와 정확한 표현은 원문(108–115쪽).' }],
-    related: [req('events'), opt('locks-traps'), opt('traders')],
+    related: [req('events'), cond('p-locks-traps', '함정이 나왔을 때'), opt('locks-traps'), opt('traders'), ed('p-scavenge', '이벤트를 처리한 뒤 방에서 선택')],
     source: [core(108, 109, 110, 111, 112, 113, 114, 115)],
     verification: 'verified',
   },

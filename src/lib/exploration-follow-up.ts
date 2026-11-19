@@ -13,7 +13,8 @@ type FollowAction =
   | { kind: 'table'; id: string; table: string }
   | { kind: 'spoils'; id: string }
   | { kind: 'link'; id: string; dest: string }
-  | { kind: 'combat' | 'trader'; id: string; label: string };
+  | { kind: 'combat' | 'trader'; id: string; label: string }
+  | { kind: 'environment-trap'; id: string };
 export type FollowStep = FollowAction & { when?: Condition };
 
 const paper = (id: string, text: Extract<FollowAction, { kind: 'paper' }>['text'], gear?: GearEffect): FollowStep => ({ kind: 'paper', id, text, gear });
@@ -55,7 +56,7 @@ function altar(text: string) {
 }
 
 const EVENT_STEPS: Record<number, FollowStep[]> = {
-  1: [link('locks-traps')],
+  1: [{ kind: 'environment-trap', id: 'environment-trap' }],
   11: [spoils()],
   21: [{ kind: 'trader', id: 'trader', label: '상인 거래로' }],
   31: altar('최대 Toughness +5'),

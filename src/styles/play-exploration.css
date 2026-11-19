@@ -65,6 +65,9 @@
 .play-explore-action-body .lock-trap-roll { grid-template-columns: minmax(0, 1fr) auto auto; }
 .play-explore-action-body input { min-width: 0; }
 .play-explore-action-btn { justify-self: start; }
+.play-explore-actions summary[data-explore-action] {
+  scroll-margin-block-start: calc(var(--play-stage-top) + var(--s2));
+}
 .play-action-darkness-heading { scroll-margin-top: var(--play-stage-top, 6rem); }
 .play-scavenge-check {
   display: grid;

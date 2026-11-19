@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { tableById } from '../../content';
 import type { RollResult } from '../../lib/dice';
 import { followUpSteps, type FollowAnswers, type FollowStep } from '../../lib/exploration-follow-up';
@@ -30,13 +30,14 @@ function diceFor(step: Extract<FollowStep, { kind: 'roll' }>, answers: FollowAns
   return typeof step.dice === 'function' ? step.dice(answers) : step.dice;
 }
 
-export function ExplorationFollowUp({ kind, row, darknessEffectCount, onReport, onCombat, onTrader }: {
+export function ExplorationFollowUp({ kind, row, darknessEffectCount, onReport, onCombat, onTrader, onEnvironmentTrap }: {
   kind: 'event' | 'darkness';
   row: number | undefined;
   darknessEffectCount?: number;
   onReport: (report: FollowUpReport) => void;
   onCombat?: () => void;
   onTrader?: () => void;
+  onEnvironmentTrap?: () => void;
 }) {
   const clear = useClearPlayDraftScope();
   const [answers, setAnswers] = usePlayDraftState<FollowAnswers>('answers', {});
@@ -139,6 +140,14 @@ export function ExplorationFollowUp({ kind, row, darknessEffectCount, onReport, 
         if (step.kind === 'spoils') return <FollowSpoils key={step.id} id={step.id} onLoot={reportLoot} />;
         if (step.kind === 'link') return <XRef key={step.id} id={step.dest} />;
         if (step.kind === 'combat' && onCombat) return <button key={step.id} type="button" className="btn ghost exploration-follow-button" onClick={onCombat}>{step.label}</button>;
+        if (step.kind === 'environment-trap') return (
+          <Fragment key={step.id}>
+            {onEnvironmentTrap
+              ? <button type="button" className="btn ghost exploration-follow-button" onClick={onEnvironmentTrap}>환경 함정 처리로</button>
+              : <XRef id="locks-traps" />}
+            <p className="play-explore-note">함정을 우회한 상태에서 방을 뒤지거나 깊은 수색을 하면 함정이 발동합니다.</p>
+          </Fragment>
+        );
         if (step.kind === 'trader') return onTrader
           ? <button key={step.id} type="button" className="btn ghost exploration-follow-button" onClick={onTrader}>{step.label}</button>
           : <XRef key={step.id} id="traders" />;
