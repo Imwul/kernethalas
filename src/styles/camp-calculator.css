@@ -1,0 +1,98 @@
+.camp-calc {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+  max-width: 50rem;
+  padding: var(--s3);
+  border-block: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.camp-calc h2,
+.camp-calc h3 {
+  margin: 0;
+  font: 400 1.15rem var(--f-ko-display);
+}
+
+.camp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--s2) var(--s3);
+  min-width: 0;
+}
+
+.camp-grid .field {
+  min-width: 0;
+  align-content: start;
+}
+
+.camp-grid :is(input, select):not([type='checkbox']) { min-height: 44px; }
+
+.camp-options,
+.camp-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s3);
+}
+
+.camp-options label,
+.camp-amulets,
+.camp-links .xref,
+.camp-calc > .xref {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: 44px;
+}
+
+.camp-options label,
+.camp-amulets {
+  color: var(--ink-2);
+  font: 14px/1.35 var(--f-ui);
+}
+
+.camp-calc input[type='checkbox'] { accent-color: var(--copper-ink); }
+
+.camp-activities { border-top: 1px solid var(--rule-soft); }
+
+.camp-activities summary {
+  padding-block: var(--s2);
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--copper-ink);
+  font: 14px/1.65 var(--f-ui);
+}
+
+.camp-activities fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.camp-activities fieldset:disabled { opacity: 0.55; }
+.camp-calc p { margin: 0; }
+.camp-calc > .xref { justify-self: start; }
+
+.camp-ledger {
+  display: grid;
+  gap: var(--s1);
+  margin: 0;
+  padding: var(--s2) 0;
+  border-block: 1px solid var(--rule-soft);
+  font: 14px/1.45 var(--f-ui);
+}
+
+.camp-ledger > div {
+  display: grid;
+  grid-template-columns: minmax(6.875rem, 29%) minmax(0, 1fr);
+  gap: var(--s2);
+}
+
+.camp-ledger dt { color: var(--ink-2); }
+.camp-ledger dd { margin: 0; overflow-wrap: anywhere; }
+.camp-verdict p + p { margin-top: var(--s1); }
+.camp-benefits { display: grid; gap: var(--s2); }
+.camp-roll-form { display: grid; gap: var(--s2); min-width: 0; }
+.camp-roll-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.camp-encounter { justify-self: start; }
+.camp-benefits .loot-roll { margin-top: var(--s2); }

@@ -16,7 +16,7 @@ describe('creature defenses', () => {
       restored: ['Infernal', 'Fire'],
       immuneConditions: ['Poisoned'],
     });
-    expect(defensesOf('cr-umbra-fiend').resistant).toEqual(['비마법 물리 피해']);
+    expect(defensesOf('cr-umbra-fiend').resistsNonMagicalPhysical).toBe(true);
   });
 
   it('deduplicates overlapping type and trait effects', () => {

@@ -5,7 +5,7 @@ import { nav, useNav } from './lib/store';
 import { Palette } from './components/Palette';
 import { ReferenceContext, type PreviewReference } from './components/ReferenceContext';
 import { ReferencePanel, type ReferenceFrame } from './components/ReferencePanel';
-import { Crest, IBeast, IBench, IDrawer, IMoon, IPlan, IQuestion, IRecord, ISearch, ISun, ISystem } from './components/icons';
+import { Crest, IBeast, IBench, IDie, IDrawer, IMoon, IPlan, IQuestion, IRecord, ISearch, ISun, ISystem } from './components/icons';
 import { Home } from './views/Home';
 import { ReferenceIndex, ReferencePage } from './views/Reference';
 import { OracleIndex, OraclePage } from './views/Oracle';
@@ -14,6 +14,7 @@ import { Rulings } from './views/Rulings';
 import { Workbench, Dock } from './views/Workbench';
 import { Sources } from './views/Sources';
 import { Bestiary } from './views/Bestiary';
+import { Play } from './views/Play';
 import { NotFound } from './views/NotFound';
 import { CATEGORY_LABEL } from './content';
 import type { SearchFilter } from './lib/search';
@@ -30,6 +31,7 @@ const SECTIONS = [
 function route(path: string, onSearch: (q?: string) => void) {
   let m;
   if (path === '/') return <Home onSearch={onSearch} />;
+  if (path === '/play') return <Play />;
   if (path === '/ref') return <ReferenceIndex />;
   if ((m = match('/ref/:id', path))) return <ReferencePage id={m.id} />;
   if (path === '/oracle') return <OracleIndex />;
@@ -107,7 +109,8 @@ export function App() {
   }, [openSearch]);
 
   const nextTheme = theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system';
-  const showDock = path !== '/workbench';
+  const playing = path === '/play';
+  const showDock = path !== '/workbench' && !playing;
 
   return (
     <ReferenceContext.Provider value={preview}>
@@ -130,6 +133,8 @@ export function App() {
             ))}
           </nav>
           <div className="head-tools">
+            <Link to="/play" className="head-play" aria-label="플레이 모드"
+              aria-current={playing ? 'page' : undefined} title="플레이 모드"><IDie /><span>플레이</span></Link>
             <button className="searchtrigger" onClick={() => openSearch()} aria-label="검색" aria-keyshortcuts="Control+K Meta+K /">
               <ISearch />
               <span className="label">검색</span>
@@ -142,7 +147,7 @@ export function App() {
         </div>
       </header>
 
-      <div className={`frame ${showDock ? 'has-dock' : ''}`}>
+      <div className={`frame${showDock ? ' has-dock' : ''}`}>
         {showDock && (
           <div className="frame-index">
             <nav className="side-index" aria-label="범주 색인">

@@ -1,0 +1,75 @@
+.play-exploration {
+  display: grid;
+  min-width: 0;
+  gap: var(--s4);
+}
+
+.play-explore-options,
+.play-explore-choice,
+.play-explore-links,
+.play-explore-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+}
+
+.play-explore-options { gap: var(--s2) var(--s4); }
+.play-explore-choice > span { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
+.play-explore-choice .seg { flex-wrap: wrap; }
+.play-explore-choice .seg button,
+.play-explore-next .btn,
+.play-explore-links .xref { min-height: 44px; align-items: center; }
+
+.play-explore-context {
+  padding: var(--s2) var(--s3);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--paper);
+}
+.play-explore-context p, .play-explore-next p { margin: 0; }
+.play-explore-note { margin: 0; color: var(--ink-2); font: 14px/1.45 var(--f-ui); }
+.play-explore-context p > span { color: var(--ink-2); }
+.play-explore-lair {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  font: 14px/1.4 var(--f-ui);
+}
+.play-explore-lair input { accent-color: var(--copper-ink); }
+.play-explore-step { display: grid; min-width: 0; gap: var(--s2); }
+.play-explore-step h3 { margin: 0; font: 18px/1.35 var(--f-ko-display); }
+.play-explore-step .tension-tool {
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--copper);
+  background: var(--paper);
+}
+.play-explore-next:empty { display: none; }
+
+.play-explore-actions,
+.play-explore-action-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+}
+.play-explore-actions > .fold > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.play-explore-action-body { padding: 0 var(--s2) var(--s2); }
+.play-explore-action-body > .fold { margin-top: 0; }
+.play-explore-action-body > .field { max-width: 24rem; }
+.play-explore-action-body :is(select, input:not([type='checkbox']), .btn) { min-height: 44px; }
+.play-explore-action-body .lock-trap-roll { grid-template-columns: minmax(0, 1fr) auto auto; }
+.play-explore-action-body input { min-width: 0; }
+.play-explore-action-btn { justify-self: start; }
+.play-action-darkness-heading { scroll-margin-top: var(--play-stage-top, 6rem); }
+.play-scavenge-check {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  align-items: end;
+  gap: var(--s2);
+}
+.play-scavenge-check > .field-err { grid-column: 1 / -1; margin: 0; }

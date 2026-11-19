@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { tables, tableById, TABLE_GROUP_LABEL } from '../content';
 import type { OracleTable } from '../content/schema';
+import { ENCOUNTER_PLACES, encounterRowsForPlace, type EncounterPlace } from '../content/tables/exploration';
 import { Link, navigate, useLocation } from '../lib/router';
 import { TableView } from '../components/TableView';
 import { CheckCalculator } from '../components/CheckCalculator';
@@ -219,16 +220,22 @@ interface OracleBodyProps {
 
 export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow }: OracleBodyProps) {
   const [localOnly, setLocalOnly] = useState(compact);
+  const [encounterPlace, setEncounterPlace] = useState<EncounterPlace | null>(null);
   const table = useRef<HTMLDivElement>(null);
   const sides = tableSides(t.dice);
   const resultOnly = only ?? localOnly;
   const showTable = sides === null || !resultOnly || (value === null && !collapseTableBeforeRoll);
+  const isEncounter = t.id === 't-encounter-check';
+  const contextual = isEncounter && encounterPlace !== null;
+  const activeTable = contextual
+    ? { ...t, columns: undefined, rows: encounterRowsForPlace(encounterPlace) }
+    : t;
   return (
     <div className={`oracle-body${compact ? ' compact' : ''}${sides ? ' split' : ''}`}>
       {sides !== null && (
         <Roller
           key={t.id}
-          t={t}
+          t={activeTable}
           sides={sides}
           value={value}
           onValue={onValue}
@@ -237,6 +244,18 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
           rollLabel={rollLabel}
           sourceForRow={sourceForRow}
           showUnrolledViewToggle={collapseTableBeforeRoll}
+          beforeRoll={isEncounter && (
+            <div className="oracle-encounter-place">
+              <span aria-hidden="true">장소</span>
+              <div className="seg" role="group" aria-label="조우 장소">
+                {([null, 'room', 'corridor'] as const).map((place) => (
+                  <button key={place ?? 'both'} type="button" aria-pressed={encounterPlace === place} onClick={() => setEncounterPlace(place)}>
+                    {place === null ? '방·통로 비교' : ENCOUNTER_PLACES[place].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           onShowRow={() => {
             const row = table.current?.querySelector<HTMLTableRowElement>('tr[aria-current="true"]');
             row?.scrollIntoView({ block: 'center' });
@@ -246,7 +265,11 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
       )}
       <div className="oracle-table-area">
         <Notes notes={t.notes} />
-        {showTable && <div className="oracle-table-sheet" ref={table}><TableView t={t} hit={value} sourceForRow={sourceForRow} /></div>}
+        {showTable && (
+          <div className="oracle-table-sheet" ref={table}>
+            <TableView t={activeTable} hit={value} sourceForRow={contextual ? () => '' : sourceForRow} />
+          </div>
+        )}
         {t.related.length > 0 && (
           <details className="oracle-related" open={!compact}>
             <summary>관련 항목</summary>

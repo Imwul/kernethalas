@@ -3,8 +3,13 @@
 An unofficial play-time reference for *Ker Nethalas: Into the Midnight Throne — Gravebound Edition v1.2*:
 rules index, official oracle tables, procedure atlas, quick rulings, and a workbench for comparing rules side by side.
 
-It is a **reference companion, not a game runner**: it never tracks characters, HP, maps, sessions or combat state,
-never advances a procedure for you, and only rolls dice when you press a button.
+It is a **reference companion** for a paper character sheet and journal. Choose when to advance a procedure
+or roll a die.
+
+**Play mode** (`/play`) brings the current location's exploration, encounters, combat, and wrap-up into one screen.
+Enter dice you rolled at the table or roll in the app. Review the changes to mark on paper, copy a journal line,
+and carry the Tension Die into the next location. The current location and domain effects recover within the browser tab.
+Named custom encounter tables are saved on the device and can be shared as JSON files.
 
 ## Commands
 

@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { entryById, tableById, procById, rulingById, hrefOf, titleOf, kindOf } from '../content';
 import { Link } from '../lib/router';
 import { nav, OPEN_MAX, useNav } from '../lib/store';
-import { CheckCalculator } from '../components/CheckCalculator';
 import { EntryBody } from '../components/EntryBody';
 import { IClose, IDown, IUp } from '../components/icons';
 import { KIND_KO } from '../components/Plan';
-import { TensionTool } from '../components/TensionTool';
+import { procedureTools } from '../components/procedure-tools';
 import { Notes, XRef } from '../components/bits';
 import { LedgerItem } from './Home';
 import { OracleBody } from './Oracle';
@@ -48,7 +47,7 @@ export function PaneBody({ id }: { id: string }) {
   if (t) return <TablePane id={id} />;
   const p = procById.get(id);
   if (p) {
-    const tool = id === 'p-attack' ? <CheckCalculator attackOnly /> : id === 'p-tension' ? <TensionTool /> : null;
+    const Tool = procedureTools[id];
     const outline = (
       <ol className="steps">
         {[...p.nodes]
@@ -67,9 +66,9 @@ export function PaneBody({ id }: { id: string }) {
     return (
       <div className="bench-procedure">
         <p className="summary">{p.summary}</p>
-        {tool ? (
+        {Tool ? (
           <>
-            {tool}
+            <Tool />
             <details className="fold bench-tool-outline">
               <summary>절차 순서</summary>
               {outline}

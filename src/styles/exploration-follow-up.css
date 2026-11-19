@@ -1,0 +1,18 @@
+.exploration-follow-up {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--paper);
+}
+.exploration-follow-up > h3 { font: 650 15px/1.4 var(--f-ui); }
+.exploration-follow-choice { width: min(100%, 24rem); min-width: 0; }
+.exploration-follow-up :is(input, select, button, .xref) { min-height: 44px; }
+.exploration-follow-button, .exploration-follow-up > .xref { justify-self: start; }
+.exploration-follow-up > .xref { align-items: center; }
+.exploration-follow-results { margin: 0; padding-inline-start: 1.3rem; overflow-wrap: anywhere; }
+.exploration-follow-results > li + li { margin-block-start: var(--s1); }
+.exploration-follow-up :is(fieldset, .loot-roll-form, .loot-roll-form .field) { min-width: 0; }
+.exploration-follow-up .field-err { overflow-wrap: anywhere; }

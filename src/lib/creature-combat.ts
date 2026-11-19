@@ -51,14 +51,20 @@ export function creatureActionTable(creature: CreatureRecord, entry: Entry): Ora
   };
 }
 
-function armorAt(armor: string, location: string, bonuses: readonly ArmorBonus[]): number | null {
+function armorAt(armor: string, location: string | null, bonuses: readonly ArmorBonus[]): number | null {
   const match = /^(\d+)\s*\(([^)]+)\)$/.exec(armor);
   const bonus = adaptationArmorBonus(bonuses, location);
   if (bonus === null) return null;
   if (/^[–—-]$/.test(armor)) return bonus;
   if (!match) return null;
-  const applies = /^all( hit)? locations$/i.test(match[2]) || match[2].split(',').some((part) => part.trim() === location);
+  const appliesToAll = /^all( hit)? locations$/i.test(match[2]);
+  if (!location && !appliesToAll) return null;
+  const applies = appliesToAll || match[2].split(',').some((part) => part.trim() === location);
   return (applies ? Number(match[1]) : 0) + bonus;
+}
+
+export function creatureHitImpact(creature: CreatureRecord, location: string | null, bonuses: readonly ArmorBonus[]) {
+  return { armor: armorAt(creature.armor, location, bonuses), weak: location !== null && location === creature.weakSpot };
 }
 
 export function creatureHitTable(creature: CreatureRecord, entry: Entry, bonuses: readonly ArmorBonus[]): OracleTable | undefined {
@@ -67,12 +73,9 @@ export function creatureHitTable(creature: CreatureRecord, entry: Entry, bonuses
   return {
     ...table,
     columns: [{ key: 'armor', ko: 'Armor' }, { key: 'weak', ko: '약점' }],
-    rows: table.rows.map((row) => ({
-      ...row,
-      cols: {
-        armor: String(armorAt(creature.armor, row.label ?? '', bonuses) ?? '능력치 확인'),
-        weak: row.label === creature.weakSpot ? '해당' : '—',
-      },
-    })),
+    rows: table.rows.map((row) => {
+      const { armor, weak } = creatureHitImpact(creature, row.label ?? '', bonuses);
+      return { ...row, cols: { armor: String(armor ?? '능력치 확인'), weak: weak ? '해당' : '—' } };
+    }),
   };
 }

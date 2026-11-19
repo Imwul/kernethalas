@@ -320,6 +320,19 @@
   justify-content: space-between;
 }
 
+.oracle-encounter-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+  color: var(--ink-2);
+  font: 14px/1.45 var(--f-ui);
+}
+
+.oracle-encounter-place .seg {
+  flex-wrap: wrap;
+}
+
 .oracle-dice-spec {
   display: grid;
   gap: 2px;

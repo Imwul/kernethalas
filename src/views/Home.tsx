@@ -20,11 +20,14 @@ export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
           <h1 id="home-title">Ossuary Index</h1>
           <p>Ker Nethalas · Gravebound Edition v1.2</p>
         </div>
-        <button className="bigsearch" onClick={() => onSearch()} aria-label="규칙 검색 열기">
-          <ISearch />
-          <span>규칙, 표, 절차 검색</span>
-          <kbd>/</kbd>
-        </button>
+        <div className="home-launch-tools">
+          <Link to="/play" className="btn primary home-play-launch"><IDie /> 플레이 시작</Link>
+          <button className="bigsearch" onClick={() => onSearch()} aria-label="규칙 검색 열기">
+            <ISearch />
+            <span>규칙, 표, 절차 검색</span>
+            <kbd>/</kbd>
+          </button>
+        </div>
       </section>
 
       <div className="archive-layout">

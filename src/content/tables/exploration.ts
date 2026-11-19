@@ -5,6 +5,23 @@ const ROOM_SHAPE_EXITS = [2,4,1,3,2,4,6,2,2,2,2,1,2,4,3,2,2,2,3,3,3,4,2,2,5,2,4,
 const r = (min: number, max: number, ko: string, label?: string, extra?: Partial<TableRow>): TableRow => ({ min, max, ko, label, ...extra });
 const n = (id: string, note?: string) => ({ id, note });
 
+export const ENCOUNTER_PLACES = {
+  room: { label: '방', threshold: 10 },
+  corridor: { label: '통로', threshold: 15 },
+} as const;
+export type EncounterPlace = keyof typeof ENCOUNTER_PLACES;
+
+/** Resolve only the selected place. With no selection the published table compares both. */
+export function encounterRowsForPlace(place: EncounterPlace): TableRow[] {
+  const { label, threshold } = ENCOUNTER_PLACES[place];
+  return [
+    place === 'room'
+      ? r(1, threshold - 1, `${label} · 조우 없음. 이벤트를 굴립니다.`, undefined, { next: [n('t-events')] })
+      : r(1, threshold - 1, `${label} · 조우 없음. 선택 행동이나 다음 장소로 이어갑니다.`),
+    r(threshold, 20, `${label} · 전투 조우.`, undefined, { next: [n('t-encounter-general', '일반 도메인')] }),
+  ];
+}
+
 /** 1..N single rows with a page pointer — for flavor tables shipped as local-only */
 const localRows = (count: number, page: string): TableRow[] =>
   Array.from({ length: count }, (_, i) => r(i + 1, i + 1, `분위기 묘사 — 규칙 효과 없음(묘사 원문 ${page})`));
@@ -135,16 +152,16 @@ export const explorationTables: OracleTable[] = [
     aliases: ['encounter check', '조우 판정', 'random encounter'],
     dice: 'D20',
     group: 'exploration',
-    usage: 'Tension Die 판정 뒤. 방: 10+, 통로: 15+면 조우. 은신처 방은 판정하지 않는다.',
+    usage: `Tension Die 판정 뒤. 방: ${ENCOUNTER_PLACES.room.threshold}+, 통로: ${ENCOUNTER_PLACES.corridor.threshold}+면 조우. 은신처 방은 판정하지 않는다.`,
     mode: 'summary',
     columns: [
       { key: 'room', ko: '방' },
       { key: 'corridor', ko: '통로' },
     ],
     rows: [
-      r(1, 9, '조우 없음', undefined, { cols: { room: '없음 → 방이면 Events', corridor: '없음' }, next: [n('t-events', '방일 때만')] }),
-      r(10, 14, '방: 조우 / 통로: 없음', undefined, { cols: { room: '조우', corridor: '없음' }, next: [n('t-encounter-general', '방일 때만')] }),
-      r(15, 20, '조우', undefined, { cols: { room: '조우', corridor: '조우' }, next: [n('t-encounter-general')] }),
+      r(1, ENCOUNTER_PLACES.room.threshold - 1, '조우 없음', undefined, { cols: { room: '없음 → 방이면 Events', corridor: '없음' }, next: [n('t-events', '방일 때만')] }),
+      r(ENCOUNTER_PLACES.room.threshold, ENCOUNTER_PLACES.corridor.threshold - 1, '방: 조우 / 통로: 없음', undefined, { cols: { room: '조우', corridor: '없음' }, next: [n('t-encounter-general', '방일 때만')] }),
+      r(ENCOUNTER_PLACES.corridor.threshold, 20, '조우', undefined, { cols: { room: '조우', corridor: '조우' }, next: [n('t-encounter-general')] }),
     ],
     related: [req('encounter-check')],
     source: [core(98, 99)],

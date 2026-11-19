@@ -2,7 +2,10 @@ import { useRef, type ReactNode } from 'react';
 import type { Entry } from '../content/schema';
 import { CATEGORY_LABEL } from '../content';
 import { creatureById } from '../content/entries/creatures';
+import { isUsageDieRule } from '../lib/usage-die';
 import { CreatureCombatCard } from './CreatureCombatCard';
+import { DamageCalculator } from './DamageCalculator';
+import { UsageDieTool } from './UsageDieTool';
 import { Link } from '../lib/router';
 import { Cite, Notes, Relations, VChip, XRef } from './bits';
 
@@ -34,6 +37,8 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
             <ul className="bullets">{e.exceptions.map((item, index) => <li key={index}>{item}</li>)}</ul>
           </div>
         ) : null}
+        {isUsageDieRule(e.id) && <UsageDieTool key={e.id} rule={e.id} />}
+        {e.id === 'damage-to-pc' && <DamageCalculator pc confirmedFirst unlocatedArmor={null} initialCritical={false} />}
         {hasRelated && (
           <button className="reference-related-jump linkbtn" onClick={() => {
             related.current?.scrollIntoView({ block: 'start' });

@@ -7,6 +7,7 @@ import { Plan, KIND_KO } from '../components/Plan';
 import { ContextLink } from '../components/ReferenceContext';
 import { RulingMatrix } from '../components/RulingMatrix';
 import { TensionTool } from '../components/TensionTool';
+import { procedureTools } from '../components/procedure-tools';
 import { BenchButton, Cite, Notes, PinButton, VChip, XRef, useVisit } from '../components/bits';
 import { NotFound } from './NotFound';
 import '../styles/atlas.css';
@@ -68,6 +69,7 @@ export function AtlasPage({ id }: { id: string }) {
   const wide = useWidePlan();
   useVisit(p?.id);
   if (!p) return <NotFound />;
+  const Tool = p.id === 'p-attack' ? undefined : procedureTools[p.id];
   const requestedNode = search.get('node');
   const active = p.nodes.find((n) => n.id === requestedNode);
   const start = p.nodes.find((n) => n.kind === 'start') ?? p.nodes[0];
@@ -110,7 +112,7 @@ export function AtlasPage({ id }: { id: string }) {
       </header>
       <p className="summary atlas-summary">{p.summary}</p>
       {p.id === 'p-explore-room' && <ExplorationTools />}
-      {p.id === 'p-tension' && <TensionTool />}
+      {Tool && <Tool />}
       {p.id === 'p-attack' && <AttackComparison />}
       <div className="atlas-controls">
         <div className="seg" role="group" aria-label="절차 보기">

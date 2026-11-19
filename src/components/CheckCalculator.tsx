@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { procById } from '../content';
 import { d100FromValue, resolveAttack, resolveCheck, resolveOpposed, type AttackResult, type Edge } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
+import { usePlayDraftState } from '../lib/play-draft';
 import { XRef } from './bits';
 
 interface SideState {
@@ -14,7 +15,7 @@ interface CreatureAttack {
   combatSkill: number | null;
   attacking: boolean;
   onChangeAttacker: (attacking: boolean) => void;
-  onHitLocation: () => void;
+  onHitLocation: (critical: boolean, pc: boolean) => void;
 }
 
 type SideId = 'a' | 'b' | 'pc-attack' | 'pc-defense' | 'enemy-attack' | 'enemy-defense';
@@ -70,8 +71,12 @@ function Side({ label, s, set }: { label: string; s: SideState; set: (v: Partial
 }
 
 function HitLocation({ enemyAttacks, onHitLocation }: { enemyAttacks: boolean; onHitLocation?: () => void }) {
-  if (enemyAttacks) return <XRef id="t-hit-humanoid">PC 명중 부위 D20</XRef>;
-  if (onHitLocation) return <button type="button" className="btn ghost" onClick={onHitLocation}>적 명중 부위 보기</button>;
+  if (onHitLocation) return (
+    <button type="button" className="btn ghost" onClick={onHitLocation}>{enemyAttacks ? 'PC 명중 부위 D20' : '적 명중 부위 보기'}</button>
+  );
+  if (enemyAttacks) return (
+    <><XRef id="t-hit-humanoid">PC 명중 부위 D20</XRef><XRef id="damage-to-pc">PC 받는 피해 계산</XRef></>
+  );
   const tables = procById.get('p-attack')?.nodes.find(({ id }) => id === 'loc')?.tables ?? [];
   return (
     <details className="checkcalc-hit-tables">
@@ -84,7 +89,7 @@ function HitLocation({ enemyAttacks, onHitLocation }: { enemyAttacks: boolean; o
 export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?: boolean; creature?: CreatureAttack }) {
   const [mode, setMode] = useState<'single' | 'attack' | 'opposed'>('attack');
   const [enemy, setEnemy] = useState(false);
-  const [inputs, setInputs] = useState<Partial<Record<SideId, Partial<SideState>>>>({});
+  const [inputs, setInputs] = usePlayDraftState<Partial<Record<SideId, Partial<SideState>>>>('attack-inputs', {});
   const enemyAttacks = creature?.attacking ?? enemy;
   const attack = mode === 'attack';
   const aKey = creature ? (enemyAttacks ? 'enemy-attack' : 'pc-attack') : 'a';
@@ -150,7 +155,8 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
       {result && (result.outcome === 'hit' || result.outcome === 'critical-hit' || result.outcome === 'defended' || result.attackerFumble) && (
         <div className="checkcalc-follow-ups">
           {(result.outcome === 'hit' || result.outcome === 'critical-hit') && (
-            <HitLocation enemyAttacks={enemyAttacks} onHitLocation={creature?.onHitLocation} />
+            <HitLocation enemyAttacks={enemyAttacks}
+              onHitLocation={creature && (() => creature.onHitLocation(result.outcome === 'critical-hit', enemyAttacks))} />
           )}
           {result.outcome === 'critical-hit' && <XRef id="critical-strike">치명타 피해</XRef>}
           {result.outcome === 'defended' && (

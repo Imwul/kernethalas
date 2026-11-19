@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const ROUTES = [
   '/',
+  '/play',
   '/ref',
   '/ref?c=character',
   '/ref/prone',
@@ -105,6 +106,8 @@ test('works offline after the first visit', async ({ page, context }) => {
   await context.setOffline(true);
   await page.goto('/ref/m-zealot');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Zealot');
+  await page.goto('/play');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('플레이 모드');
 });
 
 test('bestiary lists all 59 creatures, each with a way to appear', async ({ page }) => {

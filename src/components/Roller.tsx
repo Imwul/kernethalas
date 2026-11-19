@@ -1,8 +1,9 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { OracleTable, TableRow } from '../content/schema';
 import { d100FromValue } from '../lib/dice';
 import { automaticRollSides, oracleRowsAvailable, readOracleValue, rollTable } from '../lib/oracle';
 import { tableRowSource } from '../lib/overlay';
+import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { CopyButton, XRef } from './bits';
 import { IDie } from './icons';
 import { rangeText, rowTitle, showLabel } from './TableView';
@@ -18,21 +19,25 @@ interface Props {
   rollLabel?: string;
   sourceForRow?: (row: TableRow) => string | undefined;
   showUnrolledViewToggle?: boolean;
+  beforeRoll?: ReactNode;
 }
 
-export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle }: Props) {
+export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle, beforeRoll }: Props) {
   const id = useId();
   const [manual, setManual] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const [history, setHistory] = useState<number[]>([]);
+  const [history, setHistory] = usePlayDraftState<number[]>(`oracle-history:${t.id}`, []);
+  const commitRoll = usePlayRoll();
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
   const original = row && (sourceForRow?.(row) ?? (t.mode === 'local-only' ? tableRowSource(t.id, row.min) : undefined));
   const digits = value !== null && sides === 100 ? d100FromValue(value) : null;
   const rollValue = (n: number) => {
     setInvalid(false);
-    setHistory((h) => [n, ...h].slice(0, 12));
-    onValue(n);
+    commitRoll(() => {
+      setHistory((h) => [n, ...h].slice(0, 12));
+      onValue(n);
+    });
   };
   const copyText = row ? [
     `[${t.en}, ${t.dice}: ${value}] ${showLabel(t, row) ? row.label + ' — ' : ''}${row.ko}`,
@@ -41,6 +46,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
 
   return (
     <section className="oracle-instrument" aria-label="표 굴리기">
+      {beforeRoll}
       <div className="oracle-instrument-top">
         <div className="oracle-dice-spec">
           <span>{t.dice}</span>
@@ -70,7 +76,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
             : '표 결과에 검증이 필요해 자동 굴림을 중지했습니다.'}
         </p>
       )}
-      <form className="manual oracle-manual" noValidate onSubmit={(e) => {
+      <form className="manual oracle-manual" data-play-roll noValidate onSubmit={(e) => {
         e.preventDefault();
         const number = readOracleValue(manual.trim(), sides);
         if (number === null) {
@@ -84,13 +90,14 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
         <input
           id={id}
           inputMode="numeric"
+          data-play-dice
           autoComplete="off"
           value={manual}
           onChange={(e) => {
             setManual(e.target.value);
             if (invalid) setInvalid(false);
           }}
-          placeholder={sides === 100 ? '1–100 또는 00' : `1–${sides}`}
+          placeholder={sides === 100 ? '1–100/00' : `1–${sides}`}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? `${id}-error` : undefined}
         />

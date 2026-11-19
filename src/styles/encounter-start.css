@@ -1,0 +1,52 @@
+.encounter-start {
+  display: grid;
+  min-width: 0;
+  max-width: 48rem;
+  padding: var(--s3);
+  gap: var(--s3);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--copper);
+  background: var(--paper);
+}
+
+.encounter-grid, .encounter-traits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr));
+  align-items: start;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.encounter-start .field {
+  min-width: 0;
+  align-content: start;
+}
+
+.encounter-start .field input, .encounter-start .field select { min-height: 44px; }
+.encounter-start .field select { padding-inline: var(--s2); font-family: var(--f-ui); }
+.encounter-note, .encounter-outcome { margin: 0; color: var(--ink-2); font: 14px/1.5 var(--f-ui); }
+.encounter-outcome { font-weight: 700; }
+
+.encounter-check {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: var(--s2);
+  min-width: 0;
+  border: 1px solid var(--rule-soft);
+}
+
+.encounter-check legend { padding-inline: var(--s1); font: 700 14px var(--f-ui); }
+.encounter-option {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  gap: var(--s1);
+  color: var(--ink-2);
+  font: 14px/1.4 var(--f-ui);
+}
+
+.encounter-option input { accent-color: var(--copper-ink); }
+.encounter-links { display: flex; flex-wrap: wrap; gap: 0 var(--s3); }
+.encounter-links .xref { align-items: center; min-height: 44px; }

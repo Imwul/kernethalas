@@ -1,0 +1,78 @@
+.usage-die {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--copper);
+  background: var(--paper);
+}
+
+.usage-die h3 {
+  margin: 0;
+  font: 700 16px/1.4 var(--f-ko);
+}
+
+.usage-die-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) max-content;
+  align-items: end;
+  gap: var(--s2);
+}
+
+.usage-die-inputs .field {
+  min-width: 0;
+}
+
+.usage-die-inputs .btn,
+.usage-die-inputs input,
+.usage-die-inputs select {
+  min-height: 44px;
+}
+
+.usage-die-inputs .field-err {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.usage-die-result:not(:empty) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--s3);
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+  background: var(--bone);
+}
+
+.usage-die-readout,
+.usage-die-effect {
+  display: grid;
+  align-content: start;
+  gap: var(--s1);
+}
+
+.usage-die-readout {
+  justify-items: center;
+  color: var(--copper-ink);
+  font: 13px/1.3 var(--f-mono);
+}
+
+.usage-die-readout .readout {
+  padding-block: .06em .12em;
+}
+
+.usage-die-effect {
+  justify-items: start;
+  align-content: center;
+  font: 14px/1.45 var(--f-ui);
+}
+
+.usage-die-effect strong {
+  color: var(--ink);
+  font: 700 16px/1.4 var(--f-ko);
+}
+
+.usage-die-effect .xref {
+  align-items: center;
+  min-height: 44px;
+}

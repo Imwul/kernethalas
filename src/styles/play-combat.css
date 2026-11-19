@@ -1,0 +1,187 @@
+.play-combat,
+.play-combat-lookup,
+.play-combat-table,
+.play-combat-search {
+  display: grid;
+  min-width: 0;
+  gap: var(--s3);
+}
+
+.play-combat-lookup {
+  container-type: inline-size;
+  padding: var(--s4);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--copper);
+  background: var(--paper);
+}
+
+.play-combat-lookup .field { min-width: 0; }
+.play-combat-lookup input,
+.play-combat-lookup select,
+.play-combat-lineup input,
+.play-combat .btn,
+.play-combat-lookup .xref { min-height: 44px; }
+
+.play-combat-lookup .xref { align-items: center; justify-self: start; }
+.play-combat-method,
+.play-combat-search > .field { max-width: 25rem; }
+.play-combat-method select { font-family: var(--f-ui); }
+.play-combat-method select:focus { scroll-margin-block: calc(var(--header-h) + var(--s2)); }
+
+.play-combat-roll {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) max-content max-content;
+  align-items: end;
+  gap: var(--s2);
+}
+
+.play-combat-roll .field-err { grid-column: 1 / -1; margin: 0; }
+
+.play-combat-table {
+  border-top: 1px solid var(--rule-soft);
+  padding-top: var(--s3);
+}
+
+.play-combat-table h3 {
+  margin: 0;
+  color: var(--ink);
+  font: 700 17px / 1.4 var(--f-ko-display);
+}
+
+.play-combat-table-choice {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  padding-block: var(--s1);
+  border: 1px solid var(--rule-soft);
+  background: var(--bone);
+}
+
+.play-combat-table-choice .readout { padding-block: .06em .12em; }
+.play-combat-table-choice strong { font: 700 20px / 1.4 var(--f-ko-display); }
+
+.play-combat-matches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.play-combat-matches .btn { width: 100%; justify-content: start; text-align: start; }
+.play-combat-search p,
+.play-combat-note,
+.play-combat-heading p {
+  margin: 0;
+  color: var(--ink-2);
+  font: 14px / 1.5 var(--f-ui);
+}
+
+.play-combat-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+}
+
+.play-combat-heading h3 {
+  margin: 0 0 var(--s1);
+  scroll-margin-block: calc(var(--header-h) + var(--s3));
+  font: 400 clamp(25px, 4vw, 36px) / 1.15 var(--f-display-i);
+}
+
+.play-combat-lineup,
+.play-custom-form,
+.play-custom-body,
+.play-custom-library,
+.play-custom-management[open],
+.play-aux-body { display: grid; gap: var(--s3); min-width: 0; }
+.play-combat-targets,
+.play-combat-target-actions,
+.play-combat-domain-overseer,
+.play-custom-row-actions { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.play-combat-targets {
+  padding-block: var(--s2);
+  border-block: 1px solid var(--rule-soft);
+}
+.play-combat-targets .btn[aria-pressed='true'] {
+  border-color: var(--copper-ink);
+  background: var(--copper-wash);
+  color: var(--ink);
+}
+.play-combat > :is(.creature-encounter, .play-combat-round, .play-target-allocation, .play-flee),
+.play-custom-library > .play-custom-management { margin-top: 0; }
+.play-combat-round > p {
+  margin: 0 0 var(--s2);
+  padding-inline-start: var(--s2);
+  border-inline-start: 2px solid var(--copper);
+  color: var(--ink-2);
+  font: 14px / 1.5 var(--f-ui);
+}
+.play-combat-round > summary { min-height: 44px; }
+.play-combat :is(.play-target-allocation, .play-flee, .play-custom-management) > summary { min-height: 44px; }
+.play-aux-body { padding-block-end: var(--s3); }
+.play-aux-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  align-items: end;
+  gap: var(--s2);
+  max-width: 42rem;
+}
+.play-aux-body :is(input, select), .play-custom-library :is(input, select) { min-height: 44px; }
+.play-aux-body .field, .play-custom-library .field { min-width: 0; }
+.play-aux-form, .play-custom-name { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s2); max-width: 30rem; }
+.play-aux-form .field, .play-custom-name .field { flex: 1 1 min(100%, 11rem); }
+.play-aux-form .field-err { flex-basis: 100%; margin: 0; }
+.play-aux-action { justify-self: start; }
+.play-alloc-tie { padding: var(--s2); border: 1px solid var(--rule-soft); background: var(--paper); }
+.play-alloc-tie ol { margin-block: var(--s2); padding-inline-start: 2rem; }
+.play-allocation-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--s2);
+  max-width: 42rem;
+  margin: 0;
+}
+.play-allocation-counts > div { display: flex; justify-content: space-between; gap: var(--s2); padding: var(--s2); border: 1px solid var(--rule-soft); }
+.play-allocation-counts :is(dt, dd) { min-width: 0; margin: 0; }
+.play-allocation-counts dd { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.play-custom-library > .field { max-width: 30rem; }
+.play-custom-management[open] { padding-block-end: var(--s2); }
+.play-custom-body { padding: var(--s2); }
+.play-custom-encounter > summary { min-height: 44px; }
+.play-custom-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+  max-width: 24rem;
+}
+.play-custom-rows { display: grid; margin: 0; padding: 0; list-style: none; }
+.play-custom-rows li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  gap: var(--s2);
+  align-items: center;
+  padding-block: var(--s1);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.play-custom-rows li > strong { overflow-wrap: anywhere; }
+.play-custom-range { color: var(--copper-ink); font: 700 15px / 1.3 var(--f-ui); font-variant-numeric: tabular-nums; }
+
+.play-combat-complete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule-soft);
+}
+
+@container (width < 340px) {
+  .play-combat-roll { grid-template-columns: minmax(0, 1fr) max-content; }
+  .play-combat-roll .btn[type='button'] { grid-column: 1 / -1; justify-self: start; }
+  .play-custom-rows li { grid-template-columns: 3rem minmax(0, 1fr); }
+  .play-custom-rows .play-custom-row-actions { grid-column: 2; }
+}

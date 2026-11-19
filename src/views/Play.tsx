@@ -1,0 +1,476 @@
+import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
+import { tableById } from '../content';
+import { creatureById, type CreatureRecord } from '../content/entries/creatures';
+import { CopyButton, XRef } from '../components/bits';
+import { PlayCombat, type EncounterSeed } from '../components/play/PlayCombat';
+import { PlayDomain } from '../components/play/PlayDomain';
+import { PlayEquipment } from '../components/play/PlayEquipment';
+import { PlayExploration, type ExplorationReport } from '../components/play/PlayExploration';
+import { PlayWrapUp } from '../components/play/PlayWrapUp';
+import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
+import { PlayDraftProvider, PlayDraftScope, usePlayDraft, usePlayDraftState } from '../lib/play-draft';
+import {
+  activeDarkness, darknessDetails, domainOverseer, influenceText, newPlayDomain, tensionSides,
+  type DarknessEvent, type PlayDomainRecord, type RetreatedEncounter, type TensionSides,
+} from '../lib/play-domain';
+import '../styles/play.css';
+
+const STAGES = [
+  { id: 'explore', label: '탐험', heading: '이번 장소 탐험', references: ['p-explore-room', 'first-domain-rules', 'retracing'] },
+  { id: 'combat', label: '조우·전투', heading: '조우와 전투', references: ['p-combat-round', 'p-initiative', 'p-attack'] },
+  { id: 'wrapup', label: '휴식·정리', heading: '휴식과 전리품', references: ['p-rest', 'combat-end', 'spoils'] },
+  { id: 'journal', label: '저널', heading: '이번 장소 기록', references: [] },
+] as const;
+
+type StageId = typeof STAGES[number]['id'];
+type EncounterKind = 'encounter' | 'overseer';
+type BattleOutcome = 'victory' | 'ended' | 'fled';
+type SheetItem = { id: string; text: string };
+type Battle = {
+  kind: EncounterKind;
+  planKey?: string;
+  retreatId?: string;
+  seed?: EncounterSeed;
+  primaryId: string | null;
+  creatureIds: string[];
+  outcome: BattleOutcome | null;
+};
+const BASE_BATTLE: Battle = { kind: 'encounter', primaryId: null, creatureIds: [], outcome: null };
+const FIRST_DOMAIN = [newPlayDomain(1)];
+const ENCOUNTER_LABELS = { encounter: '전투', overseer: 'Overseer 은신처', none: '없음' } as const;
+const COMBAT_EFFECTS = new Set([1, 13, 23, 29, 35, 51, 55, 59, 61, 65, 77]);
+const REST_EFFECTS = new Set([15, 17, 19, 61]);
+const EXPLORE_EFFECTS = new Set([61, 69, 73]);
+
+function encounterFromEvent(source: string): EncounterSeed | undefined {
+  const match = /^event-(\d+)$/.exec(source);
+  if (!match) return undefined;
+  const roll = Number(match[1]);
+  const row = tableById.get('t-events')?.rows.find(({ min, max }) => min <= roll && roll <= max);
+  const creatureIds = row?.next?.flatMap(({ id }) => creatureById.has(id) ? [id] : []) ?? [];
+  return creatureIds.length ? { creatureIds, description: `이벤트 D100 ${roll}` } : undefined;
+}
+
+function advanceDiceFocus(event: KeyboardEvent<HTMLDivElement>) {
+  const input = event.target;
+  if (event.key !== 'Enter' || event.nativeEvent.isComposing || !(input instanceof HTMLInputElement)
+      || !input.matches('[data-play-dice]') || !input.form?.hasAttribute('data-play-roll')) return;
+  const section = input.closest('.play-stage, .play-domain-body');
+  if (!section) return;
+  requestAnimationFrame(() => {
+    if (document.activeElement !== input || input.getAttribute('aria-invalid') === 'true') return;
+    const inputs = Array.from(section.querySelectorAll<HTMLInputElement>('input[data-play-dice]'));
+    const next = inputs.slice(inputs.indexOf(input) + 1)
+      .find((field) => !field.disabled && field.getClientRects().length > 0);
+    next?.focus();
+  });
+}
+
+function EffectNotice({ effects, types, influence = [] }: { effects: DarknessEvent[]; types: Set<number>; influence?: string[] }) {
+  const lines = effects.flatMap((event) => {
+    const row = darknessDetails(event);
+    return row && types.has(row.min) ? [{ id: event.id, text: row.ko }] : [];
+  });
+  if (!lines.length && !influence.length) return null;
+  return (
+    <aside className="play-effect-note" aria-label="이 단계에 적용되는 도메인 효과">
+      {influence.length > 0 && <p><strong>도메인의 일반 적</strong> · {influence.join(' / ')}</p>}
+      {lines.length > 0 && <ul>{lines.map(({ id, text }) => <li key={id}>{text}</li>)}</ul>}
+    </aside>
+  );
+}
+
+export function Play() {
+  return <PlayDraftProvider><PlayDesk /></PlayDraftProvider>;
+}
+
+function PlayDesk() {
+  const draft = usePlayDraft()!;
+  const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
+  const [revision, setRevision] = useState(0);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [exploration, setExploration] = useState<ExplorationReport | null>(null);
+  const [battles, setBattles] = usePlayDraftState<Record<string, Battle>>('battles', {});
+  const [combatId, setCombatId] = usePlayDraftState('combat', 'place');
+  const [wrapId, setWrapId] = usePlayDraftState('wrap', 'place');
+  const [targetNames, setTargetNames] = usePlayDraftState<Record<string, string[]>>('targetNames', {});
+  const [battleLines, setBattleLines] = usePlayDraftState<Record<string, string>>('battleLines', {});
+  const [wrapSummary, setWrapSummary] = useState('');
+  const [sheetShared, setSheetShared] = useState<SheetItem[]>([]);
+  const [equipmentReport, setEquipmentReport] = useState('');
+  const [equipmentSheet, setEquipmentSheet] = useState<SheetItem[]>([]);
+  const [battleSheet, setBattleSheet] = usePlayDraftState<Record<string, SheetItem[]>>('battleSheet', {});
+  const [applied, setApplied] = usePlayDraftState<string[]>('paperApplied', []);
+  const [placeName, setPlaceName] = usePlayDraftState('placeName', '');
+  const [note, setNote] = usePlayDraftState('note', '');
+  const [nextTension, setNextTension] = usePlayDraftState('nextTension', '');
+  const [initialTension] = usePlayDraftState<TensionSides>('initialTension', 8);
+  const [breatherTension, setBreatherTension] = useState<TensionSides | null>(null);
+  const [domains, setDomains] = usePlayDraftState<PlayDomainRecord[]>('domains', FIRST_DOMAIN);
+  const [domainId] = usePlayDraftState('domainId', 1);
+  const [roomNumber] = usePlayDraftState('roomNumber', 1);
+  const [darkness, setDarkness] = useState<number | null>(null);
+  const [actionDarkness, setActionDarkness] = useState<number[]>([]);
+  const [breatherDarkness, setBreatherDarkness] = useState<number | null>(null);
+  const [dismissed, setDismissed] = usePlayDraftState<string[]>('dismissedDarkness', []);
+  const [customSets, setCustomSets] = useState(readEncounterLibrary);
+  const equipment = useRef<HTMLDetailsElement>(null);
+  const headings = useRef<Partial<Record<StageId, HTMLHeadingElement>>>({});
+  const stage = STAGES.find(({ id }) => id === active) ?? STAGES[0];
+  const domain = domains.find(({ id }) => id === domainId) ?? domains[0];
+  const overseer = domainOverseer(domain.overseerRoll);
+  const defeated = domain.defeated || !!overseer && Object.values(battles).some(
+    (battle) => battle.outcome === 'victory' && battle.creatureIds.includes(overseer.id),
+  );
+  const previousEffects = activeDarkness(domain.darkness, dismissed);
+  const roomDarkness = [
+    ...[darkness].flatMap((roll) => roll === null ? [] : [{ id: `${roomNumber}-entry-${roll}`, roll }]),
+    ...actionDarkness.map((roll, index) => ({ id: `${roomNumber}-action-${index}-${roll}`, roll })),
+    ...[breatherDarkness].flatMap((roll) => roll === null ? [] : [{ id: `${roomNumber}-breather-${roll}`, roll }]),
+  ];
+  const effects = activeDarkness([...domain.darkness, ...roomDarkness], dismissed);
+  const preBreatherEffects = activeDarkness([
+    ...domain.darkness, ...roomDarkness.filter(({ id }) => !id.startsWith(`${roomNumber}-breather-`)),
+  ], dismissed);
+  const hasEffect = (min: number) => effects.some((effect) => darknessDetails(effect)?.min === min);
+  const influence = defeated ? [] : [
+    influenceText(domain.influence),
+    ...effects.filter(({ roll }) => roll >= 81).map(({ id }) => domain.extra[id]
+      ? influenceText(domain.extra[id]) : '추가 영향력 굴림 필요'),
+  ].filter(Boolean);
+
+  const combat = battles[combatId] ?? BASE_BATTLE;
+  const wrapBattle = battles[wrapId];
+  const completedBattles = Object.entries(battles).filter(([, battle]) => battle.outcome && battle.outcome !== 'fled');
+  const campEncounterResolved = completedBattles.flatMap(([, battle]) => battle.planKey ?? []);
+  const roster = wrapBattle?.outcome === 'victory'
+    ? wrapBattle.creatureIds.flatMap((id) => creatureById.get(id) ?? [])
+    : undefined;
+  const victoryXp = roster?.some(({ group }) => group === 'overseer') ? 200
+    : roster?.some(({ group }) => group === 'creature') ? 50 : undefined;
+  const battleLabel = (id: string, battle: Battle) => {
+    const names = targetNames[id] ?? battle.creatureIds.flatMap((creatureId) => creatureById.get(creatureId)?.name ?? []);
+    return names.join(', ') || (battle.primaryId ? creatureById.get(battle.primaryId)?.name : undefined) || '조우';
+  };
+
+  const focusStage = (id: StageId) => requestAnimationFrame(() => {
+    const heading = headings.current[id];
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({ block: 'start' });
+  });
+  const goTo = (id: StageId) => {
+    setActive(id);
+    focusStage(id);
+  };
+  const changeBattle = useCallback((update: (previous: Battle) => Battle) => {
+    setBattles((previous) => {
+      const battle = previous[combatId] ?? BASE_BATTLE;
+      const result = update(battle);
+      return result === battle ? previous : { ...previous, [combatId]: result };
+    });
+  }, [combatId, setBattles]);
+  const chooseCreature = useCallback((creature: CreatureRecord | null) => {
+    changeBattle((prior) => {
+      const primaryId = creature?.id ?? null;
+      return primaryId === prior.primaryId ? prior : { ...prior, primaryId, creatureIds: [], outcome: null };
+    });
+  }, [changeBattle]);
+  const reportTargets = useCallback((names: string[]) => {
+    const old = targetNames[combatId] ?? [];
+    if (old.length === names.length && old.every((name, index) => name === names[index])) return;
+    setTargetNames((previous) => ({ ...previous, [combatId]: names }));
+    if (old.length > 0) changeBattle((prior) => prior.outcome ? { ...prior, outcome: null, creatureIds: [] } : prior);
+  }, [changeBattle, combatId, setTargetNames, targetNames]);
+  const startCombat = (kind: EncounterKind, source?: string, planKey?: string) => {
+    const id = source ?? (kind === 'overseer' ? 'overseer' : 'place');
+    if (!battles[id]) {
+      setBattles((previous) => ({ ...previous, [id]: { ...BASE_BATTLE, kind, planKey, seed: encounterFromEvent(id) } }));
+    }
+    setCombatId(id);
+    goTo('combat');
+  };
+  const startCampEncounter = (planKey: string) => {
+    const existing = Object.entries(battles).find(([, battle]) => battle.planKey === planKey);
+    const id = existing?.[0] ?? `camp-${Object.keys(battles).length + 1}`;
+    startCombat('encounter', id, planKey);
+  };
+  const updateDomain = (change: Partial<PlayDomainRecord>) => {
+    setDomains((previous) => previous.map((record) => record.id === domain.id ? { ...record, ...change } : record));
+  };
+  const endBattle = (creature: CreatureRecord, outcome: 'victory' | 'ended', creatures?: CreatureRecord[]) => {
+    changeBattle((prior) => ({ ...prior, primaryId: creature.id, outcome, creatureIds: (creatures ?? [creature]).map(({ id }) => id) }));
+    if (outcome === 'victory' && combat.retreatId) {
+      updateDomain({ retreats: (domain.retreats ?? []).filter(({ id }) => id !== combat.retreatId) });
+    }
+    setWrapId(combatId);
+    goTo('wrapup');
+  };
+  const flee = (creatures: CreatureRecord[]) => {
+    const id = combat.retreatId ?? `${roomNumber}-${combatId}`;
+    const prior = domain.retreats?.find((retreat) => retreat.id === id);
+    const place = placeName.trim() || prior?.place || `장소 ${roomNumber}`;
+    const creatureIds = creatures.map((creature) => creature.id);
+    const retreat = { id, place, creatureIds, kind: combat.kind };
+    updateDomain({ retreats: [...(domain.retreats ?? []).filter((item) => item.id !== id), retreat] });
+    changeBattle((battle) => ({ ...battle, outcome: 'fled', creatureIds, retreatId: id }));
+    if (!placeName.trim()) setPlaceName(place);
+    goTo('journal');
+  };
+  const reenter = (retreat: RetreatedEncounter) => {
+    const pending = Object.entries(battles).find(([, battle]) => battle.retreatId === retreat.id && !battle.outcome);
+    const id = pending?.[0] ?? `reentry-${Object.keys(battles).length + 1}`;
+    if (!pending) setBattles((previous) => ({ ...previous, [id]: {
+      ...BASE_BATTLE, kind: retreat.kind, retreatId: retreat.id,
+      seed: { creatureIds: retreat.creatureIds, description: '재진입 · 적 Health 전부 회복' },
+    } }));
+    if (!placeName.trim()) setPlaceName(retreat.place);
+    setCombatId(id);
+    goTo('combat');
+  };
+  const openTrader = () => {
+    goTo('wrapup');
+    requestAnimationFrame(() => {
+      if (!equipment.current) return;
+      equipment.current.open = true;
+      const summary = equipment.current.querySelector('summary');
+      summary?.focus({ preventScroll: true });
+      summary?.scrollIntoView({ block: 'start' });
+    });
+  };
+  const reportBattleLine = useCallback((line: string) => {
+    setBattleLines((previous) => (previous[wrapId] ?? '') === line ? previous : { ...previous, [wrapId]: line });
+  }, [setBattleLines, wrapId]);
+  const reportSheet = useCallback((items: SheetItem[]) => {
+    const scoped = items.filter(({ id }) => id.startsWith(`${wrapId}:`));
+    const shared = items.filter(({ id }) => !id.startsWith(`${wrapId}:`));
+    setSheetShared((previous) => JSON.stringify(previous) === JSON.stringify(shared) ? previous : shared);
+    setBattleSheet((previous) => JSON.stringify(previous[wrapId] ?? []) === JSON.stringify(scoped)
+      ? previous : { ...previous, [wrapId]: scoped });
+  }, [setBattleSheet, wrapId]);
+  const saveCustomSets = (sets: EncounterSet[]) => {
+    setCustomSets(sets);
+    storeEncounterLibrary(sets);
+  };
+
+  const exploreTension = tensionSides(exploration?.nextTension);
+  const confirmedTension = tensionSides(nextTension) ?? breatherTension ?? exploreTension;
+  const carryTension = confirmedTension ?? initialTension;
+  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides) => {
+    draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1, initialTension: tension });
+    setRevision((previous) => previous + 1);
+    setConfirmReset(false);
+    setExploration(null);
+    setWrapSummary('');
+    setSheetShared([]);
+    setEquipmentReport('');
+    setEquipmentSheet([]);
+    setDarkness(null);
+    setActionDarkness([]);
+    setBreatherDarkness(null);
+    setBreatherTension(null);
+    focusStage('explore');
+  };
+  const storeDomain = (keepRoomEffects: boolean) => domains.map((record) => record.id === domain.id ? {
+    ...record,
+    darkness: keepRoomEffects ? effects : record.darkness,
+    defeated: keepRoomEffects ? defeated : record.defeated,
+  } : record);
+  const switchDomain = (id: number | 'new') => {
+    const saved = storeDomain(true);
+    if (id === 'new') {
+      const addition = newPlayDomain(Math.max(...domains.map((record) => record.id)) + 1);
+      resetRoom([...saved, addition], addition.id, 8);
+    } else resetRoom(saved, id, carryTension);
+  };
+
+  const fightFacts = Object.entries(battles).flatMap(([id, battle]) => {
+    if (!battle.primaryId && !battle.outcome) return [];
+    const details = [battleLabel(id, battle)];
+    if (battle.outcome) details.push(battle.outcome === 'victory' ? '승리' : battle.outcome === 'fled' ? '후퇴 · 적 편성 기록' : '전투 종료');
+    if (battle.planKey) details.push('야영 조우');
+    return [details.join(' · ')];
+  });
+  const wrapFacts = [
+    ...completedBattles.flatMap(([id]) => battleLines[id] || []),
+    wrapSummary.trim(),
+  ].filter(Boolean);
+  const facts = [
+    { label: '장소', value: [placeName.trim(), exploration?.shape ?? exploration?.place].filter(Boolean).join(' · ') },
+    { label: '짙어지는 어둠', value: exploration?.darkness },
+    { label: '이벤트', value: exploration?.event },
+    { label: '조우', value: exploration?.encounter && !fightFacts.length ? ENCOUNTER_LABELS[exploration.encounter] : null },
+    { label: '적', value: fightFacts.join(' / ') },
+    { label: '탐험 행동', value: exploration?.actions },
+    { label: '휴식·전리품', value: wrapFacts.join(' / ') },
+    { label: '상인 거래', value: equipmentReport },
+    { label: '다음 긴장 주사위', value: confirmedTension ? `D${confirmedTension}` : null },
+    { label: '메모', value: note.trim() },
+  ].filter(({ value }) => value);
+  const journal = facts.map(({ label, value }) => `${label} ${value}`).join(' / ');
+  const sheet = [
+    ...(exploration?.sheet ?? []),
+    ...completedBattles.flatMap(([id]) => battleSheet[id] ?? []),
+    ...sheetShared,
+    ...equipmentSheet,
+  ];
+
+  const stageHeading = (id: StageId) => (
+    <h2 id={`play-${id}`} className="play-stage-heading" tabIndex={-1} ref={(node) => {
+      if (node) headings.current[id] = node;
+    }}>{STAGES.find((entry) => entry.id === id)?.heading}</h2>
+  );
+
+  return (
+    <div className="play-desk" onKeyDownCapture={advanceDiceFocus}>
+      <header className="play-header">
+        <div>
+          <h1>플레이 모드</h1>
+          <p>종이 시트와 저널 옆에서 이번 장소의 판정과 결과를 모읍니다.</p>
+        </div>
+        <div className="play-header-actions">
+          <button className="btn ghost" type="button" disabled={!draft.canUndo} onClick={draft.undoRoll}>직전 굴림 되돌리기</button>
+          <button className="btn ghost" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
+            onClick={() => setConfirmReset((open) => !open)}>새 장소 시작</button>
+        </div>
+      </header>
+      {confirmReset && (
+        <div className="play-reset" id="play-reset" role="group" aria-label="새 장소 확인">
+          <p>이번 장소의 입력과 굴림 결과를 지웁니다.</p>
+          <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(false), domain.id, initialTension)}>초기화하고 시작</button>
+          <button className="btn ghost" type="button" onClick={() => setConfirmReset(false)}>취소</button>
+        </div>
+      )}
+      <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated}
+        onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])} />
+
+      <div className="play-layout">
+        <nav className="play-nav" aria-label="플레이 단계">
+          {STAGES.map(({ id, label }) => (
+            <button key={id} type="button" aria-current={id === active ? 'step' : undefined}
+              aria-controls={`play-stage-${id}`} onClick={() => goTo(id)}>{label}</button>
+          ))}
+        </nav>
+        <div className="play-main">
+          <section className="play-stage" id="play-stage-explore" aria-labelledby="play-explore" hidden={active !== 'explore'}>
+            {stageHeading('explore')}
+            <EffectNotice effects={effects} types={EXPLORE_EFFECTS} />
+            {!!domain.retreats?.length && (
+              <details className="fold play-reentries">
+                <summary>후퇴했던 장소 다시 열기</summary>
+                <ul>
+                  {domain.retreats.map((retreat) => <li key={retreat.id}>
+                    <div><strong>{retreat.place}</strong><p>{retreat.creatureIds.map((id) => creatureById.get(id)?.name).filter(Boolean).join(' · ')}</p></div>
+                    <button className="btn ghost" type="button" onClick={() => reenter(retreat)} aria-label={`${retreat.place} 재진입`}>재진입</button>
+                  </li>)}
+                </ul>
+              </details>
+            )}
+            <PlayDraftScope name="explore">
+              <PlayExploration key={revision} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')}
+                initialTension={initialTension} lightCost={previousEffects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
+                onDarknessChange={setDarkness} onActionDarknessChange={setActionDarkness}
+                darknessEffectCount={previousEffects.length} onTrader={openTrader} />
+            </PlayDraftScope>
+          </section>
+          <section className="play-stage" id="play-stage-combat" aria-labelledby="play-combat" hidden={active !== 'combat'}>
+            {stageHeading('combat')}
+            <EffectNotice effects={effects} types={COMBAT_EFFECTS} influence={influence} />
+            <PlayDraftScope name="combat">
+              <PlayDraftScope name={combatId}>
+                <PlayCombat key={`${revision}:${combatId}`} initialKind={combat.kind} domainOverseer={overseer ?? null}
+                  customSets={customSets} customSetId={domain.encounterSetId}
+                  onCustomSetSelect={(encounterSetId) => updateDomain({ encounterSetId })} onCustomSetsChange={saveCustomSets}
+                  seed={combat.seed} fled={combat.outcome === 'fled'} onFlee={flee}
+                  onCreatureChange={chooseCreature} onTargetsChange={reportTargets} onBattleEnd={endBattle} />
+              </PlayDraftScope>
+            </PlayDraftScope>
+          </section>
+          <section className="play-stage" id="play-stage-wrapup" aria-labelledby="play-wrapup" hidden={active !== 'wrapup'}>
+            {stageHeading('wrapup')}
+            <EffectNotice effects={effects} types={REST_EFFECTS} />
+            {completedBattles.length > 1 && (
+              <label className="field play-wrap-battle"><span>정리할 전투</span>
+                <select value={wrapId} onChange={(event) => setWrapId(event.target.value)}>
+                  {completedBattles.map(([id, battle]) => <option key={id} value={id}>{battle.planKey ? '야영 · ' : ''}{battleLabel(id, battle)}</option>)}
+                </select>
+              </label>
+            )}
+            <PlayDraftScope name="wrap">
+              <PlayWrapUp key={revision} creature={roster?.[0] ?? null} victoryCreatures={roster}
+                victoryLabels={targetNames[wrapId]} victoryXp={victoryXp}
+                battleId={wrapId} combatEnded={!!wrapBattle?.outcome && wrapBattle.outcome !== 'fled'}
+                onCampEncounter={startCampEncounter} campEncounterResolved={campEncounterResolved}
+                campDarkness={hasEffect(17)} campAttunementBlocked={hasEffect(19)}
+                afterBreatherCheck={hasEffect(15)} breatherTension={exploreTension ?? initialTension}
+                breatherDarknessEffectCount={preBreatherEffects.length}
+                onBreatherTensionChange={setBreatherTension} onBreatherDarknessChange={setBreatherDarkness}
+                onBreatherAmbush={() => startCombat('encounter', 'breather')}
+                onJournalChange={setWrapSummary} onBattleJournalChange={reportBattleLine} onSheetChange={reportSheet} />
+            </PlayDraftScope>
+            <details className="fold play-equipment-fold" key={`equipment-${revision}`} ref={equipment}>
+              <summary>소지칸·상인 거래</summary>
+              <PlayDraftScope name="equipment">
+                <PlayEquipment onSheetChange={setEquipmentSheet} onJournalChange={setEquipmentReport} />
+              </PlayDraftScope>
+            </details>
+            <button type="button" className="btn primary play-stage-next" onClick={() => goTo('journal')}>저널 기록 보기</button>
+          </section>
+          <section className="play-stage" id="play-stage-journal" aria-labelledby="play-journal" hidden={active !== 'journal'}>
+            {stageHeading('journal')}
+            <div className="play-journal">
+              <div className="play-journal-fields">
+                <label className="field"><span>장소 이름 (선택)</span>
+                  <input value={placeName} onChange={(event) => setPlaceName(event.target.value)} placeholder="예: 지하 묘실" />
+                </label>
+                <label className="field"><span>다음 긴장 주사위</span>
+                  <select value={nextTension} onChange={(event) => setNextTension(event.target.value)}>
+                    <option value="">현재 판정에서 가져오기</option>
+                    <option>D8</option><option>D6</option><option>D4</option>
+                  </select>
+                </label>
+              </div>
+              <label className="field"><span>덧붙일 메모 (선택)</span>
+                <textarea value={note} rows={2} onChange={(event) => setNote(event.target.value)} />
+              </label>
+              {sheet.length > 0 && (
+                <fieldset className="play-sheet">
+                  <legend>종이 시트에 반영</legend>
+                  {sheet.map(({ id, text }) => {
+                    const key = `${id}:${text}`;
+                    return <label key={key}><input type="checkbox" checked={applied.includes(key)}
+                      onChange={(event) => setApplied((old) => event.target.checked ? [...old, key] : old.filter((item) => item !== key))} />{text}</label>;
+                  })}
+                </fieldset>
+              )}
+              {journal ? (
+                <div className="play-journal-output">
+                  <h3>저널에 옮길 내용</h3>
+                  <p>{journal}</p>
+                  <div className="play-header-actions">
+                    <CopyButton text={journal} label="장소 기록 복사" />
+                    <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(true), domain.id, carryTension)}>다음 장소</button>
+                  </div>
+                  <p className="play-carry">다음 장소는 긴장 주사위 D{carryTension}{carryTension === 6 ? '으로' : '로'} 시작합니다.</p>
+                </div>
+              ) : <p className="play-empty">도구에서 굴림이나 결과를 확인하면 여기에 모입니다.</p>}
+            </div>
+          </section>
+        </div>
+        <aside className="play-context" aria-label="플레이 중 참고">
+          <section>
+            <h2>이번 장소</h2>
+            {facts.length ? (
+              <dl className="play-facts">
+                {facts.map(({ label, value }) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+              </dl>
+            ) : <p className="play-empty">확인한 장소와 결과가 여기에 표시됩니다.</p>}
+          </section>
+          {stage.references.length > 0 && <section>
+            <h2>현재 단계의 규칙</h2>
+            <div className="play-refs">{stage.references.map((id) => <XRef key={id} id={id} />)}</div>
+          </section>}
+        </aside>
+      </div>
+    </div>
+  );
+}

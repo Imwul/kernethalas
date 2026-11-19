@@ -36,7 +36,7 @@ const SUMMONED_AFFINITIES: Record<string, string> = {
 
 export function creatureDefenses(creature: Pick<CreatureRecord, 'id' | 'types' | 'traits'>) {
   const vulnerable = new Set<string>();
-  const resistant = new Set<string>();
+  let resistsNonMagicalPhysical = false;
   const restored = new Set<string>();
   const immuneConditions = new Set<string>();
   const otherTraits: string[] = [];
@@ -56,13 +56,13 @@ export function creatureDefenses(creature: Pick<CreatureRecord, 'id' | 'types' |
     if (affinity) restored.add(affinity[1]);
     else if (restoredBy) restored.add(restoredBy[1]);
     else if (vulnerableTo) vulnerable.add(vulnerableTo[1]);
-    else if (trait === 'Resistant to all Physical, non-Magical damage') resistant.add('비마법 물리 피해');
+    else if (trait === 'Resistant to all Physical, non-Magical damage') resistsNonMagicalPhysical = true;
     else if (!trait.startsWith('Ruthlessness (')) otherTraits.push(trait);
   }
 
   return {
     vulnerable: [...vulnerable],
-    resistant: [...resistant],
+    resistsNonMagicalPhysical,
     restored: [...restored],
     immuneConditions: [...immuneConditions],
     otherTraits,

@@ -16,6 +16,21 @@
   justify-content: center;
 }
 
+.tension-manual {
+  display: grid;
+  grid-template-columns: auto minmax(0, 8rem) auto;
+  align-items: end;
+  justify-content: start;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+.tension-manual .field { min-width: 0; }
+.tension-manual .field > span { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
+.tension-manual input { width: 100%; }
+.tension-manual :is(input, select, button) { min-height: 44px; }
+.tension-manual .field-err { grid-column: 1 / -1; margin: 0; }
+
 .tension-result:not(:empty) {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);

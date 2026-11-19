@@ -282,8 +282,8 @@ h4 {
   font-size: 21px;
   letter-spacing: 0.12em;
 }
-/* small phones (≤ 380px): the wordmark alone would push the header past the screen */
-@media (max-width: 380px) {
+/* Keep the wordmark and header actions together on narrow phones. */
+@media (max-width: 420px) {
   .masthead-inner {
     gap: var(--s2);
   }
@@ -297,6 +297,11 @@ h4 {
   .wordmark-glyph {
     width: 22px;
     height: 22px;
+  }
+}
+@media (max-width: 360px) {
+  .wordmark-glyph {
+    display: none;
   }
 }
 .wordmark-sub {

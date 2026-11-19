@@ -1,0 +1,119 @@
+.play-equipment {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  align-items: start;
+  gap: var(--s3);
+  min-inline-size: 0;
+}
+
+.play-equipment-panel {
+  container: play-equipment-panel / inline-size;
+  display: grid;
+  gap: var(--s2);
+  min-inline-size: 0;
+  padding: var(--s2);
+  border: 1px solid var(--rule);
+  border-block-start: 2px solid var(--copper);
+  background: var(--paper);
+  font: 14px/1.45 var(--f-ui);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.play-equipment-panel h3 { margin: 0; font: 400 20px/1.35 var(--f-ko-display); }
+.play-equipment .field { min-inline-size: 0; align-content: start; }
+.play-equipment .field > :is(span, label) { color: var(--ink-2); font: inherit; }
+.play-equipment :is(input:not([type='checkbox']), select) {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding-inline: var(--s1);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--bone);
+  font: 15px/1.4 var(--f-ui);
+}
+
+.play-equipment :is(input[inputmode='numeric'], dd, .play-trade-unit, .play-trade-cart li > strong) {
+  font-variant-numeric: tabular-nums;
+}
+
+.play-equipment input[aria-invalid='true'] { border-color: var(--oxblood-ink); }
+.play-equipment .btn { min-block-size: 44px; max-inline-size: 100%; white-space: normal; }
+.play-equipment .field-err { margin: 0; }
+.play-carry-options, .play-trade-choices, .play-trade-quote {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--s2);
+}
+
+.play-equipment-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  min-block-size: 44px;
+}
+
+.play-equipment-check input { flex: none; accent-color: var(--copper-ink); }
+.play-carry-table { inline-size: 100%; border-collapse: collapse; table-layout: fixed; }
+.play-carry-table th, .play-carry-table td {
+  padding: var(--s1);
+  text-align: start;
+  vertical-align: middle;
+  border-block-end: 1px solid var(--rule-soft);
+}
+
+.play-carry-table th:first-child { inline-size: 33%; padding-inline-start: 0; }
+.play-carry-table th:last-child, .play-carry-table td:last-child { padding-inline-end: 0; }
+.play-carry-table thead th { color: var(--ink-2); font-weight: 600; }
+.play-carry-table tbody th { font-weight: 500; }
+.play-carry-table input { text-align: end; }
+
+.play-equipment-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--rule);
+  background: var(--bone);
+}
+
+.play-equipment-totals > div { display: grid; align-content: start; gap: 2px; padding: var(--s1); }
+.play-equipment-totals > div + div { border-inline-start: 1px solid var(--rule-soft); }
+.play-equipment-totals dt { color: var(--ink-2); font-size: 13px; }
+.play-equipment-totals dd { margin: 0; font-weight: 700; }
+.play-equipment-over { color: var(--oxblood-ink); }
+.play-equipment-rule { display: grid; align-items: start; justify-items: start; gap: var(--s1); }
+.play-equipment-rule p { margin: 0; color: var(--ink-2); }
+.play-equipment-rule a { display: inline-flex; align-items: center; min-block-size: 44px; }
+
+.play-trade-form, .play-trade-cart { display: grid; min-inline-size: 0; gap: var(--s2); }
+.play-trade-choices { grid-template-columns: minmax(0, 1fr); }
+@container play-equipment-panel (min-width: 410px) {
+  .play-trade-choices { grid-template-columns: minmax(5.2rem, 1fr) minmax(0, 2fr); }
+}
+.play-trade-form > .btn { justify-self: start; }
+.play-trade-unit {
+  display: flex;
+  align-items: center;
+  min-block-size: 44px;
+  min-inline-size: 0;
+  margin: 0;
+  padding-inline: var(--s1);
+  border-block-end: 1px solid var(--rule);
+}
+
+.play-trade-cart ul { display: grid; gap: var(--s1); margin: 0; padding: 0; list-style: none; }
+.play-trade-cart li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(2.6rem, 0.38fr) auto;
+  align-items: center;
+  gap: var(--s1);
+  padding-block: var(--s1);
+  border-block-start: 1px solid var(--rule-soft);
+}
+
+.play-trade-cart li > strong { text-align: end; }
+.play-trade-actions { display: flex; flex-wrap: wrap; gap: var(--s1); }
+.play-trade-actions:empty { display: none; }
+.play-trade-actions .btn:disabled { opacity: 0.7; cursor: default; }

@@ -1,0 +1,84 @@
+.play-survival,
+.survival-card {
+  display: grid;
+  gap: var(--s3);
+  min-inline-size: 0;
+  max-inline-size: 50rem;
+}
+
+.survival-card {
+  padding: var(--s3);
+  border-block: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.survival-card h3 {
+  margin: 0;
+  font: 400 1.15rem/1.35 var(--f-ko-display);
+}
+
+.survival-nav,
+.survival-conditions,
+.survival-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  min-inline-size: 0;
+}
+
+.survival-nav { justify-self: start; }
+.survival-choice { inline-size: min(100%, 25rem); }
+
+.survival-card .play-wrap-links {
+  row-gap: var(--s1);
+  align-items: center;
+}
+
+.survival-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--s2) var(--s3);
+  min-inline-size: 0;
+  align-items: start;
+}
+
+.survival-fields .field {
+  min-inline-size: 0;
+  align-content: start;
+}
+
+.survival-card :is(.field input, .field select) { inline-size: 100%; }
+.survival-conditions { margin: 0; padding: 0; border: 0; }
+.survival-conditions legend { font: 700 14px/1.4 var(--f-ui); padding: 0; }
+.survival-conditions label {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  min-block-size: 44px;
+  font: 14px/1.4 var(--f-ui);
+}
+.survival-conditions input { flex: none; accent-color: var(--copper-ink); }
+
+.survival-preview,
+.survival-actions {
+  padding: var(--s2);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--bone);
+}
+
+.survival-preview { display: grid; gap: var(--s1); }
+.survival-action { justify-self: start; }
+.survival-actions { justify-content: space-between; }
+.survival-actions > :is(span, strong) { flex: 1 1 14rem; min-inline-size: 0; }
+.survival-card :is(.survival-preview, .survival-actions, .field-err, .loot-roll-result),
+.survival-notice,
+.survival-records {
+  font: 14px/1.5 var(--f-ui);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.survival-notice { margin: 0; color: var(--ink-2); }
+.survival-records { margin: 0; padding-inline-start: 1.5rem; }
+.survival-records li + li { margin-block-start: var(--s1); }

@@ -1,26 +1,40 @@
-import { useRef, useState } from 'react';
-import { titleOf } from '../content';
+import { useRef } from 'react';
+import { tableById, titleOf } from '../content';
 import { creatureDefenses } from '../content/creature-defenses';
 import { armorKo, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
 import type { Entry } from '../content/schema';
 import { calculateCreatureAdaptation, readCreatureLevel } from '../lib/creature-adaptation';
-import { creatureActionTable, creatureHitTable, creatureSpoilsTables } from '../lib/creature-combat';
+import { creatureActionTable, creatureHitImpact, creatureHitTable, creatureSpoilsTables } from '../lib/creature-combat';
 import { creatureActionSource } from '../lib/overlay';
+import { PlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { OracleBody } from '../views/Oracle';
 import { XRef } from './bits';
 import { CheckCalculator } from './CheckCalculator';
 import { CreatureAdaptation } from './CreatureAdaptation';
 import { CreatureTraitSummary } from './CreatureTraitSummary';
+import { DamageCalculator } from './DamageCalculator';
+import { EncounterStart } from './EncounterStart';
 import '../styles/creature-combat.css';
 
-export function CreatureCombatCard({ creature, entry }: { creature: CreatureRecord; entry: Entry }) {
-  const [levelText, setLevelText] = useState('');
-  const [mode, setMode] = useState<'action' | 'hit' | 'check'>('action');
-  const [enemyAttacking, setEnemyAttacking] = useState(false);
-  const [actionValue, setActionValue] = useState<number | null>(null);
-  const [hitValue, setHitValue] = useState<number | null>(null);
+const PC_HIT_TABLE = tableById.get('t-hit-humanoid')!;
+
+export function CreatureCombatCard({ creature, entry, showEncounterStart = true }: {
+  creature: CreatureRecord;
+  entry: Entry;
+  showEncounterStart?: boolean;
+}) {
+  const [levelText, setLevelText] = usePlayDraftState('creature-level', '');
+  const [mode, setMode] = usePlayDraftState<'action' | 'hit' | 'check' | 'damage'>('creature-mode', 'action');
+  const [enemyAttacking, setEnemyAttacking] = usePlayDraftState('creature-attacking', false);
+  const [actionValue, setActionValue] = usePlayDraftState<number | null>('creature-action', null);
+  const [hitValue, setHitValue] = usePlayDraftState<number | null>('creature-hit', null);
+  const [pcTarget, setPcTarget] = usePlayDraftState('creature-is-pc-target', false);
+  const [pcHitValue, setPcHitValue] = usePlayDraftState<number | null>('creature-pc-hit', null);
+  const [damageSeed, setDamageSeed] = usePlayDraftState('creature-damage-seed', { attempt: 0, critical: false });
+  const [pcDamageSeed, setPcDamageSeed] = usePlayDraftState('creature-pc-damage-seed', { attempt: 0, critical: false });
   const hitTab = useRef<HTMLButtonElement>(null);
   const checkTab = useRef<HTMLButtonElement>(null);
+  const damageTab = useRef<HTMLButtonElement>(null);
   const adjustment = calculateCreatureAdaptation(creature, readCreatureLevel(levelText));
   const { value: combatSkill, unknown: unknownCS } = adjustment.stats.combatSkill;
   const action = creatureActionTable(creature, entry);
@@ -28,6 +42,15 @@ export function CreatureCombatCard({ creature, entry }: { creature: CreatureReco
     ({ min, max, tag }) => min <= actionValue && actionValue <= max && tag === 'Physical',
   );
   const hit = creatureHitTable(creature, entry, adjustment.armorBonuses);
+  const hitDie = (pcTarget ? PC_HIT_TABLE : hit)?.dice;
+  const hitRow = hitValue === null ? undefined : hit?.rows.find(({ min, max }) => min <= hitValue && hitValue <= max);
+  const impact = hitRow ? { location: hitRow.ko, ...creatureHitImpact(creature, hitRow.label ?? '', adjustment.armorBonuses) }
+    : !hit ? { location: '몸통', ...creatureHitImpact(creature, 'Body', adjustment.armorBonuses) } : undefined;
+  const unlocatedArmor = creatureHitImpact(creature, null, adjustment.armorBonuses).armor;
+  const pcHit = pcHitValue === null ? undefined : PC_HIT_TABLE.rows.find(({ min, max }) => min <= pcHitValue && pcHitValue <= max);
+  const pcImpact = pcHit ? { location: pcHit.ko, armor: null, weak: pcHit.label === 'Head' } : undefined;
+  const damageKey = `outgoing-${damageSeed.attempt}-${impact?.location ?? ''}`;
+  const pcDamageKey = `incoming-${pcDamageSeed.attempt}-${pcImpact?.location ?? ''}`;
   const spoils = creatureSpoilsTables(creature);
   const kind = creature.group === 'overseer' ? 'Overseer' : creature.group === 'overseer-summon' ? 'Overseer 소환수' : creature.group === 'minion' ? 'Mastery 소환수' : '일반 생물';
   const ruthlessness = creature.traits.map((trait) => /^Ruthlessness \((\d+)\)$/i.exec(trait)).find(Boolean);
@@ -48,12 +71,26 @@ export function CreatureCombatCard({ creature, entry }: { creature: CreatureReco
       </dl>
       <CreatureDefenseSummary defenses={defenses} />
       <CreatureTraitSummary traits={defenses.otherTraits} />
+      {showEncounterStart && <details className="fold creature-encounter">
+        <summary>조우 시작</summary>
+        <EncounterStart creature={creature} />
+      </details>}
       <div className="creature-roll-tools">
         <div className="seg" role="group" aria-label="전투 도구">
           <button type="button" aria-pressed={mode === 'action'} onClick={() => setMode('action')}>행동 {action.dice}</button>
-          <button type="button" ref={hitTab} aria-pressed={mode === 'hit'} onClick={() => setMode('hit')}>명중 부위{hit ? ` ${hit.dice}` : ''}</button>
+          <button type="button" ref={hitTab} aria-pressed={mode === 'hit'} onClick={() => setMode('hit')}>명중 부위{hitDie ? ` ${hitDie}` : ''}</button>
           <button type="button" ref={checkTab} aria-pressed={mode === 'check'} onClick={() => setMode('check')}>공격 판정</button>
+          <button type="button" ref={damageTab} aria-pressed={mode === 'damage'} onClick={() => setMode('damage')}>피해 계산</button>
         </div>
+        {(mode === 'hit' || mode === 'damage') && (
+          <div className="creature-target">
+            <span aria-hidden="true">피해를 받는 쪽</span>
+            <div className="seg" role="group" aria-label="피해를 받는 쪽">
+              <button type="button" aria-pressed={!pcTarget} onClick={() => setPcTarget(false)}>몬스터</button>
+              <button type="button" aria-pressed={pcTarget} onClick={() => setPcTarget(true)}>PC</button>
+            </div>
+          </div>
+        )}
         <div hidden={mode !== 'action'}>
           <OracleBody t={action} value={actionValue} onValue={setActionValue} compact collapseTableBeforeRoll
             rollLabel={`${action.dice} 굴리기`} sourceForRow={(row) => row.label ? creatureActionSource(creature.id, row.label) : undefined} />
@@ -66,19 +103,48 @@ export function CreatureCombatCard({ creature, entry }: { creature: CreatureReco
           )}
         </div>
         <div hidden={mode !== 'hit'}>
-          {hit ? <OracleBody t={hit} value={hitValue} onValue={setHitValue} compact collapseTableBeforeRoll rollLabel={`${hit.dice} 굴리기`} />
-            : <p className="creature-fixed-hit">{entry.stats?.['Hit Location']}</p>}
+          <div hidden={pcTarget}>
+            {hit ? <OracleBody t={hit} value={hitValue} onValue={setHitValue} compact collapseTableBeforeRoll rollLabel={`${hit.dice} 굴리기`} />
+              : <p className="creature-fixed-hit">{entry.stats?.['Hit Location']}</p>}
+          </div>
+          <div hidden={!pcTarget}>
+            <OracleBody t={PC_HIT_TABLE} value={pcHitValue} onValue={setPcHitValue} compact collapseTableBeforeRoll rollLabel="D20 굴리기" />
+          </div>
+          {(pcTarget ? pcImpact : impact) && (
+            <button type="button" className="btn ghost creature-action-check" onClick={() => {
+              setMode('damage');
+              damageTab.current?.focus();
+            }}>이 부위로 피해 계산</button>
+          )}
         </div>
         <div hidden={mode !== 'check'}>
           <CheckCalculator attackOnly creature={{
             combatSkill: unknownCS ? null : combatSkill,
             attacking: enemyAttacking,
             onChangeAttacker: setEnemyAttacking,
-            onHitLocation: () => {
+            onHitLocation: (critical, pc) => {
+              setPcTarget(pc);
+              if (pc) {
+                setPcDamageSeed(({ attempt }) => ({ attempt: attempt + 1, critical }));
+                setPcHitValue(null);
+              } else {
+                setDamageSeed(({ attempt }) => ({ attempt: attempt + 1, critical }));
+                setHitValue(null);
+              }
               setMode('hit');
               hitTab.current?.focus();
             },
           }} />
+        </div>
+        <div hidden={mode !== 'damage' || pcTarget}>
+          <PlayDraftScope name={damageKey} key={damageKey}>
+            <DamageCalculator impact={impact} unlocatedArmor={unlocatedArmor} defenses={defenses} initialCritical={damageSeed.critical} />
+          </PlayDraftScope>
+        </div>
+        <div hidden={mode !== 'damage' || !pcTarget}>
+          <PlayDraftScope name={pcDamageKey} key={pcDamageKey}>
+            <DamageCalculator impact={pcImpact} unlocatedArmor={null} initialCritical={pcDamageSeed.critical} pc />
+          </PlayDraftScope>
         </div>
       </div>
       <section className="creature-reactions" aria-label="방어 동작과 펌블">
@@ -114,7 +180,7 @@ export function CreatureCombatCard({ creature, entry }: { creature: CreatureReco
 function CreatureDefenseSummary({ defenses }: { defenses: ReturnType<typeof creatureDefenses> }) {
   const rows = [
     { key: 'vulnerable', label: '취약 ×2', items: defenses.vulnerable },
-    { key: 'resistant', label: '저항 ½', items: defenses.resistant },
+    { key: 'resistant', label: '저항 ½', items: defenses.resistsNonMagicalPhysical ? ['비마법 물리 피해'] : [] },
     { key: 'restored', label: '회복', items: defenses.restored },
     { key: 'immune', label: '상태 면역', items: defenses.immuneConditions.map((condition) => titleOf(condition.toLowerCase()).ko) },
   ].filter(({ items }) => items.length > 0);

@@ -1,0 +1,62 @@
+.lock-trap-tool,
+.lock-trap-step {
+  display: grid;
+  gap: var(--s2);
+  min-width: 0;
+}
+.lock-trap-tool {
+  max-width: 50rem;
+  padding: var(--s3);
+  border-block: 1px solid var(--rule);
+  background: var(--paper);
+}
+.lock-trap-head,
+.lock-trap-links,
+.lock-trap-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+}
+.lock-trap-head { justify-content: space-between; }
+.lock-trap-tool h2,
+.lock-trap-tool h3,
+.lock-trap-tool h4 {
+  margin: 0;
+  font: 400 1.05rem/1.4 var(--f-ko-display);
+}
+.lock-trap-tool h2 { font-size: 1.15rem; }
+.lock-trap-tool p { margin: 0; }
+.lock-trap-targets { justify-self: start; flex-wrap: wrap; }
+.lock-trap-step {
+  padding-block-start: var(--s2);
+  border-top: 1px solid var(--rule-soft);
+}
+.lock-trap-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  align-items: end;
+  gap: var(--s2);
+}
+.lock-trap-wide { grid-column: 1 / -1; }
+.lock-trap-choices { display: grid; gap: var(--s1); justify-items: start; }
+.lock-trap-roll { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s1); }
+.lock-trap-select { max-width: 17rem; }
+.lock-trap-tool input:not([type='checkbox']),
+.lock-trap-tool select,
+.lock-trap-tool button,
+.lock-trap-tool .xref {
+  min-height: 44px;
+}
+.lock-trap-tool .xref { display: inline-flex; align-items: center; }
+.lock-trap-status:empty { display: none; }
+.lock-trap-status span { font-weight: 700; }
+.lock-trap-note {
+  padding: var(--s2);
+  background: var(--bone);
+  border-inline-start: 2px solid var(--copper-ink);
+}
+.lock-trap-check { display: inline-flex; align-items: center; gap: var(--s1); min-height: 44px; }
+.lock-trap-check input { accent-color: var(--copper-ink); }
+details.lock-trap-physical { margin-block-start: 0; min-width: 0; }
+.lock-trap-physical > summary { min-height: 44px; word-break: keep-all; overflow-wrap: anywhere; }

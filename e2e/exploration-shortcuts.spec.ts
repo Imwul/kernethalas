@@ -31,6 +31,68 @@ test('an exploration shortcut opens related rolls without leaving the selected s
   await expect(encounter).toBeFocused();
 });
 
+test('the same encounter roll follows the chosen place and stays on returning from a table', async ({ page }) => {
+  await page.addInitScript(() => {
+    const getRandomValues = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = (array) => {
+      if (array instanceof Uint32Array && array.length === 1) {
+        array[0] = 0xb800_0000; // D20 → 15.
+        return array;
+      }
+      return getRandomValues(array);
+    };
+  });
+  await page.goto('/atlas/p-explore-room');
+  const tray = page.getByRole('region', { name: '탐험 바로가기' });
+  await tray.getByRole('link', { name: /^조우 판정/ }).click();
+  const check = page.getByRole('dialog', { name: '조우 판정' });
+  const instrument = check.getByRole('region', { name: '표 굴리기' });
+  const places = instrument.getByRole('group', { name: '조우 장소' });
+  const room = places.getByRole('button', { name: '방', exact: true });
+  const corridor = places.getByRole('button', { name: '통로', exact: true });
+  const comparison = places.getByRole('button', { name: '방·통로 비교' });
+  const result = instrument.getByRole('status');
+  const encounter = instrument.getByRole('link', { name: /전투 조우.*표 선택/ });
+  const event = instrument.getByRole('link', { name: /이벤트/ });
+  const enterValue = async (value: string) => {
+    await instrument.getByRole('textbox', { name: '직접 굴린 값' }).fill(value);
+    await instrument.getByRole('button', { name: '확인', exact: true }).click();
+  };
+
+  await expect(comparison).toHaveAttribute('aria-pressed', 'true');
+  await room.click();
+  await enterValue('12');
+  await expect(result).toContainText('방 · 전투 조우');
+  await expect(event).toHaveCount(0);
+  await encounter.click();
+  const encounterTable = page.getByRole('dialog', { name: '전투 조우 — 표 선택' });
+  await expect(encounterTable.getByRole('status')).toContainText('굴리기 버튼을 누르거나 직접 굴린 값을 입력하세요');
+  await encounterTable.getByRole('button', { name: '조우 판정' }).click();
+  await expect(room).toHaveAttribute('aria-pressed', 'true');
+  await expect(result.locator('.readout')).toHaveText('12');
+  await expect(encounter).toBeFocused();
+
+  await corridor.click();
+  await expect(result.locator('.readout')).toHaveText('12');
+  await expect(result).toContainText('통로 · 조우 없음. 선택 행동이나 다음 장소');
+  await expect(encounter).toHaveCount(0);
+  await expect(event).toHaveCount(0);
+
+  await enterValue('9');
+  await expect(event).toHaveCount(0);
+  await room.click();
+  await expect(result.locator('.readout')).toHaveText('9');
+  await expect(event).toBeVisible();
+  await expect(encounter).toHaveCount(0);
+
+  await corridor.click();
+  await instrument.getByRole('button', { name: '다시 굴리기' }).click();
+  await expect(result.locator('.readout')).toHaveText('15');
+  await expect(result).toContainText('통로 · 전투 조우');
+  await expect(encounter).toBeVisible();
+  await expect(event).toHaveCount(0);
+});
+
 test('Tension dice show the next die and only open Growing Darkness on demand', async ({ page }) => {
   await page.addInitScript(() => {
     // D8 → 2, D6 → 2, D4 → 3, D4 → 2.

@@ -73,6 +73,7 @@
 .creature-defenses .restored dt { color: var(--ochre); }
 
 .creature-roll-tools {
+  container-type: inline-size;
   display: grid;
   min-width: 0;
   gap: var(--s2);
@@ -83,6 +84,15 @@
 .creature-roll-tools .oracle-body { margin: 0; }
 .creature-action-check { min-height: 44px; margin-top: var(--s2); }
 .creature-fixed-hit { margin: 0; padding: var(--s3); background: var(--paper); }
+.creature-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); }
+.creature-target > span { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
+
+@container (width < 355px) {
+  .creature-roll-tools > .seg {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
 .creature-reactions,
 .creature-aftermath {

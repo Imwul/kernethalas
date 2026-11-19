@@ -1,0 +1,89 @@
+.loot-journal {
+  display: grid;
+  min-width: 0;
+  max-width: 50rem;
+  gap: var(--s3);
+  margin-block-end: var(--s3);
+  padding: var(--s3);
+  border-block: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.loot-journal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.loot-journal h2, .loot-journal h3 {
+  margin: 0;
+  font: 400 1.15rem var(--f-ko-display);
+}
+
+.loot-journal .field { min-width: 0; }
+.loot-journal :is(input, select, button, summary) { min-height: 44px; }
+.loot-select { justify-self: start; max-width: 100%; }
+.loot-help { color: var(--ink-2); font: 14px/1.45 var(--f-ui); }
+.loot-journal p { margin: 0; }
+
+.loot-roll {
+  display: grid;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s2);
+  margin: 0;
+  border: 1px solid var(--rule-soft);
+}
+
+.loot-roll legend {
+  padding-inline: var(--s1);
+  color: var(--ink-2);
+  font: 700 14px/1.4 var(--f-ui);
+}
+
+.loot-roll-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--s2);
+}
+
+.loot-roll-form .field { flex: 0 1 7rem; }
+.loot-roll-form .field-err { flex: 1 0 100%; }
+
+.loot-roll-result {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s2);
+  padding-block: var(--s2);
+  border-top: 1px solid var(--rule-soft);
+  font: 14px/1.45 var(--f-ui);
+}
+
+.loot-roll-result .readout { padding-block: .06em .12em; }
+.loot-property { display: grid; gap: var(--s2); }
+.loot-refs { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.loot-journal .xref { min-height: 44px; align-items: center; }
+.loot-appearance { border-top: 1px solid var(--rule-soft); }
+
+.loot-appearance summary {
+  padding-block: var(--s2);
+  cursor: pointer;
+  color: var(--copper-ink);
+  font: 14px/1.5 var(--f-ui);
+}
+
+.loot-journal-line {
+  display: grid;
+  gap: var(--s2);
+  justify-items: start;
+  min-width: 0;
+  padding: var(--s2) var(--s3);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--bone);
+}
+
+.loot-journal-line p { overflow-wrap: anywhere; font: 15px/1.5 var(--f-ui); }
