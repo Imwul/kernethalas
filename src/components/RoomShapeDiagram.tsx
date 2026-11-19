@@ -2,6 +2,8 @@ import { roomShapeForRoll } from '../content/tables/exploration';
 import '../styles/room-shape.css';
 
 const center = { x: 64, y: 48 };
+const outlineWidth = 13;
+const passageWidth = 10;
 const corridorEnds = [
   { x: 64, y: 83 }, { x: 24, y: 78 }, { x: 13, y: 48 }, { x: 24, y: 18 },
   { x: 64, y: 13 }, { x: 104, y: 18 }, { x: 115, y: 48 }, { x: 104, y: 78 },
@@ -41,12 +43,15 @@ export function RoomShapeDiagram({ roll }: { roll: number }) {
     };
   });
   const branches = paths.map(({ from, to }) => `M${from.x},${from.y}L${to.x},${to.y}`).join(' ');
+  const junction = place === 'corridor' && exits > 1;
   return (
     <svg className="room-shape-diagram" viewBox="0 0 128 96" role="img"
       aria-label={`${roll}번 ${place === 'room' ? '방' : '통로'} 모양 예시 · 출입구 ${exits}개`}>
-      <path className="room-shape-outline" d={branches} />
+      {junction && <circle className="room-shape-outline-junction" cx={center.x} cy={center.y} r={outlineWidth / 2} />}
+      <path className="room-shape-outline" d={branches} strokeWidth={outlineWidth} />
       {place === 'room' && <rect className="room-shape-chamber" {...room} />}
-      <path className="room-shape-passage" d={branches} />
+      {junction && <circle className="room-shape-passage-junction" cx={center.x} cy={center.y} r={passageWidth / 2} />}
+      <path className="room-shape-passage" d={branches} strokeWidth={passageWidth} />
       {paths.map(({ from, to }, i) => {
         const length = Math.hypot(to.x - from.x, to.y - from.y);
         const x = (to.y - from.y) * 5 / length;

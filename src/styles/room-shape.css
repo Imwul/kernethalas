@@ -22,8 +22,10 @@
   stroke-linejoin: round;
 }
 
-.room-shape-outline { stroke: var(--ink-2); stroke-width: 13; }
-.room-shape-passage { stroke: var(--paper); stroke-width: 10; }
+.room-shape-outline { stroke: var(--ink-2); }
+.room-shape-outline-junction { fill: var(--ink-2); }
+.room-shape-passage { stroke: var(--paper); }
+.room-shape-passage-junction { fill: var(--paper); }
 .room-shape-exit { stroke: var(--copper-ink); stroke-width: 2.5; stroke-linecap: round; }
 
 .room-shape-result {
