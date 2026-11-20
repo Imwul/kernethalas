@@ -22,7 +22,7 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
   return (
     <article className="folio reference-folio">
       {!(creature && hideTitle) && <header className={`folio-head${hideTitle ? ' folio-head-compact' : ''}`}>
-        <div className="reference-category">{cat?.ko}</div>
+        {(hideTitle || cat?.ko !== e.ko) && <div className="reference-category">{cat?.ko}</div>}
         {!hideTitle && <Title className="folio-title">{e.ko}{e.ko !== e.en && <span className="en">{e.en}</span>}</Title>}
         {hideTitle && e.ko !== e.en && <span className="en">{e.en}</span>}
         <div className="marks"><VChip v={e.verification} /> <Cite source={e.source} /></div>

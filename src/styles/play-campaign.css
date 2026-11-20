@@ -1,6 +1,14 @@
 .campaign-selector.fold, .campaign-storage-status {
-  max-inline-size: 1940px;
-  margin: 0 auto var(--s3);
+  max-inline-size: 1120px;
+  margin: 0 auto var(--s4);
+}
+/* Line up with the play desk below it on ultrawide screens. */
+@media (min-width: 2000px) {
+  .campaign-selector.fold, .campaign-storage-status {
+    max-inline-size: 1940px;
+    margin-inline-start: clamp(0px, calc((100vw - 2360px) / 2), 480px);
+    margin-inline-end: 0;
+  }
 }
 .campaign-selector.fold {
   min-inline-size: 0;

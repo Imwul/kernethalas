@@ -278,7 +278,8 @@ export function Workbench() {
         }} />
         {open.length === 0 ? (
           <div className="empty">
-            규칙·표·절차 페이지의 <b>작업대에 펼치기</b> 버튼이나 검색 창의 <kbd>Shift</kbd>+<kbd>Enter</kbd>로 항목을 펼치세요.
+            규칙·표·절차 페이지에서 <b>작업대에 펼치기</b>를 누르면 여기에 펼쳐집니다.
+            <span className="kbd-hint"> 검색 창에서는 <kbd>Shift</kbd>+<kbd>Enter</kbd>로 바로 펼칠 수 있습니다.</span>
           </div>
         ) : (
           <>

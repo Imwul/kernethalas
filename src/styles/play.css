@@ -49,10 +49,8 @@
   flex-wrap: wrap;
   align-items: end;
   justify-content: space-between;
-  gap: var(--s2) var(--s4);
-  padding-bottom: var(--s3);
-  margin-bottom: var(--s3);
-  border-bottom: 1px solid var(--rule);
+  gap: var(--s3) var(--s4);
+  padding-bottom: var(--s4);
 }
 .play-header h1 { margin: 0; font: 400 clamp(30px, 5vw, 45px)/1.15 var(--f-ko-display); }
 .play-header p { margin: var(--s1) 0 0; color: var(--ink-2); font: 14px/1.5 var(--f-ui); }
@@ -78,7 +76,8 @@ details.play-domain { margin-block: 0 var(--s3); }
 .play-effect-note li + li, .play-effect-note p + ul { margin-top: var(--s1); }
 .play-wrap-battle { max-width: 28rem; }
 .play-wrap-battle select { min-height: 44px; }
-.play-stage > :is(.play-reentries, .play-equipment-fold) { margin-top: 0; }
+/* Folds inside grid stacks already get the grid gap; their own top margin doubles it. */
+.play-stage > details.fold, .play-exploration > details.fold { margin-top: 0; }
 .play-stage > :is(.play-reentries, .play-equipment-fold) > summary {
   min-height: 44px;
   scroll-margin-block-start: calc(var(--play-stage-top) + var(--s2));
@@ -165,7 +164,10 @@ details.play-domain { margin-block: 0 var(--s3); }
 .play-facts dt, .play-empty { color: var(--ink-2); }
 .play-facts dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .play-refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); column-gap: var(--s2); }
-.play-refs .xref { min-height: 44px; align-items: center; }
+.play-refs .xref { min-height: 44px; align-items: center; font: 15px/1.4 var(--f-ui); }
+/* The desk's folds read as one ledger: no gaps between consecutive rows. */
+.play-desk > details.fold { margin-block: 0; }
+.play-desk > details.fold:has(+ .play-layout) { margin-bottom: var(--s4); border-bottom: 1px solid var(--rule); }
 .play-journal {
   display: grid;
   gap: var(--s3);

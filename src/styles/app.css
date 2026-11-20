@@ -320,7 +320,7 @@ h4 {
   padding: 6px 12px;
   text-decoration: none;
   font-family: var(--f-display);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
   font-size: 15px;
   color: var(--ink-2);
   display: flex;
@@ -375,6 +375,9 @@ h4 {
   display: none;
 }
 kbd {
+  display: inline-block;
+  line-height: 1.5;
+  vertical-align: 0.08em;
   font-family: var(--f-mono);
   font-size: 12px;
   border: 1px solid var(--rule);
@@ -549,7 +552,7 @@ kbd {
 }
 .side-index h2 {
   font-family: var(--f-display);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   font-size: 13px;
   color: var(--faded);
   margin: var(--s4) 0 var(--s2);
@@ -578,9 +581,10 @@ kbd {
    ========================================================================== */
 .page-head {
   display: grid;
-  gap: var(--s2);
-  margin-bottom: var(--s5);
+  gap: var(--s3);
+  margin-bottom: var(--s6);
 }
+.page-head > :is(h1, p) { margin: 0; }
 .page-head .kicker {
   display: flex;
   gap: 12px;
@@ -601,8 +605,13 @@ kbd {
 .lede {
   font-family: var(--f-ko);
   font-size: 18.5px;
+  line-height: 1.6;
   max-width: var(--measure);
   color: var(--ink-2);
+  text-wrap: pretty;
+}
+@media (max-width: 560px) {
+  .lede { font-size: 16.5px; }
 }
 
 .chip {
@@ -1133,22 +1142,26 @@ details.fold {
 details.fold > summary {
   list-style: none;
   cursor: pointer;
+  min-height: 44px;
   padding: 10px 0;
-  font-family: var(--f-display);
-  letter-spacing: 0.12em;
-  font-size: 14px;
-  color: var(--faded);
+  font: 600 14px/1.45 var(--f-ui);
+  letter-spacing: normal;
+  color: var(--ink-2);
   display: flex;
   gap: 8px;
   align-items: center;
 }
+details.fold > summary:hover { color: var(--ink); }
 details.fold > summary::-webkit-details-marker {
   display: none;
 }
 details.fold > summary::before {
   content: '+';
+  flex: none;
   font-family: var(--f-mono);
+  font-weight: 400;
   width: 14px;
+  color: var(--copper-ink);
 }
 details.fold[open] > summary::before {
   content: '−';
@@ -2727,3 +2740,6 @@ input[aria-invalid='true'] {
     display: none;
   }
 }
+
+/* Keyboard shortcut hints mean nothing on touch screens. */
+@media (pointer: coarse) { .kbd-hint { display: none; } }
