@@ -99,14 +99,48 @@
 .play-custom-library,
 .play-custom-management[open],
 .play-aux-body { display: grid; gap: var(--s3); min-width: 0; }
-.play-combat-targets,
 .play-combat-target-actions,
 .play-combat-domain-overseer,
 .play-custom-row-actions { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
 .play-combat-targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--s2);
   padding-block: var(--s2);
   border-block: 1px solid var(--rule-soft);
 }
+.play-combat-target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s2);
+  align-items: stretch;
+  min-width: 0;
+}
+.play-combat-target .btn {
+  min-width: 0;
+  justify-content: start;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.play-target-status {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--s1);
+  color: var(--ink-2);
+  font: 13px/1.35 var(--f-ui);
+}
+.play-target-status select {
+  inline-size: 6rem;
+  block-size: 44px;
+  min-width: 0;
+  padding-inline: var(--s2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--bone);
+  font: 14px/1.35 var(--f-ui);
+}
+.play-target-status[data-status] select { border-color: var(--copper-ink); }
 .play-combat-targets .btn[aria-pressed='true'] {
   border-color: var(--copper-ink);
   background: var(--copper-wash);
@@ -178,6 +212,7 @@
   padding-top: var(--s3);
   border-top: 1px solid var(--rule-soft);
 }
+.play-combat-complete .play-combat-note { flex-basis: 100%; }
 
 @container (width < 340px) {
   .play-combat-roll { grid-template-columns: minmax(0, 1fr) max-content; }

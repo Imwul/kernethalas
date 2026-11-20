@@ -114,7 +114,14 @@ function parents({ scope, changes }: PlayRollEntry) {
     return timing;
   }
   if (scope.startsWith('combat/')) {
-    return battleParents(scope.split('/')[1] ?? '');
+    const result = battleParents(scope.split('/')[1] ?? '');
+    const target = scope.match(/^combat\/[^/]+\/target-[^/]+\//)?.[0];
+    if (target) {
+      if (scope.startsWith(`${target}action-follow-up-`)) result.push(`${target}creature-action`);
+      if (slots.includes(`${target}creature-hit`)) result.push(`${target}attack-confirmed-pc`);
+      if (slots.includes(`${target}creature-pc-hit`)) result.push(`${target}attack-confirmed-enemy`);
+    }
+    return result;
   }
   return [];
 }

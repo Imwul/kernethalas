@@ -2,9 +2,10 @@ import { creatureById } from '../content/entries/creatures';
 import { MAX_SET_NAME, readPlayCustomEncounterRows, type EncounterSet } from './custom-encounters';
 import { DAMAGE_TYPES } from './damage';
 import { DICE_CHAIN } from './dice';
-import { PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
+import { isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
 import { ARMOR_DICE, GEAR_WEIGHTS, isGearLedger, type GearLedger } from './play-inventory';
 import { readPlayRollHistory, safePlaySlot, type PlayRollEntry } from './play-roll-history';
+import { isPlayTimeline, PLAY_TIMELINE_SLOT } from './play-timeline';
 import { isGrowthSkill } from './skill-growth';
 
 export interface PlayCheckpointData {
@@ -62,6 +63,8 @@ const diceFace = shape({ tens: between(0, 9), ones: between(0, 9), value: isD100
 const skillResult = shape({ raw: diceFace, read: diceFace, skill: isFiniteNumber, outcome, flippedRead: isBoolean });
 const confirmedSkill = shape({ inputs: checkInputs, result: skillResult });
 const rollResult = shape({ expr: isText, dice: list(isPositive), mod: isFiniteNumber, total: isFiniteNumber });
+const summonRoll: Validator = (value) => isRecord(value) && value.expr === 'D4' && value.mod === 0
+  && Array.isArray(value.dice) && value.dice.length === 1 && between(1, 4)(value.dice[0]) && value.total === value.dice[0];
 const damageType = oneOf(['', ...DAMAGE_TYPES]);
 const storyEffect: Validator = (value) => isRecord(value) && (
   value.kind === 'count'
@@ -86,6 +89,7 @@ const battle = shape({
   kind: oneOf(ENCOUNTER_KINDS), planKey: optional(isText), retreatId: optional(isText), primaryId: nullable(creature),
   seed: optional(shape({ creatureIds: list(creature), description: isText })), creatureIds: list(creature),
   outcome: nullable(oneOf(['victory', 'ended', 'fled'])),
+  defeatedTargets: optional(list(shape({ creatureId: creature, label: isText }))),
 });
 const tension = shape({ sides: tensionDie, value: between(1, 8), nextDie: tensionDie, darkness: isBoolean });
 const lootReport = shape({ journal: isText, sheet: isText, gear: optional(storyEffect) });
@@ -94,7 +98,7 @@ const encounterRoll = shape({ roll: isText, edge: oneOf(EDGE), growthRecorded: o
 const encounterCheck = shape({ skill: isText, roll: isText, edge: oneOf(EDGE), growthRecorded: optional(isBoolean) });
 const roundTiming = oneOf(['start', 'end', 'round']);
 const mapLocation = shape({ domainId: isPositive, paperId: (value) => isText(value) && value.length <= 32 && !!paperMapKey(value),
-  note: textWithLimit(400), area: oneOf(PLACE_TYPES), tags: list(oneOf(PAPER_MAP_TAGS)) });
+  note: textWithLimit(400), area: oneOf(PLACE_TYPES), tags: list(oneOf(PAPER_MAP_TAGS)), tile: optional(isPaperMapTile) });
 const carryCounts = shape({ normal: isText, heavy: isText, light: isText, coins: isText, gems: isText });
 const tradeDirection = oneOf(['buy', 'sell']);
 const tradeLine = shape({ direction: tradeDirection, name: isText, quantity: isPositive, price: isCount });
@@ -108,12 +112,15 @@ const ROOT_FIELDS: Record<string, Validator> = {
   nextTension: oneOf(['', 'D4', 'D6', 'D8']), initialTension: tensionDie, domainId: isPositive, roomNumber: isPositive,
   domains: (value) => Array.isArray(value) && value.length > 0 && value.every(domain)
     && new Set(value.map(({ id }) => id)).size === value.length,
-  dismissedDarkness: list(isText), paperApplied: list(isText), skillCriticalHistory: list(isText),
+  dismissedDarkness: list(isText), paperApplied: list((value) => isText(value) || shape({ id: isText, text: isText })(value)),
+  journalCopiedText: isText, skillCriticalHistory: list(isText),
   pendingSkillGrowth: list((value) => isText(value) && isGrowthSkill(value)),
   battles: recordOf(battle), targetNames: recordOf(list(isText)), battleLines: recordOf(isText),
   masteryReports: recordOf(isText), masterySheet: recordOf(list(paperChange)), battleSheet: recordOf(list(paperChange)),
   [PAPER_MAP_SLOT]: (value) => Array.isArray(value) && value.every(mapLocation)
+    && value.every(({ tile, area }) => tile === undefined || isPaperMapTile(tile, area))
     && new Set(value.map(({ domainId, paperId }) => `${domainId}/${paperMapKey(paperId)}`)).size === value.length,
+  [PLAY_TIMELINE_SLOT]: isPlayTimeline,
 };
 
 // The most heavily structured child records are read as arrays or objects in the Play views.
@@ -134,7 +141,8 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'event-roll': nullable(isD100),
   'paper-map-key': isText,
   'lineup': shape({
-    targets: list(shape({ id: isText, creatureId: creature, source: isText, ordinal: optional(isPositive) })),
+    targets: list(shape({ id: isText, creatureId: creature, source: isText, ordinal: optional(isPositive),
+      status: optional(oneOf(['defeated', 'left'])) })),
     activeId: nullable(isText), encounterId: nullable(isText),
   }),
   'table-choice': nullable(shape({ table: oneOf(['t-encounter-a', 't-encounter-b', 't-overseer']), roll: isPositive })),
@@ -180,7 +188,11 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'element': rollResult,
   'setup-duration': rollResult,
   'duration': rollResult,
-  'summons': rollResult,
+  'summons': summonRoll,
+  'summon-added': nullable(between(-1, 4)),
+  'summon-done': list(between(1, 4)),
+  'attack-confirmed-pc': nullable(shape({ id: isText, attacker: isText, defender: isText })),
+  'attack-confirmed-enemy': nullable(shape({ id: isText, attacker: isText, defender: isText })),
   'roll': (value) => value === null || isPositive(value) || rollResult(value),
   'loot-reports': recordOf(lootReport),
   'gem-values': list(nullable(isPositive)),

@@ -5,9 +5,6 @@ import type { CreatureRecord } from '../content/entries/creatures';
 import type { Entry, OracleTable } from '../content/schema';
 import { adaptationArmorBonus, type ArmorBonus } from './creature-adaptation';
 
-const ACTION_FOLLOW_ON: Record<string, Record<number, string>> = {
-  'cr-infernal-archon': { 3: 'cr-lesser-demon' },
-};
 const SPOILS_TABLES: Record<string, string[]> = {
   'Spoils table': ['t-spoils'],
   'Resources table': ['t-resources'],
@@ -31,8 +28,8 @@ export function creatureActionTable(creature: CreatureRecord, entry: Entry): Ora
     mode: 'summary',
     columns: [{ key: 'kind', ko: '처리' }],
     rows: creature.actions.map((action, index) => {
-      const next = ACTION_FOLLOW_ON[creature.id]?.[action.min];
-      const { resistance, after } = creatureActionRule(creature, action);
+      const { resistance, after, summons } = creatureActionRule(creature, action);
+      const next = summons?.kind === 'roster' ? summons.creatureId : undefined;
       const check = action.tag === 'Physical' ? '공격 판정' : resistance ? `${resistance} 판정` : '행동 효과 적용';
       const kind = [action.tag, check, after && `추가 ${after}`].filter(Boolean).join(' · ');
       return {

@@ -1,0 +1,40 @@
+.ruling-note.fold {
+  min-inline-size: 0;
+  margin: 0;
+  padding-inline: var(--s2);
+  border: 1px solid var(--rule-soft);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--paper);
+}
+.reference-record .ruling-note { grid-column: 1; }
+.ruling-note.fold > summary {
+  min-block-size: 44px;
+  min-inline-size: 0;
+  gap: var(--s2);
+  color: var(--ink-2);
+  font: 700 14px/1.5 var(--f-ui);
+  letter-spacing: normal;
+}
+.ruling-note.fold > summary::before { flex: none; color: var(--copper-ink); }
+.ruling-note.fold > summary > span:first-child { flex: none; white-space: nowrap; }
+.ruling-note-preview {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.ruling-note[open] .ruling-note-preview { display: none; }
+.ruling-note-body, .ruling-note-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+.ruling-note-body { padding-block-end: var(--s2); }
+.ruling-note-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
+.ruling-note :is(button, input) { min-block-size: 44px; }
+.ruling-note :is(input, textarea) { inline-size: 100%; min-inline-size: 0; }
+.ruling-note :is(p, ul) { margin: 0; }
+.ruling-note-text { max-inline-size: 72ch; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+.ruling-note-status { color: var(--ink-2); font: 14px/1.5 var(--f-ui); overflow-wrap: anywhere; }
+.ruling-notes-index.fold { margin-block-end: var(--s3); }
+.ruling-notes-results { list-style: none; padding: 0; }
+.ruling-notes-results li { min-inline-size: 0; padding-block: var(--s1) var(--s2); border-block-start: 1px solid var(--rule-soft); }
+.ruling-notes-results a { display: inline-flex; align-items: center; min-block-size: 44px; overflow-wrap: anywhere; }

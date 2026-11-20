@@ -4,17 +4,20 @@ import { planRollCorrection, type PlayRollEntry } from '../../lib/play-roll-hist
 
 const FIELD = 'input[data-play-roll-field]';
 const ACTION = '[data-play-next]';
-const MODE_KEY = 'kn-play-physical-first';
 type Stage = PlayRollEntry['stage'];
 
 export function usePhysicalFirst() {
+  return usePlayPreference('kn-play-physical-first');
+}
+
+export function usePlayPreference(key: string) {
   const [enabled, setEnabled] = useState(() => {
-    try { return localStorage.getItem(MODE_KEY) === '1'; }
+    try { return localStorage.getItem(key) === '1'; }
     catch { return false; }
   });
   const toggle = () => {
     setEnabled(!enabled);
-    try { localStorage.setItem(MODE_KEY, enabled ? '0' : '1'); }
+    try { localStorage.setItem(key, enabled ? '0' : '1'); }
     catch { /* can still use the mode in this tab */ }
   };
   return [enabled, toggle] as const;
@@ -37,7 +40,7 @@ function focusControl(control: HTMLElement) {
 }
 
 export function focusPlayRoll(stage: Stage, field?: string) {
-  requestAnimationFrame(() => {
+  const reveal = () => {
     const section = document.getElementById(`play-stage-${stage}`);
     const input = field && Array.from(section?.querySelectorAll<HTMLInputElement>(FIELD) ?? [])
       .find((element) => element.dataset.playRollField === field && !element.matches(':disabled'));
@@ -55,6 +58,24 @@ export function focusPlayRoll(stage: Stage, field?: string) {
       if (canReach(input)) focusControl(input);
       else section?.querySelector<HTMLElement>('.play-stage-heading')?.focus();
     });
+  };
+  requestAnimationFrame(() => {
+    const target = field?.match(/^combat\/[^/]+\/target-([^/]+)\//)?.[1];
+    if (!target) { reveal(); return; }
+    const section = document.getElementById(`play-stage-${stage}`);
+    const switchTo = (attribute: 'data-play-combat-target' | 'data-play-attack-side', value: string) => {
+      const button = section?.querySelector<HTMLButtonElement>(`button[${attribute}="${CSS.escape(value)}"]`);
+      if (!button || button.getAttribute('aria-pressed') === 'true') return false;
+      button.click();
+      return true;
+    };
+    const revealAttackSide = () => {
+      const side = field?.match(/\/attack:(pc-attack|enemy-attack)$/)?.[1];
+      if (side && switchTo('data-play-attack-side', side)) requestAnimationFrame(reveal);
+      else reveal();
+    };
+    if (switchTo('data-play-combat-target', target)) requestAnimationFrame(revealAttackSide);
+    else revealAttackSide();
   });
 }
 

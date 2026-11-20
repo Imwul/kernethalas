@@ -14,6 +14,7 @@ test('mobile action bar focuses the next physical roll and the 00 shortcut persi
   const preferred = page.getByRole('button', { name: '실물 입력 우선', exact: true });
   const input = shape.getByRole('textbox', { name: '직접 굴린 값', exact: true });
 
+  await expect(shape.getByRole('button', { name: 'D100에 00 입력' })).toBeHidden();
   await preferred.click();
   await expect(shape.getByText('D100 · 1–100 · 00 허용', { exact: true })).toBeVisible();
   const roll = shape.getByRole('button', { name: '굴리기', exact: true });

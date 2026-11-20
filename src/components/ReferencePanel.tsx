@@ -6,6 +6,7 @@ import { BenchButton, Cite, Notes, PinButton, VChip, XRef } from './bits';
 import { EntryBody } from './EntryBody';
 import { IClose } from './icons';
 import { RulingMatrix } from './RulingMatrix';
+import { RulingNote } from './RulingNote';
 import { procedureTools } from './procedure-tools';
 
 export interface ReferenceFrame {
@@ -112,6 +113,7 @@ function PreviewBody({ frame, onValue }: { frame: ReferenceFrame; onValue: (valu
     <article className="preview-detail">
       <div className="marks"><VChip v={table.verification} /> <Cite source={table.source} /></div>
       <p className="usage">{table.usage}</p>
+      <RulingNote id={table.id} />
       <OracleBody t={table} value={frame.result ?? null} onValue={onValue} compact />
     </article>
   );

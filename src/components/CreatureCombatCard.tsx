@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { tableById, titleOf } from '../content';
 import { creatureActionRule } from '../content/creature-action-rules';
 import { creatureDefenses } from '../content/creature-defenses';
@@ -15,6 +15,7 @@ import { CheckCalculator } from './CheckCalculator';
 import { CreatureAdaptation } from './CreatureAdaptation';
 import { CreatureActionResolution } from './CreatureActionResolution';
 import { CreatureTraitSummary } from './CreatureTraitSummary';
+import type { CombatSummonControls } from './CreatureSummonRoll';
 import { DamageCalculator } from './DamageCalculator';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import { EncounterStart } from './EncounterStart';
@@ -22,11 +23,14 @@ import '../styles/creature-combat.css';
 
 const PC_HIT_TABLE = tableById.get('t-hit-humanoid')!;
 
-export function CreatureCombatCard({ creature, entry, showEncounterStart = true }: {
+export function CreatureCombatCard({ creature, entry, targetName, summons, showEncounterStart = true }: {
   creature: CreatureRecord;
   entry: Entry;
+  targetName?: string;
+  summons?: CombatSummonControls;
   showEncounterStart?: boolean;
 }) {
+  const checkPane = useId();
   const [levelText, setLevelText] = usePlayDraftState('creature-level', '');
   const [mode, setMode] = usePlayDraftState<'action' | 'hit' | 'check' | 'damage'>('creature-mode', 'action');
   const [enemyAttacking, setEnemyAttacking] = usePlayDraftState('creature-attacking', false);
@@ -85,7 +89,7 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
         <div className="seg" role="group" aria-label="전투 도구">
           <button type="button" aria-pressed={mode === 'action'} onClick={() => setMode('action')}>행동 {action.dice}</button>
           <button type="button" ref={hitTab} aria-pressed={mode === 'hit'} onClick={() => setMode('hit')}>명중 부위{hitDie ? ` ${hitDie}` : ''}</button>
-          <button type="button" ref={checkTab} aria-pressed={mode === 'check'} onClick={() => setMode('check')}>공격 판정</button>
+          <button type="button" ref={checkTab} aria-controls={checkPane} aria-pressed={mode === 'check'} onClick={() => setMode('check')}>공격 판정</button>
           <button type="button" ref={damageTab} aria-pressed={mode === 'damage'} onClick={() => setMode('damage')}>피해 계산</button>
         </div>
         {(mode === 'hit' || mode === 'damage') && (
@@ -113,7 +117,7 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
           )}
           {selectedAction && selectedAction.tag !== 'Physical' && (
             <PlayDraftScope name={actionScope} key={actionScope}>
-              <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} />
+              <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} summons={summons} />
             </PlayDraftScope>
           )}
         </div>
@@ -132,11 +136,21 @@ export function CreatureCombatCard({ creature, entry, showEncounterStart = true 
             }}>이 부위로 피해 계산</button>
           )}
         </div>
-        <div hidden={mode !== 'check'}>
+        <div id={checkPane} hidden={mode !== 'check'}>
           <CheckCalculator attackOnly creature={{
+            name: targetName ?? creature.name,
             combatSkill: unknownCS ? null : combatSkill,
             attacking: enemyAttacking,
             onChangeAttacker: setEnemyAttacking,
+            onNextAttack: (pc) => {
+              if (pc) {
+                setPcHitValue(null);
+                setPcDamageSeed(({ attempt }) => ({ attempt: attempt + 1, critical: false }));
+              } else {
+                setHitValue(null);
+                setDamageSeed(({ attempt }) => ({ attempt: attempt + 1, critical: false }));
+              }
+            },
             onHitLocation: (critical, pc) => {
               setPcTarget(pc);
               if (pc) {

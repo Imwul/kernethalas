@@ -6,6 +6,7 @@ import { Link, navigate, useLocation } from '../lib/router';
 import { TableView } from '../components/TableView';
 import { CheckCalculator } from '../components/CheckCalculator';
 import { Roller } from '../components/Roller';
+import { RulingNote } from '../components/RulingNote';
 import type { RoomShapeState } from '../components/RoomShapeDiagram';
 import { BenchButton, Cite, Notes, PinButton, Relations, VChip, useVisit } from '../components/bits';
 import { IDie, IPin, ISearch } from '../components/icons';
@@ -318,6 +319,7 @@ export function OraclePage({ id }: { id: string }) {
           <BenchButton id={t.id} />
         </div>
       </header>
+      <RulingNote key={`note:${t.id}`} id={t.id} />
       <OracleBody
         key={t.id}
         t={t}

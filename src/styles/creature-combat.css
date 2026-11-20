@@ -103,6 +103,39 @@
 .creature-resolution-body :is(dd, .creature-resistance-outcome, .creature-action-damage > p) { margin: 0; }
 .creature-resolution-body :is(dl, .creature-resistance-outcome, .creature-action-damage > p) { font: 14px/1.45 var(--f-ui); }
 .creature-resolution-body dt { color: var(--ink-2); }
+.checkcalc-exchange {
+  display: grid;
+  gap: var(--s2);
+  padding-block-start: var(--s2);
+  border-block-start: 1px solid var(--rule-soft);
+}
+.creature-summon, .creature-summon-info, .creature-summon-check > div {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+}
+.creature-summon-info {
+  justify-items: start;
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+  background: var(--bone);
+}
+.creature-summon :is(p, fieldset) { margin: 0; }
+.creature-summon :is(p, label, legend) { font: 14px/1.45 var(--f-ui); }
+.creature-summon-check {
+  min-width: 0;
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+}
+.creature-summon-check > div {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+.creature-summon-check label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+}
 .creature-guide-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s2); }
 .creature-guide-controls .field { width: min(100%, 14rem); min-width: 0; }
 .creature-guide-controls select,

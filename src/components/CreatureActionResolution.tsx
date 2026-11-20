@@ -2,12 +2,17 @@ import type { ActionDamage, CreatureActionRule } from '../content/creature-actio
 import type { CreatureAction } from '../content/entries/creatures';
 import type { RollResult } from '../lib/dice';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
+import { CreatureSummonRoll, type CombatSummonControls } from './CreatureSummonRoll';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import { PhysicalDiceRoll } from './PhysicalDiceRoll';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { XRef } from './bits';
 
-export function CreatureActionResolution({ action, rule }: { action: CreatureAction; rule: CreatureActionRule }) {
+export function CreatureActionResolution({ action, rule, summons }: {
+  action: CreatureAction;
+  rule: CreatureActionRule;
+  summons?: CombatSummonControls;
+}) {
   const [resisted, setResisted] = usePlayDraftState<boolean | null>('resisted', null);
   const [extraResisted, setExtraResisted] = usePlayDraftState<boolean | null>('extra-resisted', null);
   const [revision, setRevision] = usePlayDraftState('resistance-run', 0);
@@ -67,9 +72,12 @@ export function CreatureActionResolution({ action, rule }: { action: CreatureAct
         {additional && extraResisted !== null && (
           <p className="creature-resistance-outcome">{extraResisted ? '추가 효과를 피했습니다.' : '행동표의 추가 효과를 확인하세요.'}</p>
         )}
-        {(susceptible || halfDamage || rule.summons) && (
+        {rule.summons && <PlayDraftScope name={`rolls-${revision}`} key={`summon-${revision}`}>
+          <CreatureSummonRoll summon={rule.summons} encounter={summons} />
+        </PlayDraftScope>}
+        {(susceptible || halfDamage) && (
           <PlayDraftScope name={`rolls-${revision}`} key={`rolls-${revision}`}>
-            <ActionOutcomeRolls damage={damage} duration={susceptible ? rule.duration : undefined} summons={rule.summons} halfDamage={halfDamage} />
+            <ActionOutcomeRolls damage={damage} duration={susceptible ? rule.duration : undefined} halfDamage={halfDamage} />
           </PlayDraftScope>
         )}
       </div>
@@ -77,14 +85,12 @@ export function CreatureActionResolution({ action, rule }: { action: CreatureAct
   );
 }
 
-function ActionOutcomeRolls({ damage, duration, summons, halfDamage }: {
+function ActionOutcomeRolls({ damage, duration, halfDamage }: {
   damage: readonly ActionDamage[];
   duration?: string;
-  summons?: string;
   halfDamage: boolean;
 }) {
   const [durationRoll, setDurationRoll] = usePlayDraftState<RollResult | undefined>('duration', undefined);
-  const [summonsRoll, setSummonsRoll] = usePlayDraftState<RollResult | undefined>('summons', undefined);
   return (
     <>
       {damage.map((effect, index) => (
@@ -94,8 +100,6 @@ function ActionOutcomeRolls({ damage, duration, summons, halfDamage }: {
       ))}
       {duration && <PhysicalDiceRoll label="지속 라운드" dice={duration} value={durationRoll}
         onValue={setDurationRoll} resultText={({ total }) => `${total}라운드`} />}
-      {summons && <PhysicalDiceRoll label="소환 수" dice={summons} value={summonsRoll}
-        onValue={setSummonsRoll} resultText={({ total }) => `${total}체`} />}
     </>
   );
 }

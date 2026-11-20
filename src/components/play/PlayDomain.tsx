@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { DICE_CHAIN } from '../../lib/dice';
 import { activeDomainDie, DEFAULT_DOMAIN_PROGRESS, stepDomainDie } from '../../lib/domain-progress';
 import {
   DAMAGE_TYPE_TABLE, EMPTY_INFLUENCE, INFLUENCE_TABLE, OVERSEER_TABLE, darknessDetails,
   domainOverseer, influenceText, type DarknessEvent, type InfluenceRoll, type PlayDomainRecord,
 } from '../../lib/play-domain';
+import type { PlayTimelineEntry } from '../../lib/play-timeline';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
+import { PlayTimeline } from './PlayTimeline';
 
 interface Props {
   domain: PlayDomainRecord;
@@ -17,6 +19,8 @@ interface Props {
   onSwitch: (id: number | 'new') => void;
   onDismiss: (id: string) => void;
   domainPlaceId?: string;
+  timeline?: PlayTimelineEntry[];
+  onTimelineChange?: Dispatch<SetStateAction<PlayTimelineEntry[]>>;
 }
 
 export function domainName({ name, id }: PlayDomainRecord) {
@@ -36,7 +40,8 @@ function InfluenceInputs({ label, value, onChange }: { label: string; value: Inf
   );
 }
 
-export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate, onSwitch, onDismiss, domainPlaceId }: Props) {
+export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate, onSwitch, onDismiss, domainPlaceId,
+  timeline, onTimelineChange }: Props) {
   const [destination, setDestination] = useState<number | 'new' | null>(null);
   const overseer = domainOverseer(domain.overseerRoll);
   const progress = domain.progress ?? DEFAULT_DOMAIN_PROGRESS;
@@ -77,6 +82,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate,
             <button className="btn ghost" type="button" onClick={() => setDestination(null)}>취소</button>
           </div>
         )}
+        {timeline && onTimelineChange && <PlayTimeline domainId={domain.id} timeline={timeline} onChange={onTimelineChange} />}
         <section className="play-domain-options" aria-label="도메인 진행 설정">
           <h3>탐험 진행</h3>
           <div className="play-domain-fields">

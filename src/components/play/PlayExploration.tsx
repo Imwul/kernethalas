@@ -5,7 +5,7 @@ import type { OracleTable } from '../../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, roomShapeForRoll, type EncounterPlace } from '../../content/tables/exploration';
 import { DEFAULT_DOMAIN_PROGRESS, domainPlaceLabel, introEncounterCreature, markDomainPlace, removeDomainMark, stepDomainDie, type DomainProgress } from '../../lib/domain-progress';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
-import { paperMapKey, type PaperMapLocation } from '../../lib/paper-map';
+import { capturePaperMapTile, paperMapKey, type PaperMapLocation } from '../../lib/paper-map';
 import { gearCount } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
@@ -16,6 +16,7 @@ import { PlayDomainExit, PlayDomainProgress, type DomainDestination } from './Pl
 import { ExplorationActionLinks, PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport, type ExplorationActionsHandle } from './PlayExplorationActions';
 import { PlayRoll } from './PlayRoll';
 import { PlayPaperMap } from './PlayPaperMap';
+import { PlayFinishedStep } from './PlayFocus';
 import { EMPTY_ROOM_SHAPE, PlayTileControls } from './PlayTileControls';
 import '../../styles/play-exploration.css';
 
@@ -127,7 +128,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
   const placeLabel = place ? PLACE_LABELS[place] : null;
   const mapRecord = paperMap.find((record) => record.domainId === paperMapDomain && paperMapKey(record.paperId) === paperLocation);
   const mapNote = mapRecord ? [...mapRecord.tags, mapRecord.note].filter(Boolean).join(' · ') : '';
-  const descriptionRoll = place ? descriptions[place] : null;
+  const descriptionRoll = place && !revisit ? descriptions[place] : null;
   const description = place && descriptionRoll !== null ? PLACE_DESCRIPTIONS[place].rows.find(({ min, max }) =>
     descriptionRoll >= min && descriptionRoll <= max) : undefined;
   const descriptionReport = description ? `${placeLabel} · ${description.ko}` : null;
@@ -231,7 +232,14 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
     const key = paperMapKey(record.paperId);
     onPaperMapChange?.((previous) => {
       const index = previous.findIndex((item) => item.domainId === record.domainId && paperMapKey(item.paperId) === key);
-      return index < 0 ? [...previous, record] : previous.map((item, i) => i === index ? record : item);
+      const stored = previous[index];
+      const storedTile = stored?.area === record.area ? stored.tile : undefined;
+      const currentTile = !revisit && choice === 'shape' && shapeRoll !== null
+        ? capturePaperMapTile(shapeRoll, tile ?? (storedTile?.roll === shapeRoll ? storedTile : EMPTY_ROOM_SHAPE), record.area)
+        : undefined;
+      const savedTile = currentTile ?? storedTile;
+      const location = savedTile ? { ...record, tile: savedTile } : record;
+      return index < 0 ? [...previous, location] : previous.map((item, i) => i === index ? location : item);
     });
     setPaperLocation(key);
   };
@@ -321,11 +329,13 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
           </label>}
           <section className="play-explore-step" aria-label="긴장 주사위">
             <h3>긴장 주사위</h3>
-            <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
-              setTension(result);
-              if (enteredLightCost === null && place === 'room') setEnteredLightCost(lightCost);
-              applyDarkness(null);
-            }} />
+            <PlayFinishedStep summary={tension ? `D${tension.sides} ${tension.value} · ${tension.darkness ? '짙어지는 어둠' : `다음 D${tension.nextDie}`}` : null}>
+              <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
+                setTension(result);
+                if (enteredLightCost === null && place === 'room') setEnteredLightCost(lightCost);
+                applyDarkness(null);
+              }} />
+            </PlayFinishedStep>
           </section>
           {tension?.darkness && (
             <PlayRoll label="짙어지는 어둠" table={DARKNESS_TABLE} value={darknessRoll} onValue={applyDarkness} />
@@ -335,10 +345,10 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
               darknessEffectCount={darknessEffectCount} onReport={setDarknessFollow} />
           </PlayDraftScope>
           {mustCheckEncounter && (
-            <PlayRoll label="조우 판정" table={PLAY_ENCOUNTERS[place]} value={encounterRoll} onValue={setEncounterRoll} />
+            <PlayRoll label="조우 판정" table={PLAY_ENCOUNTERS[place]} value={encounterRoll} onValue={setEncounterRoll} condense />
           )}
           {mayRollEvent && (
-            <PlayRoll label="이벤트" table={EVENT_TABLE} value={eventRoll} onValue={applyEvent} />
+            <PlayRoll label="이벤트" table={EVENT_TABLE} value={eventRoll} onValue={applyEvent} condense />
           )}
           <PlayDraftScope name="event-follow">
             <ExplorationFollowUp key={eventRoll} kind="event" row={eventRow?.min}

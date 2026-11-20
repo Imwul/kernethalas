@@ -139,6 +139,10 @@ export function PlayDraftScope({ name, children }: { name: string; children: Rea
   return <Scope.Provider value={`${parent}${encodeURIComponent(name)}/`}>{children}</Scope.Provider>;
 }
 
+export function PlayReferenceTool({ children }: { children: ReactNode }) {
+  return <Draft.Provider value={null}>{children}</Draft.Provider>;
+}
+
 export function usePlayDraft() {
   return useContext(Draft);
 }

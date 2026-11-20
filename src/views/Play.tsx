@@ -9,23 +9,28 @@ import { PlayDomain } from '../components/play/PlayDomain';
 import { PlayEquipment } from '../components/play/PlayEquipment';
 import { PlayExploration, type ExplorationReport } from '../components/play/PlayExploration';
 import { ExplorationActionLinks, type ExplorationActionsHandle } from '../components/play/PlayExplorationActions';
+import { PlayFocusMode } from '../components/play/PlayFocus';
 import { PlayInventory, useGearLedger } from '../components/play/PlayInventory';
+import { findPaperCorrections, paperReceiptKey, PlayPaperCorrections, type PaperReceipt } from '../components/play/PlayPaperCorrections';
+import { PlayPinnedTool } from '../components/play/PlayPinnedTool';
 import { PlayWrapUp } from '../components/play/PlayWrapUp';
-import { focusPlayRoll, PlayActionBar, PlayRollHistory, usePhysicalFirst } from '../components/play/PlayWorkflow';
+import { focusPlayRoll, PlayActionBar, PlayRollHistory, usePhysicalFirst, usePlayPreference } from '../components/play/PlayWorkflow';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
 import { introEncounterCreature, nameDomainDiscoveries, newDomainProgress } from '../lib/domain-progress';
 import { PlayDraftProvider, PlayDraftScope, usePlayDraft, usePlayDraftState } from '../lib/play-draft';
 import type { PlayCheckpointData } from '../lib/play-checkpoints';
 import { PAPER_MAP_SLOT, paperMapKey, type PaperMapLocation } from '../lib/paper-map';
 import { playRollStage } from '../lib/play-roll-history';
+import { appendPlayTimeline, createPlayTimelineEntry, PLAY_TIMELINE_SLOT, type PlayTimelineEntry } from '../lib/play-timeline';
 import {
   activeDarkness, darknessDetails, domainOverseer, influenceText, newPlayDomain, tensionSides,
   type DarknessEvent, type PlayDomainRecord, type RetreatedEncounter, type TensionSides,
 } from '../lib/play-domain';
-import type { PaperChange } from '../lib/play-inventory';
+import { isQuickUseEntry, type PaperChange } from '../lib/play-inventory';
 import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
 import '../styles/play.css';
 import '../styles/play-workflow.css';
+import '../styles/play-desk-tools.css';
 
 const STAGES = [
   { id: 'explore', label: '탐험', heading: '이번 장소 탐험', references: ['p-explore-room', 'first-domain-rules', 'retracing'] },
@@ -37,6 +42,7 @@ const STAGES = [
 type StageId = typeof STAGES[number]['id'];
 type EncounterKind = 'encounter' | 'overseer';
 type BattleOutcome = 'victory' | 'ended' | 'fled';
+type DefeatedTarget = { creatureId: string; label: string };
 type Battle = {
   kind: EncounterKind;
   planKey?: string;
@@ -44,6 +50,7 @@ type Battle = {
   seed?: EncounterSeed;
   primaryId: string | null;
   creatureIds: string[];
+  defeatedTargets?: DefeatedTarget[];
   outcome: BattleOutcome | null;
 };
 const BASE_BATTLE: Battle = { kind: 'encounter', primaryId: null, creatureIds: [], outcome: null };
@@ -97,16 +104,20 @@ function EffectNotice({ effects, types, influence = [] }: { effects: DarknessEve
 }
 
 export function Play() {
-  return <PlayDraftProvider><PlayDesk /></PlayDraftProvider>;
+  const [focusMode, toggleFocusMode] = usePlayPreference('kn-play-focus-mode');
+  return <PlayDraftProvider><PlayFocusMode.Provider value={focusMode}>
+    <PlayDesk focusMode={focusMode} toggleFocusMode={toggleFocusMode} />
+  </PlayFocusMode.Provider></PlayDraftProvider>;
 }
 
-function PlayDesk() {
+function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFocusMode: () => void }) {
   const draft = usePlayDraft()!;
   const gear = useGearLedger();
   const pendingGrowth = usePendingSkillGrowth();
   const skillCriticalHistory = useSkillCriticalHistory();
   const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
   const [paperMap, setPaperMap] = usePlayDraftState<PaperMapLocation[]>(PAPER_MAP_SLOT, []);
+  const [timeline, setTimeline] = usePlayDraftState<PlayTimelineEntry[]>(PLAY_TIMELINE_SLOT, []);
   const [physicalFirst, togglePhysicalFirst] = usePhysicalFirst();
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -125,7 +136,8 @@ function PlayDesk() {
   const [masteryReports, setMasteryReports] = usePlayDraftState<Record<string, string>>('masteryReports', {});
   const [masterySheet, setMasterySheet] = usePlayDraftState<Record<string, PaperChange[]>>('masterySheet', {});
   const [battleSheet, setBattleSheet] = usePlayDraftState<Record<string, PaperChange[]>>('battleSheet', {});
-  const [applied, setApplied] = usePlayDraftState<string[]>('paperApplied', []);
+  const [applied, setApplied] = usePlayDraftState<PaperReceipt[]>('paperApplied', []);
+  const [journalCopiedText, setJournalCopiedText] = usePlayDraftState('journalCopiedText', '');
   const [placeName, setPlaceName] = usePlayDraftState('placeName', '');
   const [note, setNote] = usePlayDraftState('note', '');
   const [nextTension, setNextTension] = usePlayDraftState('nextTension', '');
@@ -147,11 +159,13 @@ function PlayDesk() {
   const inventory = useRef<HTMLDetailsElement>(null);
   const explorationActions = useRef<ExplorationActionsHandle>(null);
   const headings = useRef<Partial<Record<StageId, HTMLHeadingElement>>>({});
+  const stagePositions = useRef<Partial<Record<StageId, number>>>({});
   const stage = STAGES.find(({ id }) => id === active) ?? STAGES[0];
   const domain = domains.find(({ id }) => id === domainId) ?? domains[0];
   const overseer = domainOverseer(domain.overseerRoll);
   const defeated = domain.defeated || !!overseer && Object.values(battles).some(
-    (battle) => battle.outcome === 'victory' && battle.creatureIds.includes(overseer.id),
+    (battle) => battle.defeatedTargets?.some(({ creatureId }) => creatureId === overseer.id)
+      ?? (battle.outcome === 'victory' && battle.creatureIds.includes(overseer.id)),
   );
   const previousEffects = activeDarkness(domain.darkness, dismissed);
   const roomDarkness = [
@@ -175,12 +189,13 @@ function PlayDesk() {
   const completedBattles = Object.entries(battles).filter(([, battle]) => battle.outcome && battle.outcome !== 'fled');
   const finishedSources = Object.entries(battles).flatMap(([id, battle]) => battle.outcome ? [id.split(':').at(-1)!] : []);
   const campEncounterResolved = completedBattles.flatMap(([, battle]) => battle.planKey ?? []);
-  const roster = wrapBattle?.outcome === 'victory'
-    ? wrapBattle.creatureIds.flatMap((id) => creatureById.get(id) ?? [])
-    : undefined;
+  const defeatedIds = wrapBattle?.defeatedTargets?.map(({ creatureId }) => creatureId)
+    ?? (wrapBattle?.outcome === 'victory' ? wrapBattle.creatureIds : undefined);
+  const roster = defeatedIds?.flatMap((id) => creatureById.get(id) ?? []);
+  const victoryLabels = wrapBattle?.defeatedTargets?.map(({ label }) => label) ?? targetNames[wrapId];
   const overseersDefeated = roster?.filter(({ group }) => group === 'overseer').length ?? 0;
   const victoryXp = overseersDefeated ? 200 * overseersDefeated
-    : roster?.some(({ group }) => group === 'creature') ? 50 : undefined;
+    : wrapBattle?.outcome === 'victory' && wrapBattle.creatureIds.some((id) => creatureById.get(id)?.group === 'creature') ? 50 : undefined;
   const battleLabel = (id: string, battle: Battle) => {
     const names = targetNames[id] ?? battle.creatureIds.flatMap((creatureId) => creatureById.get(creatureId)?.name ?? []);
     return names.join(', ') || (battle.primaryId ? creatureById.get(battle.primaryId)?.name : undefined) || '조우';
@@ -191,12 +206,24 @@ function PlayDesk() {
     heading?.focus({ preventScroll: true });
     heading?.scrollIntoView({ block: 'start' });
   });
-  const goTo = (id: StageId) => {
+  const selectStage = (id: StageId) => {
+    const heading = headings.current[active];
+    if (heading && id !== active) stagePositions.current[active] = -heading.getBoundingClientRect().top;
     setActive(id);
-    focusStage(id);
+  };
+  const goTo = (id: StageId, rememberPosition = false) => {
+    const offset = rememberPosition ? stagePositions.current[id] : undefined;
+    selectStage(id);
+    if (offset === undefined) focusStage(id);
+    else requestAnimationFrame(() => {
+      const heading = headings.current[id];
+      if (!heading) return;
+      heading.focus({ preventScroll: true });
+      window.scrollBy({ top: heading.getBoundingClientRect().top + offset });
+    });
   };
   const goToRollHistory = () => {
-    setActive('journal');
+    selectStage('journal');
     requestAnimationFrame(() => {
       const heading = document.getElementById('play-roll-log-title');
       heading?.focus({ preventScroll: true });
@@ -213,14 +240,14 @@ function PlayDesk() {
   const chooseCreature = useCallback((creature: CreatureRecord | null) => {
     changeBattle((prior) => {
       const primaryId = creature?.id ?? null;
-      return primaryId === prior.primaryId ? prior : { ...prior, primaryId, creatureIds: [], outcome: null };
+      return primaryId === prior.primaryId ? prior : { ...prior, primaryId, creatureIds: [], defeatedTargets: undefined, outcome: null };
     });
   }, [changeBattle]);
   const reportTargets = useCallback((names: string[]) => {
     const old = targetNames[combatId] ?? [];
     if (old.length === names.length && old.every((name, index) => name === names[index])) return;
     setTargetNames((previous) => ({ ...previous, [combatId]: names }));
-    if (old.length > 0) changeBattle((prior) => prior.outcome ? { ...prior, outcome: null, creatureIds: [] } : prior);
+    if (old.length > 0) changeBattle((prior) => prior.outcome ? { ...prior, outcome: null, creatureIds: [], defeatedTargets: undefined } : prior);
   }, [changeBattle, combatId, setTargetNames, targetNames]);
   const startCombat = (kind: EncounterKind, source?: string, planKey?: string) => {
     const id = source ?? (kind === 'overseer' ? 'overseer' : 'place');
@@ -238,22 +265,22 @@ function PlayDesk() {
   const updateDomain = (change: Partial<PlayDomainRecord>) => {
     setDomains((previous) => previous.map((record) => record.id === domain.id ? { ...record, ...change } : record));
   };
-  const endBattle = (creature: CreatureRecord, outcome: 'victory' | 'ended', creatures?: CreatureRecord[]) => {
-    changeBattle((prior) => ({ ...prior, primaryId: creature.id, outcome, creatureIds: (creatures ?? [creature]).map(({ id }) => id) }));
+  const endBattle = (creature: CreatureRecord, outcome: 'victory' | 'ended', creatures?: CreatureRecord[], defeatedTargets?: DefeatedTarget[]) => {
+    changeBattle((prior) => ({ ...prior, primaryId: creature.id, outcome, creatureIds: (creatures ?? [creature]).map(({ id }) => id), defeatedTargets }));
     if (outcome === 'victory' && combat.retreatId) {
       updateDomain({ retreats: (domain.retreats ?? []).filter(({ id }) => id !== combat.retreatId) });
     }
     setWrapId(combatId);
     goTo('wrapup');
   };
-  const flee = (creatures: CreatureRecord[]) => {
+  const flee = (creatures: CreatureRecord[], participants = creatures) => {
     const id = combat.retreatId ?? `${roomNumber}-${combatId}`;
     const prior = domain.retreats?.find((retreat) => retreat.id === id);
     const place = placeName.trim() || prior?.place || `장소 ${roomNumber}`;
     const creatureIds = creatures.map((creature) => creature.id);
     const retreat = { id, place, creatureIds, kind: combat.kind };
-    updateDomain({ retreats: [...(domain.retreats ?? []).filter((item) => item.id !== id), retreat] });
-    changeBattle((battle) => ({ ...battle, outcome: 'fled', creatureIds, retreatId: id }));
+    updateDomain({ retreats: [...(domain.retreats ?? []).filter((item) => item.id !== id), ...(creatureIds.length ? [retreat] : [])] });
+    changeBattle((battle) => ({ ...battle, outcome: 'fled', creatureIds: participants.map(({ id }) => id), retreatId: id }));
     if (!placeName.trim()) setPlaceName(place);
     goTo('journal');
   };
@@ -311,6 +338,7 @@ function PlayDesk() {
   const confirmedTension = tensionSides(nextTension) ?? breatherTension ?? exploreTension;
   const carryTension = confirmedTension ?? initialTension;
   const resetReports = () => {
+    stagePositions.current = {};
     setRevision((previous) => previous + 1);
     setConfirmReset(false);
     setExploration(null);
@@ -325,9 +353,10 @@ function PlayDesk() {
     setBreatherDarkness(null);
     setBreatherTension(null);
   };
-  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides) => {
+  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides, nextTimeline = timeline) => {
     draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
-      roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth, [PAPER_MAP_SLOT]: paperMap });
+      roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth,
+      [PAPER_MAP_SLOT]: paperMap, [PLAY_TIMELINE_SLOT]: nextTimeline });
     resetReports();
     focusStage('explore');
   };
@@ -391,8 +420,44 @@ function PlayDesk() {
     ...Object.entries(masterySheet).flatMap(([id, items]) => items.map((item) => ({ ...item, id: `${id}:${item.id}` }))),
   ];
   const gearChanges = sheet.filter((item) => item.gear);
-  const paperCommitted = applied.length > 0 || (!!roomLedgerId && gear.ledger.entries.some((entry) => entry.source?.startsWith(`${roomLedgerId}:`)));
+  const postedGear = roomLedgerId ? gear.ledger.entries.flatMap((entry) => {
+    const prefix = `${roomLedgerId}/`;
+    return entry.source?.startsWith(prefix) && !isQuickUseEntry(entry, roomLedgerId)
+      ? [{ id: entry.source.slice(prefix.length), text: entry.reason }] : [];
+  }) : [];
+  const paperCommitted = applied.length > 0 || postedGear.length > 0;
   const paperId = paperMap.find((record) => record.domainId === domainId && paperMapKey(record.paperId) === draft.slots['explore/paper-map-key'])?.paperId;
+  const appliedKeys = applied.map(paperReceiptKey);
+  useEffect(() => {
+    if (!applied.some((item) => typeof item === 'string')) return;
+    const legacy = new Map(sheet.map(({ id, text }) => [paperReceiptKey({ id, text }), { id, text }]));
+    if (applied.some((item) => typeof item === 'string' && legacy.has(item))) {
+      setApplied((previous) => previous.map((item) => typeof item === 'string' ? legacy.get(item) ?? item : item));
+    }
+  });
+  const confirmCorrection = (previous: PaperReceipt, current?: PaperChange) => {
+    const previousKey = paperReceiptKey(previous);
+    const currentKey = current && paperReceiptKey(current);
+    setApplied((items) => [
+      ...items.filter((item) => ![previousKey, currentKey].includes(paperReceiptKey(item))),
+      ...(current ? [{ id: current.id, text: current.text }] : []),
+    ]);
+  };
+  const nextLocation = () => {
+    const corrections = findPaperCorrections(sheet, applied);
+    const pendingCorrections = corrections.map(({ receipt, current }) => ({
+      id: `correction:${paperReceiptKey(receipt)}`, text: `정정 · ${receipt.text} → ${current?.text ?? '취소'}`,
+    }));
+    const pendingGear = findPaperCorrections(gearChanges, postedGear).map(({ receipt, current }) => ({
+      id: `gear-correction:${paperReceiptKey(receipt)}`, text: `장부 정정 · ${receipt.text} → ${current?.text ?? '취소'}`,
+    }));
+    const archivedSheet = sheet.filter((item) => !corrections.some(({ current }) => current === item));
+    const entry = createPlayTimelineEntry({
+      id: roomLedgerId, domainId: domain.id, roomNumber, title: placeName.trim() || paperId || '', paperId, facts,
+      sheet: [...archivedSheet, ...pendingCorrections, ...pendingGear], applied: appliedKeys, journalCopied: journalCopiedText === journal,
+    });
+    resetRoom(storeDomain(true), domain.id, carryTension, appendPlayTimeline(timeline, entry));
+  };
 
   const stageHeading = (id: StageId) => (
     <h2 id={`play-${id}`} className="play-stage-heading" tabIndex={-1} ref={(node) => {
@@ -409,6 +474,7 @@ function PlayDesk() {
         </div>
         <div className="play-header-actions">
           <button className="btn ghost" type="button" aria-pressed={physicalFirst} onClick={togglePhysicalFirst}>실물 입력 우선</button>
+          <button className="btn ghost" type="button" aria-pressed={focusMode} onClick={toggleFocusMode}>집중 보기</button>
           <button className="btn ghost" type="button" disabled={!draft.canUndo} onClick={draft.undoRoll}>직전 굴림 되돌리기</button>
           <button className="btn ghost" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
             onClick={() => setConfirmReset((open) => !open)}>새 장소 시작</button>
@@ -424,7 +490,8 @@ function PlayDesk() {
       <PlayCheckpoints data={{ slots: draft.slots, gear: gear.ledger, encounters: customSets, history: draft.history }}
         place={placeName.trim() || paperId || `장소 ${roomNumber}`} stage={stage.label} onRestore={restoreCheckpoint} />
       <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
-        onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])} />
+        onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
+        timeline={timeline} onTimelineChange={setTimeline} />
       <details className="fold play-gear-fold" ref={inventory}>
         <summary>장비 장부{gear.ledger.items.length > 0 ? ` · ${gear.ledger.items.length}종` : ''}</summary>
         <PlayInventory state={gear} changes={gearChanges} roomId={roomLedgerId} />
@@ -434,7 +501,7 @@ function PlayDesk() {
         <nav className="play-nav" aria-label="플레이 단계">
           {STAGES.map(({ id, label }) => (
             <button key={id} type="button" aria-current={id === active ? 'step' : undefined}
-              aria-controls={`play-stage-${id}`} onClick={() => goTo(id)}>{label}</button>
+              aria-controls={`play-stage-${id}`} onClick={() => goTo(id, true)}>{label}</button>
           ))}
         </nav>
         <div className="play-main">
@@ -472,7 +539,7 @@ function PlayDesk() {
                 <PlayCombat key={`${revision}:${combatId}`} initialKind={combat.kind} domainOverseer={overseer ?? null}
                   customSets={customSets} customSetId={domain.encounterSetId}
                   onCustomSetSelect={(encounterSetId) => updateDomain({ encounterSetId })} onCustomSetsChange={saveCustomSets}
-                  seed={combat.seed} fled={combat.outcome === 'fled'} onFlee={flee}
+                  seed={combat.seed} fled={combat.outcome === 'fled'} finished={!!combat.outcome} onFlee={flee}
                   onMasterySheetChange={reportMasterySheet} onMasteryJournalChange={reportMasteryLine}
                   onCreatureChange={chooseCreature} onTargetsChange={reportTargets} onBattleEnd={endBattle} />
               </PlayDraftScope>
@@ -491,7 +558,7 @@ function PlayDesk() {
             <PlayDraftScope name="wrap">
               <PlayWrapUp key={revision} creature={roster?.[0] ?? null} victoryCreatures={roster}
                 inventory={gear.ledger.items}
-                victoryLabels={targetNames[wrapId]} victoryXp={victoryXp}
+                victoryLabels={victoryLabels} victoryXp={victoryXp}
                 battleId={wrapId} combatEnded={!!wrapBattle?.outcome && wrapBattle.outcome !== 'fled'}
                 onCampEncounter={startCampEncounter} campEncounterResolved={campEncounterResolved}
                 campDarkness={hasEffect(17)} campAttunementBlocked={hasEffect(19)}
@@ -503,7 +570,7 @@ function PlayDesk() {
             </PlayDraftScope>
             {wrapBattle?.outcome && wrapBattle.outcome !== 'fled' && exploration?.area && exploreTension && (
               <ExplorationActionLinks room={exploration.area === 'room'} label="이 장소 탐험 계속" onSelect={(action) => {
-                setActive('explore');
+                selectStage('explore');
                 explorationActions.current?.open(action);
               }} />
             )}
@@ -538,13 +605,18 @@ function PlayDesk() {
               <label className="field"><span>덧붙일 메모 (선택)</span>
                 <textarea value={note} rows={2} onChange={(event) => setNote(event.target.value)} />
               </label>
+              <PlayPaperCorrections items={sheet} receipts={applied} onConfirm={confirmCorrection} />
+              <PlayPaperCorrections items={gearChanges} receipts={postedGear} onOpenGear={openInventory} />
               {sheet.length > 0 && (
                 <fieldset className="play-sheet">
                   <legend>종이 시트에 반영</legend>
                   {sheet.map(({ id, text }) => {
                     const key = `${id}:${text}`;
-                    return <label key={key}><input type="checkbox" checked={applied.includes(key)}
-                      onChange={(event) => setApplied((old) => event.target.checked ? [...old, key] : old.filter((item) => item !== key))} />{text}</label>;
+                    return <label key={key}><input type="checkbox" checked={appliedKeys.includes(key)}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setApplied((old) => checked ? [...old, { id, text }] : old.filter((item) => paperReceiptKey(item) !== key));
+                      }} />{text}</label>;
                   })}
                 </fieldset>
               )}
@@ -553,9 +625,11 @@ function PlayDesk() {
                 <div className="play-journal-output">
                   <h3>저널에 옮길 내용</h3>
                   <p>{journal}</p>
+                  <label className="play-paper-copied"><input type="checkbox" checked={journalCopiedText === journal}
+                    onChange={(event) => setJournalCopiedText(event.currentTarget.checked ? journal : '')} />종이 저널에 옮김</label>
                   <div className="play-header-actions">
                     <CopyButton text={journal} label="장소 기록 복사" />
-                    <button className="btn primary" type="button" data-play-next="" onClick={() => resetRoom(storeDomain(true), domain.id, carryTension)}>다음 장소</button>
+                    <button className="btn primary" type="button" data-play-next="" onClick={nextLocation}>다음 장소</button>
                   </div>
                   <p className="play-carry">다음 장소는 긴장 주사위 D{carryTension}{carryTension === 6 ? '으로' : '로'} 시작합니다.</p>
                 </div>
@@ -564,13 +638,14 @@ function PlayDesk() {
             <PlayRollHistory key={revision} paperCommitted={paperCommitted} onCorrection={(entry) => {
               const battleId = entry.stage === 'combat' ? Object.keys(battles).find((id) => entry.scope.startsWith(`combat/${encodeURIComponent(id)}/`)) : undefined;
               if (battleId) setCombatId(battleId);
-              setActive(entry.stage);
+              selectStage(entry.stage);
               focusPlayRoll(entry.stage, entry.field);
             }} />
           </section>
         </div>
         <aside className="play-context" aria-label="플레이 중 참고">
           <PlayActionBar stage={active} onHistory={goToRollHistory} />
+          <PlayPinnedTool />
           <section>
             <h2>이번 장소</h2>
             {facts.length ? (

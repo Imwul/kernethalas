@@ -3,6 +3,9 @@ import type { CreatureAction, CreatureRecord } from './entries/creatures';
 
 type Resistance = 'Acrobatics' | 'Athletics' | 'Body' | 'Dodge' | 'Endurance' | 'Magic Resistance' | 'Resolve' | 'Spellward' | 'Thievery';
 export type ActionDamage = readonly [type: DamageType, amount: string | number];
+export type CreatureSummon =
+  | { kind: 'roster'; die: 'D4'; creatureId: string; limit: number }
+  | { kind: 'single-attack'; die: 'D4'; name: string; combatSkill: number; damage: ActionDamage };
 export interface CreatureActionRule {
   resistance?: Resistance;
   damage?: readonly ActionDamage[];
@@ -14,7 +17,7 @@ export interface CreatureActionRule {
   duration?: string;
   setupDuration?: string;
   elemental?: boolean;
-  summons?: string;
+  summons?: CreatureSummon;
 }
 
 const arcane = (amount: string | number): ActionDamage => ['Arcane', amount];
@@ -90,7 +93,11 @@ const RULES: Record<string, Record<number, CreatureActionRule>> = {
     5: area(check('Resolve')), 6: area(check('Dodge', fire('D6'))),
   },
   'cr-dreadlord': {
-    1: { target: '소환되는 Shadow Reaper', timing: 'Dreadlord 턴 직후 소환수가 공격', summons: 'D4' },
+    1: {
+      target: '소환되는 Shadow Reaper',
+      timing: 'Dreadlord 턴 직후 각자 한 번 공격하고 사라짐',
+      summons: { kind: 'single-attack', die: 'D4', name: 'Shadow Reaper', combatSkill: 40, damage: cold('D4') },
+    },
     2: { ...area(check('Resolve')), timing: '오라 근처에서 대상의 턴이 시작될 때', setupDuration: 'D4' },
     5: check('Endurance'), 6: { ...check('Spellward', necrotic('D6+2')), target: '최대 3대상 중 하나' },
   },
@@ -102,7 +109,11 @@ const RULES: Record<string, Record<number, CreatureActionRule>> = {
   'cr-gorehoof': { 1: room(check('Dodge', ['Slashing', 'D4'])), 6: room(check('Resolve')) },
   'cr-infernal-archon': {
     1: area(half('Dodge', fire('2D6'))), 4: check('Dodge', fire('D4+2')),
-    3: { target: '소환되는 Lesser Demon', timing: '시전자 바로 다음에 행동', summons: 'D4' },
+    3: {
+      target: '소환되는 Lesser Demon',
+      timing: 'Initiative 순서에서 시전자 바로 다음에 행동',
+      summons: { kind: 'roster', die: 'D4', creatureId: 'cr-lesser-demon', limit: 4 },
+    },
     5: room(check('Dodge', fire('3D4'))), 6: area(check('Spellward', fire('2D4'))),
   },
   'cr-infernal-tormentor': {
@@ -138,7 +149,6 @@ export function creatureActionRule(creature: Pick<CreatureRecord, 'id' | 'group'
   const rule = RULES[creature.id]?.[action.min] ?? {};
   const minion = creature.group === 'minion';
   // Summoning brings a new actor into play without targeting a victim.
-  const summon = creature.id === 'cr-dreadlord' && action.min === 1;
-  return { ...rule, resistance: rule.resistance ?? (action.tag === 'Magical' && !summon
+  return { ...rule, resistance: rule.resistance ?? (action.tag === 'Magical' && !rule.summons
     ? minion ? 'Magic Resistance' : 'Spellward' : undefined) };
 }

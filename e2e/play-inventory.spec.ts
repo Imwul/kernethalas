@@ -109,3 +109,54 @@ test('paper records offer a one-time inventory change, undo, and valid carrying 
   await expect(bag).toContainText('Crafting Supplies');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(3440);
 });
+
+test('quick consumption requires confirmation and links a later paper use without a second debit at 320px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto('/play');
+  const disclosure = page.locator('.play-gear-fold > summary');
+  const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
+  await disclosure.click();
+  await register(gear, 'Bandage', '2');
+  const amount = gear.getByRole('region', { name: '가방', exact: true }).locator('.play-gear-amount');
+  const quick = gear.getByRole('region', { name: '소모품 빠른 사용' });
+  const start = quick.getByRole('button', { name: 'Bandage · 가방 1개 사용', exact: true });
+  const review = quick.getByRole('group', { name: '소모품 사용 확인', exact: true });
+  await start.click();
+  await expect(review).toContainText('2 → 1개');
+  await expect(amount).toHaveText('2');
+  await review.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(start).toBeFocused();
+  await expect(amount).toHaveText('2');
+
+  await start.click();
+  await review.getByRole('button', { name: '사용 확정' }).click();
+  await expect(amount).toHaveText('1');
+  await disclosure.click();
+  await playNavigation(page)('휴식·정리');
+  const wrap = page.getByRole('region', { name: '휴식과 전리품 정리' });
+  await wrap.getByRole('button', { name: '치료·성장', exact: true }).click();
+  const treatment = wrap.getByRole('region', { name: '지속 피해와 붕대 처치' });
+  await treatment.getByRole('textbox', { name: '보정 Medicine' }).fill('50');
+  await enterDie(treatment.getByRole('group', { name: 'Medicine D100' }), '29');
+  await enterDie(treatment.getByRole('group', { name: '붕대 회복 D4' }), '3');
+  await treatment.getByRole('button', { name: '붕대 처치 기록' }).click();
+  await disclosure.click();
+  const pending = gear.getByRole('region', { name: '이번 장소의 장비 변경' });
+  await quick.getByRole('button', { name: 'Bandage · 가방 사용 기록 확인' }).click();
+  await expect(pending).toBeFocused();
+  await pending.getByRole('button', { name: '기존 사용 연결', exact: true }).click();
+  await expect(amount).toHaveText('1');
+  await expect(pending.getByRole('button', { name: '장부에 반영 Bandage −1 (붕대 처치)' })).toBeDisabled();
+  await expect(pending).toContainText('기존 사용 1개 연결');
+
+  await page.reload();
+  await disclosure.click();
+  await expect(pending).toContainText('기존 사용 1개 연결');
+  await gear.getByText(/장비 변경 내역/).click();
+  await gear.getByRole('button', { name: '마지막 장부 변경 되돌리기' }).click();
+  await expect(amount).toHaveText('1');
+  await quick.getByRole('button', { name: '빠른 사용 되돌리기' }).click();
+  await expect(amount).toHaveText('2');
+  await expect(pending.getByRole('button', { name: '장부에 반영 Bandage −1 (붕대 처치)' })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});

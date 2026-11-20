@@ -5,7 +5,7 @@
 }
 
 .play-die-hint,
-.play-zero-key { display: none; }
+.play-zero-key.btn { display: none; }
 .play-desk[data-physical-first] .play-die-hint {
   display: block;
   color: var(--ink-2);

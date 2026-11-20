@@ -3,6 +3,7 @@ import { entries, entryById, CATEGORY_LABEL, hrefOf } from '../content';
 import type { Category, Entry } from '../content/schema';
 import { Link, navigate, useLocation } from '../lib/router';
 import { EntryBody } from '../components/EntryBody';
+import { RulingNotesIndex } from '../components/RulingNote';
 import { BenchButton, CopyButton, PinButton, useVisit, V_LABEL } from '../components/bits';
 import { NotFound } from './NotFound';
 
@@ -41,6 +42,7 @@ export function ReferenceIndex() {
         </h1>
         <p className="lede">규칙·상태·생물·장비 전체. 항목마다 원본 쪽수와 검증 상태를 표시합니다.</p>
       </header>
+      <RulingNotesIndex />
       <div className="filterbar" role="group" aria-label="범주">
         <button aria-pressed={!cat} onClick={() => setQ('c', null)}>
           전체<span className="count">{entries.length}</span>

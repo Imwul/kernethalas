@@ -5,6 +5,7 @@ import { creatureById } from '../content/entries/creatures';
 import { isUsageDieRule } from '../lib/usage-die';
 import { CreatureCombatCard } from './CreatureCombatCard';
 import { DamageCalculator } from './DamageCalculator';
+import { RulingNote } from './RulingNote';
 import { UsageDieTool } from './UsageDieTool';
 import { Link } from '../lib/router';
 import { Cite, Notes, Relations, VChip, XRef } from './bits';
@@ -26,6 +27,8 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
         <div className="marks"><VChip v={e.verification} /> <Cite source={e.source} /></div>
         {actions && <div className="actions">{actions}</div>}
       </header>}
+
+      <RulingNote key={`note:${e.id}`} id={e.id} />
 
       {creature ? <CreatureCombatCard key={creature.id} creature={creature} entry={e} /> : <section className="reference-quick">
         <h2 className="reference-label">빠른 답</h2>

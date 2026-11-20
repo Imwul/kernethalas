@@ -150,13 +150,13 @@ details.play-domain { margin-block: 0 var(--s3); }
 .play-stage-heading:focus { outline: none; }
 .play-stage-next { justify-self: start; }
 .play-context { display: grid; gap: var(--s4); }
-.play-context section {
+.play-context > section {
   min-width: 0;
   padding: var(--s3);
   border-block-start: 1px solid var(--rule);
   background: var(--paper);
 }
-.play-context h2, .play-journal h3 {
+.play-context > section > h2, .play-journal h3 {
   margin: 0 0 var(--s2);
   font: 700 14px/1.4 var(--f-ui);
 }

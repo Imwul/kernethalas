@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { readEquipmentCount } from '../../lib/play-equipment';
 import {
-  ARMOR_DICE, GEAR_LOCATIONS, GEAR_WEIGHTS, applyGearEffect, gearWeight, isGearStorageEvent, matchingGear,
-  readGearLedger, saveGearItem, showIntegrity, storeGearLedger, undoGearEntry,
+  ARMOR_DICE, GEAR_LOCATIONS, GEAR_WEIGHTS, applyGearEffect, availableQuickUses, gearKey, gearWeight, isGearStorageEvent, isQuickGear, matchingGear,
+  readGearLedger, sameGearItem, saveGearItem, showIntegrity, storeGearLedger, undoGearEntry,
   type GearItem, type GearLedger, type PaperChange,
 } from '../../lib/play-inventory';
+import { PlayQuickGear } from './PlayQuickGear';
 import '../../styles/play-inventory.css';
 
 type LedgerOperation = (ledger: GearLedger) => ReturnType<typeof saveGearItem>;
@@ -64,9 +65,13 @@ function GearEditor({ item, onSave, onCancel }: {
   const [location, setLocation] = useState<GearItem['location']>(item?.location ?? 'pack');
   const [weight, setWeight] = useState<GearItem['weight'] | ''>(item?.weight ?? '');
   const [integrity, setIntegrity] = useState<GearItem['integrity']>(item?.integrity);
+  const [quickUse, setQuickUse] = useState(item?.quickUse);
   const [reason, setReason] = useState(item ? '' : '처음 등록');
   const [pending, setPending] = useState(false);
   const [invalid, setInvalid] = useState(false);
+  const details = { name: name.trim(), location, weight: weight || gearWeight(name), integrity, quickUse };
+  const quickSample = { id: '', count: 0, ...details };
+  const canUseQuickly = isQuickGear({ ...quickSample, quickUse: true });
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const amount = count.trim() ? readEquipmentCount(count) : null;
@@ -75,8 +80,7 @@ function GearEditor({ item, onSave, onCancel }: {
       return;
     }
     setPending(true);
-    await onSave({ id: original?.id ?? crypto.randomUUID(), name: name.trim(), count: integrity === 'broken' ? 0 : amount,
-      location, weight: weight || gearWeight(name), integrity }, reason.trim(), original);
+    await onSave({ ...details, id: original?.id ?? crypto.randomUUID(), count: integrity === 'broken' ? 0 : amount }, reason.trim(), original);
     setPending(false);
   };
   return (
@@ -100,6 +104,10 @@ function GearEditor({ item, onSave, onCancel }: {
         </select></label>
         <label className="field"><span>변경 이유</span><input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
       </div>
+      {canUseQuickly && <label className="play-gear-quick-option">
+        <input type="checkbox" checked={isQuickGear(quickSample)} onChange={(event) => setQuickUse(event.target.checked)} />
+        <span>빠른 사용에 표시</span>
+      </label>}
       {invalid && <p className="field-err" role="alert">품목 이름, 0 이상의 수량과 변경 이유를 입력하세요. 내구도를 기록하는 방어구는 한 개씩 등록합니다.</p>}
       <div className="play-header-actions">
         <button type="submit" className="btn primary" disabled={pending}>장부에 저장</button>
@@ -117,6 +125,7 @@ function entryText(old: GearItem | null, next: GearItem) {
   if (old.location !== next.location) details.push(`${GEAR_LOCATIONS[old.location]} → ${GEAR_LOCATIONS[next.location]}`);
   if (old.name !== next.name) details.push(`이름 ${old.name} → ${next.name}`);
   if (old.weight !== next.weight) details.push(`${GEAR_WEIGHTS[old.weight]} → ${GEAR_WEIGHTS[next.weight]}`);
+  if (isQuickGear(old) !== isQuickGear(next)) details.push(isQuickGear(next) ? '빠른 사용에 표시' : '빠른 사용에서 숨김');
   return details.join(' · ');
 }
 
@@ -128,7 +137,11 @@ export function PlayInventory({ state, changes, roomId }: {
   const { ledger, change, error, temporary } = state;
   const [editing, setEditing] = useState<string | null>(null);
   const [targets, setTargets] = useState<Record<string, string>>({});
+  const pendingSection = useRef<HTMLElement>(null);
   const editingItem = ledger.items.find(({ id }) => id === editing) ?? null;
+  const postedBySource = new Map(ledger.entries.map((entry) => [entry.source, entry]));
+  const pendingNames = new Set(changes.flatMap(({ id, gear }) =>
+    gear?.kind === 'count' && gear.amount < 0 && !postedBySource.has(`${roomId}/${id}`) ? [gearKey(gear.name)] : []));
   return (
     <section className="play-gear" aria-label="현재 장비와 소모 내역">
       <div className="play-gear-summary">
@@ -137,9 +150,13 @@ export function PlayInventory({ state, changes, roomId }: {
       </div>
       {temporary && <p className="play-empty" role="status">브라우저 저장 공간을 사용할 수 없어 현재 화면에 장부를 보관합니다.</p>}
       {error && <p className="field-err" role="alert">{error}</p>}
+      <PlayQuickGear ledger={ledger} roomId={roomId} pendingNames={pendingNames} onChange={change} onShowPending={() => {
+        pendingSection.current?.focus({ preventScroll: true });
+        pendingSection.current?.scrollIntoView({ block: 'start' });
+      }} />
       {editing && <GearEditor key={editing} item={editingItem} onSave={async (item, reason, original) => {
         const saved = await change((old) => {
-          if (original && JSON.stringify(old.items.find(({ id }) => id === original.id)) !== JSON.stringify(original)) {
+          if (original && !sameGearItem(old.items.find(({ id }) => id === original.id), original)) {
             return { error: '편집하는 동안 이 품목이 바뀌었습니다. 수량을 다시 확인하세요.' };
           }
           return saveGearItem(old, item, reason);
@@ -163,37 +180,51 @@ export function PlayInventory({ state, changes, roomId }: {
           })}
         </div>
       ) : <p className="play-empty">종이 시트에서 확인한 장비와 소모품을 등록하세요.</p>}
-      {roomId && changes.length > 0 && <section className="play-gear-pending" aria-label="이번 장소의 장비 변경">
+      {roomId && changes.length > 0 && <section className="play-gear-pending" aria-label="이번 장소의 장비 변경" ref={pendingSection} tabIndex={-1}>
         <h3>이번 장소의 장비 변경</h3>
         <ul className="play-gear-list">{changes.map(({ id, text, gear }) => {
           if (!gear) return null;
           const source = `${roomId}/${id}`;
-          const posted = ledger.entries.find((entry) => entry.source === source);
+          const posted = postedBySource.get(source);
           const changedAfterPosting = posted && posted.reason !== text;
           const matches = gear.kind === 'count' ? matchingGear(ledger, gear.name) : [];
           const chosen = matches.find(({ id: itemId }) => targets[id] === itemId);
           const countItem = chosen ?? (matches.length === 1 ? matches[0] : null);
+          const accounted = !posted && countItem && gear.kind === 'count' && gear.amount < 0
+            ? availableQuickUses(ledger, roomId, countItem.id, -gear.amount) : [];
+          const extra = gear.kind === 'count' ? -gear.amount - accounted.length : 0;
           return <li key={id}>
-            <div><strong>{text}</strong>{gear.kind === 'count' && countItem && !posted && <span className="play-gear-integrity">
+            <div><strong>{text}</strong>{gear.kind === 'count' && countItem && !posted && !accounted.length && <span className="play-gear-integrity">
               {countItem.count} → {countItem.count + gear.amount}
-            </span>}{changedAfterPosting && <span className="play-gear-integrity">장부에 반영한 값 · {posted.reason}</span>}</div>
+            </span>}{changedAfterPosting && <span className="play-gear-integrity">장부에 반영한 값 · {posted.reason}</span>}
+              {!!posted?.linkedQuickUses?.length && <span className="play-gear-integrity">기존 사용 {posted.linkedQuickUses.length}개 연결</span>}
+            </div>
             {!posted && matches.length > 1 && <select aria-label={`${text}에 해당하는 품목`} value={chosen?.id ?? ''}
               onChange={(event) => setTargets((old) => ({ ...old, [id]: event.target.value }))}>
               <option value="">품목 선택</option>
               {matches.map((item) => <option value={item.id} key={item.id}>{item.name} · {GEAR_LOCATIONS[item.location]} · {item.count}</option>)}
             </select>}
-            <button type="button" className="btn ghost" disabled={!!posted || matches.length > 1 && !chosen}
+            {accounted.length ? <div className="play-gear-accounted">
+              <p className="play-gear-integrity">이 품목을 이번 장소에서 빠른 사용으로 {accounted.length}개 차감했습니다.</p>
+              <button type="button" className="btn primary" onClick={() => void change((old) =>
+                applyGearEffect(old, gear, text, source, countItem?.id, { roomId, ids: accounted }))}>
+                {extra > 0 ? `기존 사용 연결하고 ${extra}개 추가 차감` : '기존 사용 연결'}
+              </button>
+              <button type="button" className="btn ghost" onClick={() => void change((old) =>
+                applyGearEffect(old, gear, text, source, countItem?.id))}>별도 사용 {extra + accounted.length}개 차감</button>
+            </div> : <button type="button" className="btn ghost" disabled={!!posted || matches.length > 1 && !chosen}
               aria-label={`장부에 반영 ${text}`} onClick={() => void change((old) => applyGearEffect(old, gear, text, source, chosen?.id))}>
               {changedAfterPosting ? '이전 값 반영됨' : posted ? '반영됨' : '반영'}
-            </button>
+            </button>}
           </li>;
         })}</ul>
       </section>}
       {ledger.entries.length > 0 && <details className="fold play-gear-history">
         <summary>장비 변경 내역 · {ledger.entries.length}건</summary>
         <button type="button" className="btn ghost" onClick={() => void change(undoGearEntry)}>마지막 장부 변경 되돌리기</button>
-        <ol>{ledger.entries.slice().reverse().map(({ id, old, next, reason }) => <li key={id}>
-          <strong>{next.name} · {entryText(old, next)}</strong><span>{reason}</span>
+        <ol>{ledger.entries.slice().reverse().map(({ id, old, next, reason, linkedQuickUses }) => <li key={id}>
+          <strong>{[next.name, entryText(old, next)].filter(Boolean).join(' · ')}</strong><span>{reason}</span>
+          {!!linkedQuickUses?.length && <span>기존 사용 {linkedQuickUses.length}개 연결</span>}
         </li>)}</ol>
       </details>}
     </section>

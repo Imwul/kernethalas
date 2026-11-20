@@ -31,6 +31,18 @@ describe('play checkpoint files', () => {
     expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
   });
 
+  test('round-trips paper records and a bounded summon roll', () => {
+    const saved = checkpoint();
+    const summonSlot = 'combat/place/target-a/action-1/summons';
+    saved.data.slots[summonSlot] = { expr: 'D4', dice: [2], mod: 0, total: 2 };
+    saved.data.slots.paperApplied = [{ id: 'scavenge-item', text: 'Crafting Supplies +1' }, 'legacy:광원 −1'];
+    saved.data.slots.playTimeline = [{ id: 'room-6', domainId: 1, roomNumber: 6, title: 'C-06',
+      facts: [{ label: '장소', value: '통로' }], journalCopied: false, sheet: [] }];
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+    saved.data.slots[summonSlot] = { expr: 'D4', dice: [2], mod: 0, total: 1000000 };
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
+  });
+
   test('rejects invalid metadata, gear, dice and historical changes', () => {
     const saved = checkpoint();
     const visit = (update: (value: PlayCheckpoint) => void) => {

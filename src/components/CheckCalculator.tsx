@@ -1,11 +1,11 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState, type Ref } from 'react';
 import { procById } from '../content';
 import { d100FromValue, resolveAttack, resolveCheck, resolveOpposed, type AttackResult, type Edge } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { isSkillDouble } from '../lib/skill-criticals';
 import { isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
-import { XRef } from './bits';
+import { CopyButton, XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 
 interface SideState {
@@ -17,13 +17,16 @@ interface SideState {
 }
 
 interface CreatureAttack {
+  name: string;
   combatSkill: number | null;
   attacking: boolean;
   onChangeAttacker: (attacking: boolean) => void;
   onHitLocation: (critical: boolean, pc: boolean) => void;
+  onNextAttack: (enemyAttacks: boolean) => void;
 }
 
 type SideId = 'a' | 'b' | 'pc-attack' | 'pc-defense' | 'enemy-attack' | 'enemy-defense';
+type ConfirmedExchange = { id: string; attacker: string; defender: string };
 
 const CHECK_LABELS = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패(펌블)' } as const;
 const WEAPON_SKILLS = ['Bladed Weapons', 'Bludgeoning Weapons', 'Shafted Weapons', 'Unarmed Combat & Fist Weapons'] as const;
@@ -42,17 +45,23 @@ function readAdjustedSkill(raw: string): number | null {
   return /^[+-]?\d+$/.test(value) && Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-function Side({ label, s, set }: { label: string; s: SideState; set: (v: Partial<SideState>) => void }) {
+function Side({ label, s, set, disabled, rollRef, field }: {
+  label: string;
+  s: SideState;
+  set: (v: Partial<SideState>) => void;
+  disabled: boolean;
+  rollRef?: Ref<HTMLInputElement>;
+  field: ReturnType<typeof usePlayRollField>;
+}) {
   const id = useId();
   const invalidSkill = s.skill !== '' && readAdjustedSkill(s.skill) === null;
   const invalid = s.rollv !== '' && readOracleValue(s.rollv.trim(), 100) === null;
-  const field = usePlayRollField(`attack:${label}`, label, 'D100', !!s.rollv && !invalid, true);
   const changeRoll = (rollv: string) => {
     const sameRoll = readOracleValue(rollv.trim(), 100) === readOracleValue(s.rollv.trim(), 100);
     set({ rollv, growthRecorded: sameRoll && s.growthRecorded });
   };
   return (
-    <fieldset className="checkcalc-side">
+    <fieldset className="checkcalc-side" disabled={disabled}>
       <legend>{label}</legend>
       <div className="row">
         <div className="field">
@@ -65,7 +74,7 @@ function Side({ label, s, set }: { label: string; s: SideState; set: (v: Partial
         <div className="field">
           <label htmlFor={`${id}-roll`}><span className="sr-only">{label} </span>D100</label>
           <PlayDieHint dice="D100" sides={100} />
-          <input id={`${id}-roll`} inputMode="numeric" value={s.rollv} placeholder="1–100 / 00" {...field}
+          <input id={`${id}-roll`} ref={rollRef} inputMode="numeric" value={s.rollv} placeholder="1–100/00" {...field}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-roll-error` : undefined}
             onChange={(e) => changeRoll(e.target.value)} />
           <PlayZeroKey onInput={() => changeRoll('00')} />
@@ -107,7 +116,13 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const [mode, setMode] = useState<'single' | 'attack' | 'opposed'>('attack');
   const [enemy, setEnemy] = useState(false);
   const [inputs, setInputs] = usePlayDraftState<Partial<Record<SideId, Partial<SideState>>>>('attack-inputs', {});
+  const [pcConfirmed, setPcConfirmed] = usePlayDraftState<ConfirmedExchange | null>('attack-confirmed-pc', null);
+  const [enemyConfirmed, setEnemyConfirmed] = usePlayDraftState<ConfirmedExchange | null>('attack-confirmed-enemy', null);
+  const attackerRoll = useRef<HTMLInputElement>(null);
   const enemyAttacks = creature?.attacking ?? enemy;
+  const trackExchange = !!play && !!creature;
+  const confirmed = trackExchange ? (enemyAttacks ? enemyConfirmed : pcConfirmed) : null;
+  const setConfirmed = enemyAttacks ? setEnemyConfirmed : setPcConfirmed;
   const attack = mode === 'attack';
   const aKey = creature ? (enemyAttacks ? 'enemy-attack' : 'pc-attack') : 'a';
   const bKey = creature ? (enemyAttacks ? 'pc-defense' : 'enemy-defense') : 'b';
@@ -120,6 +135,8 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     setInputs((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
   const aRoll = readOracleValue(a.rollv.trim(), 100);
   const bRoll = readOracleValue(b.rollv.trim(), 100);
+  const attackField = usePlayRollField(`attack:${aKey}`, attack ? '공격자' : 'A', 'D100', aRoll !== null, true);
+  const defenseField = usePlayRollField(`attack:${bKey}`, attack ? '방어자' : 'B', 'D100', bRoll !== null, true);
   const aSkill = readAdjustedSkill(a.skill);
   const bSkill = readAdjustedSkill(b.skill);
   const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, a.edge);
@@ -137,6 +154,35 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     const r = resolveOpposed(ca, cb);
     verdict = { t: r.winner === 'A' ? 'A 승리' : r.winner === 'B' ? 'B 승리' : r.winner === 'reroll' ? '다시 굴림' : '규칙 미정', d: r.reason };
   }
+  const matchup = creature && (enemyAttacks ? `${creature.name} → PC` : `PC → ${creature.name}`);
+  const exchangeOutcome = result && `${ATTACK_LABELS[result.outcome]}${result.attackerFumble ? ' · 공격자 펌블' : ''}`;
+  const confirm = (continueAttack?: () => void) => {
+    if (confirmed || !trackExchange || !result) {
+      continueAttack?.();
+      return;
+    }
+    const attacker = a.rollv.trim();
+    const defender = b.rollv.trim();
+    commit(() => {
+      setConfirmed({ id: crypto.randomUUID(), attacker, defender });
+      continueAttack?.();
+    }, {
+      label: `공격 교환 · ${matchup}`,
+      dice: 'D100 × 2',
+      value: `공격 ${attacker} / 방어 ${defender} · ${exchangeOutcome}`,
+      source: 'manual',
+      field: attackField['data-play-roll-field'],
+    });
+  };
+  const nextAttack = () => {
+    const clearRoll = (side: Partial<SideState> | undefined): Partial<SideState> => ({
+      ...side, rollv: '', edge: 'none', growthRecorded: false,
+    });
+    setInputs((previous) => ({ ...previous, [aKey]: clearRoll(previous[aKey]), [bKey]: clearRoll(previous[bKey]) }));
+    setConfirmed(null);
+    creature?.onNextAttack(enemyAttacks);
+    requestAnimationFrame(() => attackerRoll.current?.focus());
+  };
   return (
     <section className="roller checkcalc" aria-label={attackOnly ? '공격 판정 해석기' : '판정 해석기'}>
       {!attackOnly && <span className="kicker">판정 해석기</span>}
@@ -155,15 +201,19 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
       </div>}
       {attack && (
         <div className="seg" role="group" aria-label="공격하는 쪽">
-          <button type="button" aria-pressed={!enemyAttacks} onClick={() => (creature?.onChangeAttacker ?? setEnemy)(false)}>PC가 공격</button>
-          <button type="button" aria-pressed={enemyAttacks} onClick={() => (creature?.onChangeAttacker ?? setEnemy)(true)}>적이 공격</button>
+          <button type="button" aria-pressed={!enemyAttacks} data-play-attack-side={creature ? 'pc-attack' : undefined}
+            onClick={() => (creature?.onChangeAttacker ?? setEnemy)(false)}>PC가 공격</button>
+          <button type="button" aria-pressed={enemyAttacks} data-play-attack-side={creature ? 'enemy-attack' : undefined}
+            onClick={() => (creature?.onChangeAttacker ?? setEnemy)(true)}>적이 공격</button>
         </div>
       )}
       {creature && importedSkill && (
         <p className="checkcalc-note">적 기본 입력값 {importedSkill}{enemyAttacks && ` (CS ${enemySkill} + 공격 기본 10)`}. 추가 보정은 직접 반영하세요.</p>
       )}
-      <Side label={attack ? '공격자' : 'A'} s={a} set={(patch) => setSide(aKey, patch)} />
-      {mode !== 'single' && <Side label={attack ? '방어자' : 'B'} s={b} set={(patch) => setSide(bKey, patch)} />}
+      <Side label={attack ? '공격자' : 'A'} s={a} set={(patch) => setSide(aKey, patch)}
+        disabled={!!confirmed} rollRef={attackerRoll} field={attackField} />
+      {mode !== 'single' && <Side label={attack ? '방어자' : 'B'} s={b} set={(patch) => setSide(bKey, patch)}
+        disabled={!!confirmed} field={defenseField} />}
       <div className="verdict" role="status">
         {verdict ? (
           <>
@@ -174,6 +224,17 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
           <span className="muted">직접 굴린 D100을 입력하세요. 공격 기본 +10, Speed와 그 밖의 보정을 확인하세요.</span>
         )}
       </div>
+      {trackExchange && (<div className="checkcalc-exchange">
+        {confirmed && verdict && <p className="checkcalc-note">확정 · 공격 D100 {confirmed.attacker} · 방어 D100 {confirmed.defender}</p>}
+        <div className="checkcalc-follow-ups">
+          {confirmed ? <>
+            <button type="button" className="btn primary" onClick={nextAttack}>다음 공격</button>
+            {exchangeOutcome && <CopyButton text={`${matchup} · 공격 D100 ${confirmed.attacker} / 방어 D100 ${confirmed.defender} · ${exchangeOutcome}`}
+              label="공격 결과 복사" />}
+          </> : <button type="button" className="btn primary" disabled={!result} data-play-next={result ? '' : undefined}
+            onClick={() => confirm()}>공격 교환 확정</button>}
+        </div>
+      </div>)}
       {pcDouble && <p className="checkcalc-note">PC {enemyAttacks ? '방어' : '공격'} · {pcDouble === 'critical' ? '대성공' : '대실패'}</p>}
       {play && pcDouble && pcCheck && (
         <div className="checkcalc-follow-ups" style={{ alignItems: 'end' }}>
@@ -199,7 +260,7 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
         <div className="checkcalc-follow-ups">
           {(result.outcome === 'hit' || result.outcome === 'critical-hit') && (
             <HitLocation enemyAttacks={enemyAttacks}
-              onHitLocation={creature && (() => creature.onHitLocation(result.outcome === 'critical-hit', enemyAttacks))} />
+              onHitLocation={creature && (() => confirm(() => creature.onHitLocation(result.outcome === 'critical-hit', enemyAttacks)))} />
           )}
           {result.outcome === 'critical-hit' && <XRef id="critical-strike">치명타 피해</XRef>}
           {result.outcome === 'defended' && (
