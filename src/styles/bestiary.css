@@ -176,6 +176,19 @@
 .bestiary-table .name a:hover {
   color: var(--oxblood-ink);
 }
+.bestiary-creature-actions {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--s2);
+}
+.bestiary-table .bestiary-encounter-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--copper-ink);
+  font: 13px/1.25 var(--f-ui);
+}
 .bestiary-table tbody tr:hover {
   background: var(--copper-wash);
 }
@@ -193,6 +206,7 @@
 
 /* narrow: each row becomes a card; stat cells flow as label/value pairs */
 @container (max-width: 900px) {
+  .bestiary-table .bestiary-encounter-link { min-height: 44px; }
   .bestiary-table thead {
     position: absolute;
     width: 1px;

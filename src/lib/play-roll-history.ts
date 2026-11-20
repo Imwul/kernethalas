@@ -7,6 +7,7 @@ export type PlayRollDetails = {
   value: string;
   source: 'manual' | 'app';
   field?: string;
+  breakdown?: string;
 };
 export type PlayRollEntry = PlayRollDetails & {
   id: string;
@@ -50,6 +51,7 @@ function isRollEntry(value: unknown): value is PlayRollEntry {
   return typeof entry.id === 'string' && typeof entry.label === 'string' && typeof entry.scope === 'string'
     && typeof entry.dice === 'string' && typeof entry.value === 'string' && STAGES.has(entry.stage)
     && (entry.field === undefined || typeof entry.field === 'string')
+    && (entry.breakdown === undefined || typeof entry.breakdown === 'string' && entry.breakdown.length <= 1800)
     && (entry.source === 'manual' || entry.source === 'app')
     && Array.isArray(entry.cleared) && entry.cleared.every((prefix) => safePlaySlot(prefix) && prefix.endsWith('/'))
     && (entry.requires === undefined || Array.isArray(entry.requires) && entry.requires.every(safePlaySlot))
@@ -118,6 +120,10 @@ function parents({ scope, changes }: PlayRollEntry) {
     const target = scope.match(/^combat\/[^/]+\/target-[^/]+\//)?.[0];
     if (target) {
       if (scope.startsWith(`${target}action-follow-up-`)) result.push(`${target}creature-action`);
+      const areaTarget = scope.slice(target.length).match(/^action-follow-up-\d+\/area-targets-\d+\/\d+\//)?.[0];
+      if (areaTarget && /^(?:rolls|extra)-\d+\//.test(scope.slice(target.length + areaTarget.length))) {
+        result.push(`${target}${areaTarget}resisted`);
+      }
       if (slots.includes(`${target}creature-hit`)) result.push(`${target}attack-confirmed-pc`);
       if (slots.includes(`${target}creature-pc-hit`)) result.push(`${target}attack-confirmed-enemy`);
     }

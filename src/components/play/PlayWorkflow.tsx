@@ -39,13 +39,15 @@ function focusControl(control: HTMLElement) {
   control.scrollIntoView({ block: 'center', inline: 'nearest' });
 }
 
-export function focusPlayRoll(stage: Stage, field?: string) {
+export function focusPlayRoll(stage: Stage, field?: string, onResult?: (focused: boolean) => void) {
   const reveal = () => {
     const section = document.getElementById(`play-stage-${stage}`);
-    const input = field && Array.from(section?.querySelectorAll<HTMLInputElement>(FIELD) ?? [])
-      .find((element) => element.dataset.playRollField === field && !element.matches(':disabled'));
+    const input = field && (Array.from(section?.querySelectorAll<HTMLElement>(FIELD) ?? [])
+      .find((element) => element.dataset.playRollField === field && !element.matches(':disabled'))
+      ?? section?.querySelector<HTMLElement>(`select[data-play-attack-field="${CSS.escape(field)}"]:not(:disabled)`));
     if (!input) {
       section?.querySelector<HTMLElement>('.play-stage-heading')?.focus();
+      onResult?.(false);
       return;
     }
     const parents: HTMLElement[] = [];
@@ -57,6 +59,7 @@ export function focusPlayRoll(stage: Stage, field?: string) {
     requestAnimationFrame(() => {
       if (canReach(input)) focusControl(input);
       else section?.querySelector<HTMLElement>('.play-stage-heading')?.focus();
+      onResult?.(document.activeElement === input);
     });
   };
   requestAnimationFrame(() => {
@@ -174,7 +177,9 @@ export function PlayRollHistory({ onCorrection, paperCommitted }: {
         <ol className="play-roll-log">
           {[...draft.history].reverse().map((entry) => (
             <li key={entry.id}>
-              <span><strong>{entry.label}</strong> <span>{entry.source === 'manual' ? '직접 입력' : '앱 굴림'}</span></span>
+              <span><strong>{entry.label}</strong> <span>{entry.source === 'manual' ? '직접 입력' : '앱 굴림'}</span>
+                {entry.breakdown && <small className="play-skill-total">{entry.breakdown}</small>}
+              </span>
               <b>{recordedValue(entry)}</b>
               <button className="btn ghost" type="button" aria-expanded={selection === entry.id}
                 aria-label={`${entry.label} ${recordedValue(entry)} 수정 미리보기`}

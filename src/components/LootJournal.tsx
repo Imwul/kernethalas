@@ -15,9 +15,10 @@ type JournalRollProps = {
   value: number | null;
   onValue: (value: number) => void;
   resultText?: string;
+  breakdown?: string;
 } & ({ tableId: string; label?: string } | { die: 'D4' | 'D6' | 'D10' | 'D20' | 'D100'; label: string });
 
-export function JournalRoll({ label, value, onValue, resultText, ...source }: JournalRollProps) {
+export function JournalRoll({ label, value, onValue, resultText, breakdown, ...source }: JournalRollProps) {
   const id = useId();
   const [typed, setTyped] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -32,7 +33,7 @@ export function JournalRoll({ label, value, onValue, resultText, ...source }: Jo
   const canRoll = !table || automaticRollSides(table) !== null;
   const commit = (roll: number, source: PlayRollDetails['source']) => {
     commitRoll(() => onValue(roll), { label: action, dice, value: sides === 100 && roll === 100 ? '00' : String(roll),
-      source, field: field['data-play-roll-field'] });
+      source, field: field['data-play-roll-field'], breakdown });
     setTyped('');
     setInvalid(false);
   };

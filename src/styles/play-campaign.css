@@ -1,0 +1,56 @@
+.campaign-selector.fold, .campaign-storage-status {
+  max-inline-size: 1940px;
+  margin: 0 auto var(--s3);
+}
+.campaign-selector.fold {
+  min-inline-size: 0;
+  padding-inline: var(--s3);
+  border: 1px solid var(--rule);
+  border-inline-start: 2px solid var(--copper);
+  background: var(--paper);
+}
+.campaign-selector.fold > summary {
+  gap: var(--s2);
+  min-block-size: 44px;
+  color: var(--ink-2);
+  font: 600 14px/1.45 var(--f-ui);
+  letter-spacing: normal;
+}
+.campaign-selector.fold > summary::before, .campaign-selector.fold > summary > span { flex: none; }
+.campaign-selector.fold > summary strong { min-inline-size: 0; color: var(--ink); overflow-wrap: anywhere; }
+.campaign-selector-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s3);
+  max-inline-size: 42rem;
+  padding-block-end: var(--s3);
+}
+.campaign-selector-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s2);
+}
+.campaign-selector-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.campaign-selector :is(button, input, select) { min-block-size: 44px; }
+.campaign-selector :is(p, form) { margin: 0; }
+.campaign-selector :is(.field, input, select) { min-inline-size: 0; }
+.campaign-selector :is(input, select) { inline-size: 100%; }
+.campaign-storage-status {
+  padding: var(--s2) var(--s3);
+  color: var(--ink-2);
+  border-inline-start: 2px solid var(--ochre);
+  font: 14px/1.5 var(--f-ui);
+  overflow-wrap: anywhere;
+}
+.campaign-storage-status p { margin: 0 0 var(--s2); }
+.campaign-storage-status .btn { min-block-size: 44px; }
+.home-play-resume { display: grid; gap: var(--s1); min-inline-size: 0; }
+.home-play-resume .home-play-launch { white-space: normal; overflow-wrap: anywhere; }
+.home-play-resume .home-play-launch svg { flex: none; }
+.home-play-resume-info { color: var(--ink-2); font: 14px/1.45 var(--f-ui); overflow-wrap: anywhere; }
+
+@media (max-width: 520px) {
+  .campaign-selector-row { grid-template-columns: minmax(0, 1fr); }
+  .campaign-selector-row > button { justify-self: start; }
+}

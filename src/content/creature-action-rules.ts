@@ -12,6 +12,7 @@ export interface CreatureActionRule {
   success?: 'half';
   after?: Resistance;
   target?: string;
+  targetScope?: 'area' | 'room';
   timing?: string;
   healthOnly?: boolean;
   duration?: string;
@@ -29,8 +30,8 @@ const pierce = (amount: string | number): ActionDamage => ['Piercing', amount];
 const d = (...damage: ActionDamage[]): CreatureActionRule => ({ damage });
 const check = (resistance: Resistance, ...damage: ActionDamage[]): CreatureActionRule => ({ resistance, damage });
 const half = (resistance: Resistance, ...damage: ActionDamage[]): CreatureActionRule => ({ resistance, damage, success: 'half' });
-const area = (rule: CreatureActionRule): CreatureActionRule => ({ ...rule, target: '범위 안 대상마다' });
-const room = (rule: CreatureActionRule): CreatureActionRule => ({ ...rule, target: '방 안 대상마다' });
+const area = (rule: CreatureActionRule): CreatureActionRule => ({ ...rule, target: '범위 안 대상마다', targetScope: 'area' });
+const room = (rule: CreatureActionRule): CreatureActionRule => ({ ...rule, target: '방 안 대상마다', targetScope: 'room' });
 const after = (resistance: Resistance, ...damage: ActionDamage[]): CreatureActionRule => ({ damage, after: resistance });
 const directHealth = (rule: CreatureActionRule): CreatureActionRule => ({ ...rule, healthOnly: true });
 
@@ -84,10 +85,10 @@ const RULES: Record<string, Record<number, CreatureActionRule>> = {
   } },
   'cr-vaelorian-magus': { 1: d(necrotic('D6')), 3: area(check('Resolve')) },
   'cr-vinekin': { 3: { ...room(check('Dodge')), timing: '붙잡힌 대상의 턴 시작마다 지속 피해' } },
-  'cr-voidweaver': { 1: d(arcane('D4+1')), 3: { target: '방 안 대상마다', timing: '2라운드 동안' }, 5: room(after('Athletics', arcane('D6'))) },
+  'cr-voidweaver': { 1: d(arcane('D4+1')), 3: room({ timing: '2라운드 동안' }), 5: room(after('Athletics', arcane('D6'))) },
   'cr-vorleg': { 5: { ...check('Endurance', bludgeoning('2D10')), target: '이미 붙잡힌 대상' } },
   'cr-wraithskull': { 1: d(necrotic('D6')), 5: area(check('Resolve')) },
-  'cr-wrath-elemental': { 1: room({ elemental: true }), 5: { target: '방 안 대상마다' } },
+  'cr-wrath-elemental': { 1: room({ elemental: true }), 5: room({}) },
   'cr-carnage-devourer': {
     1: area(check('Dodge', bludgeoning('2D8'))), 3: area(check('Acrobatics', bludgeoning('D6'))),
     5: area(check('Resolve')), 6: area(check('Dodge', fire('D6'))),

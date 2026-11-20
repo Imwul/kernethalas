@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePlayCampaignId } from '../../lib/play-campaigns';
 import {
   CHECKPOINT_MAX_BYTES, CHECKPOINT_NAME_MAX, capturePlayCheckpoint, exportPlayCheckpoint,
   parsePlayCheckpoint, readPlayCheckpoints, storePlayCheckpoints, type PlayCheckpoint,
@@ -35,7 +36,8 @@ function CheckpointLabel({ checkpoint }: { checkpoint: PlayCheckpoint }) {
 }
 
 export function PlayCheckpoints({ data, place, stage, onRestore }: Props) {
-  const [checkpoints, setCheckpoints] = useState(() => readPlayCheckpoints() ?? []);
+  const campaignId = usePlayCampaignId();
+  const [checkpoints, setCheckpoints] = useState(() => readPlayCheckpoints(campaignId) ?? []);
   const [name, setName] = useState('');
   const [review, setReview] = useState<PlayCheckpoint | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -53,9 +55,9 @@ export function PlayCheckpoints({ data, place, stage, onRestore }: Props) {
     reviewHeading.current?.scrollIntoView({ block: 'nearest' });
   }, [review]);
 
-  const currentList = () => temporary.current ? checkpoints : readPlayCheckpoints() ?? checkpoints;
+  const currentList = () => temporary.current ? checkpoints : readPlayCheckpoints(campaignId) ?? checkpoints;
   const updateList = (next: PlayCheckpoint[], message: string) => {
-    temporary.current = !storePlayCheckpoints(next);
+    temporary.current = !storePlayCheckpoints(next, campaignId);
     setCheckpoints(next);
     setError('');
     setFeedback(temporary.current ? `${message} 플레이를 열어 둔 동안만 남습니다. 파일로 내보낼 수 있습니다.` : message);

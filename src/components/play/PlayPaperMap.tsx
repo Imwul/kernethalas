@@ -54,6 +54,7 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, on
             {saved && <p className="play-explore-note play-paper-map-saved">
               {[...saved.tags, saved.note].filter(Boolean).join(' · ') || '메모 없음'}
             </p>}
+            {saved?.doors?.length ? <SavedDoorReports location={saved} /> : null}
             {!canRevisit && <p className="play-explore-note play-paper-map-saved">다음 장소에 들어가기 전에 재방문 메모를 불러오세요.</p>}
           </div>}
           {area ? (
@@ -97,6 +98,16 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, on
       </details>
       {entries.length > 0 && <PlayReturnPlaces entries={entries} canRevisit={canRevisit} onRevisit={revisit} />}
     </>
+  );
+}
+
+function SavedDoorReports({ location }: { location: PaperMapLocation }) {
+  return (
+    <ul className="play-map-door-reports" aria-label="출입구별 문과 함정 기록">
+      {location.doors?.map(({ exit, text, opened }) => (
+        <li key={paperMapKey(exit)} data-opened={opened || undefined}><strong>{exit}</strong><span>{text}</span></li>
+      ))}
+    </ul>
   );
 }
 
@@ -144,6 +155,7 @@ function PlayReturnPlaces({ entries, canRevisit, onRevisit }: {
                     </ul>
                     {exits.length > 0 && <p className="play-explore-note">{exits.join(' · ')}</p>}
                     {record.note && <p className="play-return-note">{record.note}</p>}
+                    {record.doors?.length ? <SavedDoorReports location={record} /> : null}
                   </div>
                   <button type="button" className="btn ghost" aria-label={`${record.paperId} 재방문`} disabled={!canRevisit}
                     onClick={() => {

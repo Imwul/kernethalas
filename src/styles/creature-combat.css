@@ -103,12 +103,59 @@
 .creature-resolution-body :is(dd, .creature-resistance-outcome, .creature-action-damage > p) { margin: 0; }
 .creature-resolution-body :is(dl, .creature-resistance-outcome, .creature-action-damage > p) { font: 14px/1.45 var(--f-ui); }
 .creature-resolution-body dt { color: var(--ink-2); }
+.creature-target-resolution,
+.creature-area:not([hidden]),
+.creature-area-form,
+.creature-area-targets,
+.creature-area-target,
+.creature-area-shared {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+}
+.creature-area-toggle { justify-self: start; min-height: 44px; }
+.creature-area-form {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  align-items: end;
+}
+.creature-area-form textarea {
+  width: 100%;
+  min-width: 0;
+  padding: var(--s2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--bone);
+  font: 15px/1.4 var(--f-ui);
+}
+.creature-area-form .btn { margin-block-start: var(--s1); min-height: 44px; }
+.creature-area-damage-mode { justify-self: start; min-width: 0; }
+.creature-area-targets {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: start;
+}
+.creature-area-target, .creature-area-shared {
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+}
+.creature-area h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: 700 15px/1.4 var(--f-ui);
+}
 .checkcalc-exchange {
   display: grid;
   gap: var(--s2);
   padding-block-start: var(--s2);
   border-block-start: 1px solid var(--rule-soft);
 }
+.checkcalc-defense-mode {
+  display: grid;
+  justify-items: start;
+  gap: var(--s1);
+  min-width: 0;
+}
+.checkcalc-defense-mode .field { max-width: 100%; }
+.checkcalc-defense-mode select { width: 100%; min-height: 44px; font: 14px/1.35 var(--f-ui); }
 .creature-summon, .creature-summon-info, .creature-summon-check > div {
   display: grid;
   min-width: 0;
@@ -198,3 +245,9 @@
 @container (min-width: 880px) {
   .reference-record .creature-combat { grid-column: 1; }
 }
+.creature-reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block: var(--s2);
+}
+.creature-reference-actions .btn { min-height: 44px; }

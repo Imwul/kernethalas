@@ -161,6 +161,37 @@
 }
 .play-return-note { margin: 0; white-space: pre-line; }
 
+.play-door-map {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
+}
+.play-door-map h4 { margin: 0; overflow-wrap: anywhere; }
+.play-door-map-fields {
+  display: grid;
+  gap: var(--s2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+.play-door-map-fields .field { min-width: 0; }
+.play-map-door-reports {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--s1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-2);
+  font: 13px/1.45 var(--f-ui);
+  overflow-wrap: anywhere;
+}
+.play-map-door-reports li { display: flex; flex-wrap: wrap; gap: 2px var(--s2); }
+.play-map-door-reports strong { color: var(--ink); }
+.play-map-door-reports [data-opened] strong { color: var(--copper-ink); }
+
 .play-scavenge-attempts { display: grid; gap: var(--s2); }
 .play-scavenge-attempts > .seg { flex-wrap: wrap; }
 .play-scavenge-attempts > .seg button { min-height: 44px; }

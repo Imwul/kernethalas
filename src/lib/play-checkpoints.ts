@@ -2,9 +2,13 @@ import { creatureById } from '../content/entries/creatures';
 import { MAX_SET_NAME, readPlayCustomEncounterRows, type EncounterSet } from './custom-encounters';
 import { DAMAGE_TYPES } from './damage';
 import { DICE_CHAIN } from './dice';
-import { isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
+import { isPaperMapDoorReports, isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
+import { campaignStorageKey } from './play-campaigns';
+import { isPlayOngoing, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT } from './play-effects';
 import { ARMOR_DICE, GEAR_WEIGHTS, isGearLedger, type GearLedger } from './play-inventory';
 import { readPlayRollHistory, safePlaySlot, type PlayRollEntry } from './play-roll-history';
+import { isPlayPendingRolls, PLAY_PENDING_ROLLS_SLOT } from './play-pending-rolls';
+import { isSkillModifierList, isSkillPresetRecord, SKILL_PRESETS_SLOT } from './play-skill';
 import { isPlayTimeline, PLAY_TIMELINE_SLOT } from './play-timeline';
 import { isGrowthSkill } from './skill-growth';
 
@@ -58,7 +62,8 @@ const integrity = oneOf([...ARMOR_DICE, 'broken']);
 const creature = (value: unknown) => isText(value) && creatureById.has(value);
 const tensionDie = oneOf([4, 6, 8]);
 const outcome = oneOf(OUTCOMES);
-const checkInputs = shape({ skill: isText, roll: isText, edge: oneOf(EDGE), difficulty: optional(isText), weapon: optional(isText) });
+const checkInputs = shape({ skill: isText, roll: isText, edge: oneOf(EDGE), difficulty: optional(isText), weapon: optional(isText),
+  modifiers: optional(isSkillModifierList) });
 const diceFace = shape({ tens: between(0, 9), ones: between(0, 9), value: isD100 });
 const skillResult = shape({ raw: diceFace, read: diceFace, skill: isFiniteNumber, outcome, flippedRead: isBoolean });
 const confirmedSkill = shape({ inputs: checkInputs, result: skillResult });
@@ -93,12 +98,13 @@ const battle = shape({
 });
 const tension = shape({ sides: tensionDie, value: between(1, 8), nextDie: tensionDie, darkness: isBoolean });
 const lootReport = shape({ journal: isText, sheet: isText, gear: optional(storyEffect) });
-const checkDraft = shape({ target: isText, edge: oneOf(EDGE), roll: nullable(isD100) });
+const checkDraft = shape({ target: isText, edge: oneOf(EDGE), roll: nullable(isD100), modifiers: optional(isSkillModifierList) });
 const encounterRoll = shape({ roll: isText, edge: oneOf(EDGE), growthRecorded: optional(isBoolean) });
 const encounterCheck = shape({ skill: isText, roll: isText, edge: oneOf(EDGE), growthRecorded: optional(isBoolean) });
 const roundTiming = oneOf(['start', 'end', 'round']);
 const mapLocation = shape({ domainId: isPositive, paperId: (value) => isText(value) && value.length <= 32 && !!paperMapKey(value),
-  note: textWithLimit(400), area: oneOf(PLACE_TYPES), tags: list(oneOf(PAPER_MAP_TAGS)), tile: optional(isPaperMapTile) });
+  note: textWithLimit(400), area: oneOf(PLACE_TYPES), tags: list(oneOf(PAPER_MAP_TAGS)), tile: optional(isPaperMapTile),
+  doors: optional(isPaperMapDoorReports) });
 const carryCounts = shape({ normal: isText, heavy: isText, light: isText, coins: isText, gems: isText });
 const tradeDirection = oneOf(['buy', 'sell']);
 const tradeLine = shape({ direction: tradeDirection, name: isText, quantity: isPositive, price: isCount });
@@ -121,6 +127,9 @@ const ROOT_FIELDS: Record<string, Validator> = {
     && value.every(({ tile, area }) => tile === undefined || isPaperMapTile(tile, area))
     && new Set(value.map(({ domainId, paperId }) => `${domainId}/${paperMapKey(paperId)}`)).size === value.length,
   [PLAY_TIMELINE_SLOT]: isPlayTimeline,
+  [PLAY_EFFECTS_SLOT]: isPlayOngoing, [PLAY_EFFECT_CHANGES_SLOT]: list(paperChange),
+  [PLAY_PENDING_ROLLS_SLOT]: isPlayPendingRolls, [SKILL_PRESETS_SLOT]: isSkillPresetRecord,
+  confirmedBreather: isText, confirmedCamp: isText,
 };
 
 // The most heavily structured child records are read as arrays or objects in the Play views.
@@ -160,7 +169,9 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'start-perception': encounterCheck,
   'start-enemy-surprise': encounterRoll,
   'start-enemy-initiative': encounterRoll,
-  'scavenge-check': nullable(shape({ skill: isText, roll: isD100, edge: oneOf(EDGE) })),
+  'scavenge-check': nullable(shape({ skill: isText, roll: isD100, edge: oneOf(EDGE), modifiers: optional(isSkillModifierList) })),
+  'door-map-exit': textWithLimit(53),
+  'door-manual-exit': textWithLimit(48),
   'scavenge-quantity': list(nullable(isPositive)),
   'scavenge-selected': isPositive,
   'round-board-open': isBoolean,
@@ -193,12 +204,19 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'summon-done': list(between(1, 4)),
   'attack-confirmed-pc': nullable(shape({ id: isText, attacker: isText, defender: isText })),
   'attack-confirmed-enemy': nullable(shape({ id: isText, attacker: isText, defender: isText })),
+  'attack-defense-mode-pc': oneOf(['opposed', 'unopposed', 'automatic']),
+  'attack-defense-mode-enemy': oneOf(['opposed', 'unopposed', 'automatic']),
+  'area-open': isBoolean,
+  'area-targets': (value) => Array.isArray(value) && value.length <= 12 && value.every(textWithLimit(48)),
+  'area-target-revision': isCount,
+  'area-damage-mode': oneOf(['individual', 'shared']),
+  'area-shared-damage': recordOf(rollResult),
   'roll': (value) => value === null || isPositive(value) || rollResult(value),
   'loot-reports': recordOf(lootReport),
   'gem-values': list(nullable(isPositive)),
   'follow-report': lootReport,
   'attack-inputs': recordOf(shape({ skill: optional(isText), rollv: optional(isText),
-    edge: optional(oneOf(EDGE)), growthSkill: optional(isText), growthRecorded: optional(isBoolean) })),
+    edge: optional(oneOf(EDGE)), growthSkill: optional(isText), growthRecorded: optional(isBoolean), modifiers: optional(isSkillModifierList) })),
   'camp-plan': shape({ quantities: recordOf(isText), hasRation: isBoolean, sleep: isBoolean, bedroll: isBoolean,
     darkness: isBoolean, swapAmulets: isBoolean, other: isText, die: isText, lostToughness: isText, sanityDie: isText }),
   'magic-item': shape({ item: nullable(isPositive), base: nullable(isPositive), detail: nullable(isPositive),
@@ -314,9 +332,9 @@ export function capturePlayCheckpoint(name: string, place: string, stage: string
   return parsePlayCheckpoint(exportPlayCheckpoint(checkpoint));
 }
 
-export function readPlayCheckpoints(): PlayCheckpoint[] | null {
+export function readPlayCheckpoints(campaignId?: string): PlayCheckpoint[] | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(campaignStorageKey(STORAGE_KEY, campaignId));
     if (!raw) return [];
     const data: unknown = JSON.parse(raw);
     if (!Array.isArray(data)) return null;
@@ -330,9 +348,9 @@ export function readPlayCheckpoints(): PlayCheckpoint[] | null {
   } catch { return null; }
 }
 
-export function storePlayCheckpoints(checkpoints: PlayCheckpoint[]) {
+export function storePlayCheckpoints(checkpoints: PlayCheckpoint[], campaignId?: string) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(checkpoints));
+    localStorage.setItem(campaignStorageKey(STORAGE_KEY, campaignId), JSON.stringify(checkpoints));
     return true;
   } catch { return false; }
 }

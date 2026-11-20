@@ -1,12 +1,15 @@
 import { useId, useRef, useState, type Ref } from 'react';
 import { procById } from '../content';
-import { d100FromValue, resolveAttack, resolveCheck, resolveOpposed, type AttackResult, type Edge } from '../lib/dice';
+import { d100FromValue, resolveCheck, resolveOpposed, type Edge } from '../lib/dice';
+import { resolvePhysicalAttack, type AttackDefenseMode } from '../lib/attack-defense';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { isSkillDouble } from '../lib/skill-criticals';
 import { isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
+import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../lib/play-skill';
 import { CopyButton, XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
+import { SkillAdjustments } from './play/SkillAdjustments';
 
 interface SideState {
   skill: string;
@@ -14,6 +17,7 @@ interface SideState {
   edge: Edge;
   growthSkill?: string;
   growthRecorded?: boolean;
+  modifiers?: SkillModifier[];
 }
 
 interface CreatureAttack {
@@ -34,6 +38,7 @@ const DEFENSE_SKILLS = ['Dodge', ...WEAPON_SKILLS] as const;
 const ATTACK_LABELS = {
   hit: '공격자 명중',
   'critical-hit': 'Critical Strike',
+  miss: '빗나감',
   defended: '방어 성공 → Defensive Move',
   'both-failed': '양쪽 실패 → 방어자 1 피해',
   reroll: '다시 굴림',
@@ -45,13 +50,14 @@ function readAdjustedSkill(raw: string): number | null {
   return /^[+-]?\d+$/.test(value) && Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-function Side({ label, s, set, disabled, rollRef, field }: {
+function Side({ label, s, set, disabled, rollRef, field, editableSkill }: {
   label: string;
   s: SideState;
   set: (v: Partial<SideState>) => void;
   disabled: boolean;
   rollRef?: Ref<HTMLInputElement>;
   field: ReturnType<typeof usePlayRollField>;
+  editableSkill?: boolean;
 }) {
   const id = useId();
   const invalidSkill = s.skill !== '' && readAdjustedSkill(s.skill) === null;
@@ -89,6 +95,8 @@ function Side({ label, s, set, disabled, rollRef, field }: {
           </select>
         </div>
       </div>
+      {editableSkill && <SkillAdjustments label={label} skill={s.growthSkill} base={s.skill} modifiers={s.modifiers ?? []}
+        disabled={disabled} onBase={(skill) => set({ skill })} onModifiers={(modifiers) => set({ modifiers })} />}
     </fieldset>
   );
 }
@@ -118,12 +126,19 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const [inputs, setInputs] = usePlayDraftState<Partial<Record<SideId, Partial<SideState>>>>('attack-inputs', {});
   const [pcConfirmed, setPcConfirmed] = usePlayDraftState<ConfirmedExchange | null>('attack-confirmed-pc', null);
   const [enemyConfirmed, setEnemyConfirmed] = usePlayDraftState<ConfirmedExchange | null>('attack-confirmed-enemy', null);
+  const [pcDefenseMode, setPcDefenseMode] = usePlayDraftState<AttackDefenseMode>('attack-defense-mode-pc', 'opposed');
+  const [enemyDefenseMode, setEnemyDefenseMode] = usePlayDraftState<AttackDefenseMode>('attack-defense-mode-enemy', 'opposed');
   const attackerRoll = useRef<HTMLInputElement>(null);
+  const defenseModeSelect = useRef<HTMLSelectElement>(null);
   const enemyAttacks = creature?.attacking ?? enemy;
   const trackExchange = !!play && !!creature;
   const confirmed = trackExchange ? (enemyAttacks ? enemyConfirmed : pcConfirmed) : null;
   const setConfirmed = enemyAttacks ? setEnemyConfirmed : setPcConfirmed;
   const attack = mode === 'attack';
+  const defenseMode = attack ? enemyAttacks ? enemyDefenseMode : pcDefenseMode : 'opposed';
+  const setDefenseMode = enemyAttacks ? setEnemyDefenseMode : setPcDefenseMode;
+  const attackingRolls = defenseMode !== 'automatic';
+  const defendingRolls = defenseMode === 'opposed';
   const aKey = creature ? (enemyAttacks ? 'enemy-attack' : 'pc-attack') : 'a';
   const bKey = creature ? (enemyAttacks ? 'pc-defense' : 'enemy-defense') : 'b';
   const enemySkill = creature?.combatSkill;
@@ -137,14 +152,16 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const bRoll = readOracleValue(b.rollv.trim(), 100);
   const attackField = usePlayRollField(`attack:${aKey}`, attack ? '공격자' : 'A', 'D100', aRoll !== null, true);
   const defenseField = usePlayRollField(`attack:${bKey}`, attack ? '방어자' : 'B', 'D100', bRoll !== null, true);
-  const aSkill = readAdjustedSkill(a.skill);
-  const bSkill = readAdjustedSkill(b.skill);
+  const aAdjustments = !enemyAttacks && trackExchange ? skillBreakdown(a.skill, a.modifiers) : null;
+  const bAdjustments = enemyAttacks && trackExchange ? skillBreakdown(b.skill, b.modifiers) : null;
+  const aSkill = !enemyAttacks && trackExchange ? aAdjustments?.total ?? null : readAdjustedSkill(a.skill);
+  const bSkill = enemyAttacks && trackExchange ? bAdjustments?.total ?? null : readAdjustedSkill(b.skill);
   const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, a.edge);
   const cb = bRoll === null || bSkill === null ? null : resolveCheck(d100FromValue(bRoll), bSkill, b.edge);
-  const result: AttackResult | null = attack && ca && cb ? resolveAttack(ca, cb) : null;
+  const result = attack ? resolvePhysicalAttack(defenseMode, ca, cb) : null;
   const pc = enemyAttacks ? b : a;
   const pcKey = enemyAttacks ? bKey : aKey;
-  const pcCheck = enemyAttacks ? cb : ca;
+  const pcCheck = enemyAttacks ? defendingRolls ? cb : null : attackingRolls ? ca : null;
   const pcDouble = result && pcCheck && isSkillDouble(pcCheck.outcome) ? pcCheck.outcome : null;
   const growthSkill = pc.growthSkill ?? '';
   let verdict: { t: string; d: string } | null = null;
@@ -156,32 +173,38 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   }
   const matchup = creature && (enemyAttacks ? `${creature.name} → PC` : `PC → ${creature.name}`);
   const exchangeOutcome = result && `${ATTACK_LABELS[result.outcome]}${result.attackerFumble ? ' · 공격자 펌블' : ''}`;
+  const dice = !attackingRolls ? '판정 없음' : defendingRolls ? 'D100 × 2' : 'D100';
+  const summarizeRolls = (attacker: string, defender: string) => !attacker ? '자동 명중'
+    : defender ? `공격 ${attacker} / 방어 ${defender}` : `공격 ${attacker} · 능동 방어 불가`;
+  const adjustments = enemyAttacks ? defendingRolls && bAdjustments : attackingRolls && aAdjustments;
   const confirm = (continueAttack?: () => void) => {
     if (confirmed || !trackExchange || !result) {
       continueAttack?.();
       return;
     }
-    const attacker = a.rollv.trim();
-    const defender = b.rollv.trim();
+    const attacker = attackingRolls ? a.rollv.trim() : '';
+    const defender = defendingRolls ? b.rollv.trim() : '';
     commit(() => {
       setConfirmed({ id: crypto.randomUUID(), attacker, defender });
       continueAttack?.();
     }, {
       label: `공격 교환 · ${matchup}`,
-      dice: 'D100 × 2',
-      value: `공격 ${attacker} / 방어 ${defender} · ${exchangeOutcome}`,
+      dice,
+      value: attacker ? `${summarizeRolls(attacker, defender)} · ${exchangeOutcome}` : summarizeRolls(attacker, defender),
       source: 'manual',
       field: attackField['data-play-roll-field'],
+      breakdown: adjustments ? formatSkillBreakdown(adjustments) : undefined,
     });
   };
   const nextAttack = () => {
     const clearRoll = (side: Partial<SideState> | undefined): Partial<SideState> => ({
-      ...side, rollv: '', edge: 'none', growthRecorded: false,
+      ...side, rollv: '', edge: 'none', growthRecorded: false, modifiers: [],
     });
     setInputs((previous) => ({ ...previous, [aKey]: clearRoll(previous[aKey]), [bKey]: clearRoll(previous[bKey]) }));
     setConfirmed(null);
+    setDefenseMode('opposed');
     creature?.onNextAttack(enemyAttacks);
-    requestAnimationFrame(() => attackerRoll.current?.focus());
+    requestAnimationFrame(() => (attackerRoll.current ?? defenseModeSelect.current)?.focus());
   };
   return (
     <section className="roller checkcalc" aria-label={attackOnly ? '공격 판정 해석기' : '판정 해석기'}>
@@ -207,29 +230,43 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
             onClick={() => (creature?.onChangeAttacker ?? setEnemy)(true)}>적이 공격</button>
         </div>
       )}
-      {creature && importedSkill && (
+      {attack && <div className="checkcalc-defense-mode">
+        <label className="field"><span>방어 방식</span>
+          <select ref={defenseModeSelect} value={defenseMode} disabled={!!confirmed}
+            data-play-attack-field={attackField['data-play-roll-field']}
+            onChange={(event) => setDefenseMode(event.target.value as AttackDefenseMode)}>
+            <option value="opposed">공격·방어 대항</option>
+            <option value="unopposed">능동 방어 불가 · 공격만 굴림</option>
+            <option value="automatic">자동 명중 · 굴림 없음</option>
+          </select>
+        </label>
+        {defenseMode === 'unopposed' && <p className="checkcalc-note"><XRef id="stunned">기절</XRef>처럼 능동 방어가 불가능한 경우에 적용합니다.</p>}
+        {defenseMode === 'automatic' && <p className="checkcalc-note"><XRef id="unconscious-target">의식 없음·수면·마비</XRef>라면 공격과 방어 굴림 없이 명중합니다.</p>}
+      </div>}
+      {creature && importedSkill && attackingRolls && (enemyAttacks || defendingRolls) && (
         <p className="checkcalc-note">적 기본 입력값 {importedSkill}{enemyAttacks && ` (CS ${enemySkill} + 공격 기본 10)`}. 추가 보정은 직접 반영하세요.</p>
       )}
-      <Side label={attack ? '공격자' : 'A'} s={a} set={(patch) => setSide(aKey, patch)}
-        disabled={!!confirmed} rollRef={attackerRoll} field={attackField} />
-      {mode !== 'single' && <Side label={attack ? '방어자' : 'B'} s={b} set={(patch) => setSide(bKey, patch)}
-        disabled={!!confirmed} field={defenseField} />}
-      <div className="verdict" role="status">
+      {attackingRolls && <Side label={attack ? '공격자' : 'A'} s={a} set={(patch) => setSide(aKey, patch)}
+        disabled={!!confirmed} rollRef={attackerRoll} field={attackField} editableSkill={trackExchange && !enemyAttacks} />}
+      {mode !== 'single' && defendingRolls && <Side label={attack ? '방어자' : 'B'} s={b} set={(patch) => setSide(bKey, patch)}
+        disabled={!!confirmed} field={defenseField} editableSkill={trackExchange && enemyAttacks} />}
+      <div className="verdict" role="status" aria-label={attack ? '공격 판정 결과' : '판정 결과'}>
         {verdict ? (
           <>
             <b>{verdict.t}</b>
             {verdict.d}
           </>
         ) : (
-          <span className="muted">직접 굴린 D100을 입력하세요. 공격 기본 +10, Speed와 그 밖의 보정을 확인하세요.</span>
+          <span className="muted">{defenseMode === 'unopposed' ? '공격자만 D100을 굴리고 결과를 입력하세요.'
+            : '직접 굴린 D100을 입력하세요. 공격 기본 +10, Speed와 그 밖의 보정을 확인하세요.'}</span>
         )}
       </div>
       {trackExchange && (<div className="checkcalc-exchange">
-        {confirmed && verdict && <p className="checkcalc-note">확정 · 공격 D100 {confirmed.attacker} · 방어 D100 {confirmed.defender}</p>}
+        {confirmed && verdict && <p className="checkcalc-note">확정 · {dice} · {summarizeRolls(confirmed.attacker, confirmed.defender)}</p>}
         <div className="checkcalc-follow-ups">
           {confirmed ? <>
             <button type="button" className="btn primary" onClick={nextAttack}>다음 공격</button>
-            {exchangeOutcome && <CopyButton text={`${matchup} · 공격 D100 ${confirmed.attacker} / 방어 D100 ${confirmed.defender} · ${exchangeOutcome}`}
+            {exchangeOutcome && <CopyButton text={`${matchup} · ${dice} · ${summarizeRolls(confirmed.attacker, confirmed.defender)} · ${exchangeOutcome}`}
               label="공격 결과 복사" />}
           </> : <button type="button" className="btn primary" disabled={!result} data-play-next={result ? '' : undefined}
             onClick={() => confirm()}>공격 교환 확정</button>}

@@ -3,7 +3,8 @@ import { tableById, titleOf } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import { creatureSpoilsTables } from '../../lib/creature-combat';
 import { journalRow } from '../../lib/loot-journal';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftState } from '../../lib/play-draft';
+import { usePlayOngoingEffects } from '../../lib/play-effects';
 import { gearCount, type GearEffect, type GearItem, type PaperChange } from '../../lib/play-inventory';
 import { usePendingSkillGrowth } from '../../lib/skill-growth';
 import { XRef } from '../bits';
@@ -84,6 +85,8 @@ export function PlayWrapUp({
 }: Props) {
   const paneId = useId();
   const pendingGrowth = usePendingSkillGrowth();
+  const draft = usePlayDraft();
+  const ongoing = usePlayOngoingEffects();
   const [pane, setPane] = usePlayDraftState<Pane>('pane', 'loot');
   const [survivalPane, setSurvivalPane] = usePlayDraftState<SurvivalPane>('survival-pane', 'treatment');
   const [camp, setCamp] = useState<CampReport>(EMPTY_CAMP);
@@ -133,6 +136,10 @@ export function PlayWrapUp({
   const nextTension = !breather ? null : extraCheck
     ? breatherCheck && (!breatherCheck.darkness || darknessRow) ? breatherCheck.nextDie : null
     : lowered;
+  const restHistory = (label: string, fallback: string) => draft?.history.slice().reverse().find((entry) =>
+    entry.label === label && entry.stage === 'wrapup')?.id ?? fallback;
+  const breatherRestId = nextTension === null ? '' : restHistory('숨 고르기 회복', `숨 고르기 ${breatherRoll}`);
+  const campRestId = camp.canCompleteRest ? restHistory('야영 판정', camp.summary) : '';
   const combatLoot = lootText(battleSlots);
   const manualLoot = lootText(manualSlots);
   const battleLine = [
@@ -249,6 +256,8 @@ export function PlayWrapUp({
         <JournalRoll die="D10" label="숨 고르기 회복" value={breatherRoll} onValue={setBreather} resultText={breather} />
         <p className="play-wrap-note">광원 5 소모, 긴장 주사위 한 단계 하락.</p>
         <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest</XRef> 능력을 다시 쓸 수 있습니다.</p>
+        {breatherRestId && <button type="button" className="btn ghost play-wrap-clear" disabled={draft?.slots.confirmedBreather === breatherRestId}
+          onClick={() => ongoing.confirmRest('rest', breatherRestId)}>{draft?.slots.confirmedBreather === breatherRestId ? '숨 고르기 완료됨' : '숨 고르기 완료 확인'}</button>}
         {breather && (
           <>
             <label className="play-breather-option"><input type="checkbox" checked={keepTension} onChange={(event) => {
@@ -304,8 +313,10 @@ export function PlayWrapUp({
           </div>
         )}
         <CampCalculator onEncounter={onCampEncounter} encounterResolved={campEncounterResolved} domainDarkness={campDarkness}
-          attunementBlocked={campAttunementBlocked} onReport={setCamp} />
+          attunementBlocked={campAttunementBlocked} inventory={inventory} onReport={setCamp} />
         <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest와 Once per Camp Rest</XRef> 능력의 사용 가능 여부를 확인하세요.</p>
+        {campRestId && <button type="button" className="btn ghost play-wrap-clear" disabled={draft?.slots.confirmedCamp === campRestId}
+          onClick={() => ongoing.confirmRest('camp', campRestId)}>{draft?.slots.confirmedCamp === campRestId ? '야영 완료됨' : '야영 완료 확인'}</button>}
         <div className="play-wrap-links">
           <button className="btn ghost" type="button" onClick={() => openSurvival('growth')}>야영 기술 성장</button>
           <button className="btn ghost" type="button" onClick={() => openSurvival('rot')}>부패병 판정</button>

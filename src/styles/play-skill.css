@@ -1,0 +1,15 @@
+.play-skill-adjustments {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  font: 14px/1.45 var(--f-ui);
+}
+.play-skill-adjustments > summary { display: flex; align-items: center; min-height: 44px; }
+.play-skill-preset, .play-skill-terms { display: grid; gap: var(--s2); min-width: 0; }
+.play-skill-preset > .field { max-width: 24rem; }
+.play-skill-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1); }
+.play-skill-buttons :is(.btn, .linkbtn), .play-skill-terms :is(input, select, .btn) { min-height: 44px; }
+.play-skill-terms { padding: 0; list-style: none; margin-block: var(--s2); }
+.play-skill-terms > li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: var(--s1); }
+.play-skill-total, .play-roll-log .play-skill-total { color: var(--copper-ink); font: 14px/1.45 var(--f-ui); overflow-wrap: anywhere; }
+.play-roll-log .play-skill-total { display: block; }

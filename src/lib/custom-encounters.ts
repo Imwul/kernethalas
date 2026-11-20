@@ -1,4 +1,5 @@
 import { creatureById } from '../content/entries/creatures';
+import { campaignStorageKey } from './play-campaigns';
 
 export interface PlayCustomEncounterRow {
   min: number;
@@ -34,9 +35,9 @@ export function readPlayCustomEncounterRows(value: unknown): PlayCustomEncounter
   return rows.sort((first, second) => first.min - second.min);
 }
 
-export function readEncounterLibrary(): EncounterSet[] {
+export function readEncounterLibrary(campaignId?: string): EncounterSet[] {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(campaignStorageKey(STORAGE_KEY, campaignId));
     if (saved) {
       const sets = JSON.parse(saved);
       if (Array.isArray(sets)) {
@@ -49,14 +50,14 @@ export function readEncounterLibrary(): EncounterSet[] {
         if (clean.length) return clean;
       }
     }
-    const legacy = localStorage.getItem(LEGACY_KEY);
+    const legacy = localStorage.getItem(campaignStorageKey(LEGACY_KEY, campaignId));
     if (legacy) return [{ id: 'default', name: DEFAULT_NAME, rows: readPlayCustomEncounterRows(JSON.parse(legacy)) }];
   } catch { /* storage unavailable */ }
   return [{ id: 'default', name: DEFAULT_NAME, rows: [] }];
 }
 
-export function storeEncounterLibrary(sets: EncounterSet[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sets)); }
+export function storeEncounterLibrary(sets: EncounterSet[], campaignId?: string) {
+  try { localStorage.setItem(campaignStorageKey(STORAGE_KEY, campaignId), JSON.stringify(sets)); }
   catch { /* the library stays available in this tab */ }
 }
 

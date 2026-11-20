@@ -1,0 +1,88 @@
+.reading-settings-trigger { min-inline-size: 44px; min-block-size: 44px; flex: none; }
+.reading-settings-trigger span { font: 700 14px/1 var(--f-ui); white-space: nowrap; }
+.reading-settings {
+  inline-size: min(420px, calc(100% - 24px));
+  max-block-size: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-block-start: 3px solid var(--copper);
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+.reading-settings::backdrop { background: rgb(0 0 0 / .52); }
+.reading-settings-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s3);
+  padding: var(--s4);
+}
+.reading-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.reading-settings h2 { margin: 0; font: 400 24px/1.35 var(--f-ko-display); }
+.reading-settings .iconbtn, .reading-settings .field select { min-block-size: 44px; }
+.reading-settings .field select { inline-size: 100%; }
+.reading-settings-check { display: flex; align-items: center; gap: var(--s2); min-block-size: 44px; font-family: var(--f-ui); }
+.reading-settings-check input { inline-size: 18px; block-size: 18px; margin: 0; }
+.reading-settings [role='status'] { margin: 0; color: var(--ink-2); font: 14px/1.45 var(--f-ui); }
+
+:root[data-reading-contrast='high'] {
+  --ink-2: var(--ink);
+  --faded: var(--ink);
+  --rule: color-mix(in srgb, var(--ink) 76%, var(--paper));
+  --rule-soft: color-mix(in srgb, var(--ink) 50%, var(--paper));
+  --noise: none;
+}
+:root[data-reading-contrast='high'] :focus-visible { outline-width: 3px; }
+:root[data-reading-contrast='high'] .ttable tr.hit td:first-child { box-shadow: inset 5px 0 0 var(--oxblood); }
+:root[data-reading-contrast='high'] :is([aria-current='step'], .seg button[aria-pressed='true']) { text-decoration: underline; text-underline-offset: .2em; }
+
+:root[data-reading-text='large'] { font-size: 112.5%; }
+:root[data-reading-text='large'] body { font-size: 19px; }
+:root[data-reading-text='large'] :is(.reference-summary, .ttable, .play-facts dd, .play-journal-output p) { font-size: 20px; }
+:root[data-reading-text='large'] :is(.ttable td .lbl, .ttable td .src, .ttable td .fx, .play-explore-note) { font-size: 17px; }
+:root[data-reading-text='large'] :is(.ttable th, .ttable td.rng, .ttable .nexts) { font-size: 15px; }
+:root[data-reading-text='large'] :is(.field > span, .field > label, .ruling-note-text) { font-size: 16px; }
+:root[data-reading-text='large'] :is(.field input, .field select, .field textarea) { font-size: 17px; }
+
+:root[data-reading-density='compact'] :is(.ttable td, .reference-quick, .play-facts > div) { padding-block: 6px; }
+:root[data-reading-density='compact'] :is(.reference-summary, .ttable, .play-facts dd) { line-height: 1.45; }
+:root[data-reading-density='spacious'] :is(.ttable td, .reference-quick, .play-facts > div) { padding-block: 13px; }
+:root[data-reading-density='spacious'] :is(.reference-summary, .ttable, .play-facts dd) { line-height: 1.8; }
+
+/* Reference drawers can be narrower than the window on desktop as well. */
+@container (max-width: 520px) {
+  .oracle-table-sheet .ttable:has(td[data-col]) { display: block; }
+  .oracle-table-sheet .ttable:has(td[data-col]) caption { display: block; }
+  .oracle-table-sheet .ttable:has(td[data-col]) thead {
+    display: table-header-group;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .oracle-table-sheet .ttable:has(td[data-col]) tbody { display: grid; }
+  .oracle-table-sheet .ttable:has(td[data-col]) tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-block: var(--s1);
+    border-block-end: 1px solid var(--rule);
+  }
+  .oracle-table-sheet .ttable:has(td[data-col]) tbody td {
+    padding-inline: var(--s2);
+    min-inline-size: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .oracle-table-sheet .ttable:has(td[data-col]) td:not([data-col]),
+  .oracle-table-sheet .ttable:not(.cols-many) td[data-col] { grid-column: 1 / -1; }
+  .oracle-table-sheet .ttable:has(td[data-col]) td.rng { grid-row: auto; width: auto; white-space: nowrap; font-weight: 700; }
+  .oracle-table-sheet .ttable.lookup:has(td[data-col]) td.rng { white-space: normal; }
+  .oracle-table-sheet .ttable:has(td[data-col]) td[data-col]::before {
+    content: attr(data-col);
+    display: block;
+    color: var(--ink-2);
+    font: 13px/1.4 var(--f-ui);
+  }
+}

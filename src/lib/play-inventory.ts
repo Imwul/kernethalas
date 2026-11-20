@@ -1,5 +1,6 @@
 import { tableById } from '../content';
 import { CARRY_TYPES, type CarryType } from './play-equipment';
+import { campaignStorageKey } from './play-campaigns';
 
 export const GEAR_LOCATIONS = { equipped: '착용', belt: '벨트', pack: '가방' } as const;
 export const GEAR_WEIGHTS = { normal: 'Normal', heavy: 'Heavy', light: 'Light', coins: '동전', gems: '보석', free: '칸 제외' } as const;
@@ -85,9 +86,9 @@ function isGearEntry(value: unknown): value is GearEntry {
     && isGearItem(entry.next) && (entry.old === null || isGearItem(entry.old) && entry.old.id === entry.next.id);
 }
 
-export function readGearLedger(): GearLedger | null {
+export function readGearLedger(campaignId?: string): GearLedger | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(campaignStorageKey(STORAGE_KEY, campaignId));
     if (!raw) return EMPTY;
     const data = JSON.parse(raw) as Partial<GearLedger> | null;
     if (!Array.isArray(data?.items) || !Array.isArray(data?.entries)) return null;
@@ -106,13 +107,13 @@ export function isGearLedger(value: unknown): value is GearLedger {
     && new Set(ledger.entries.map(({ id }) => id)).size === ledger.entries.length;
 }
 
-export function storeGearLedger(ledger: GearLedger) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ledger)); return true; }
+export function storeGearLedger(ledger: GearLedger, campaignId?: string) {
+  try { localStorage.setItem(campaignStorageKey(STORAGE_KEY, campaignId), JSON.stringify(ledger)); return true; }
   catch { return false; }
 }
 
-export function isGearStorageEvent(event: StorageEvent) {
-  return event.key === STORAGE_KEY || event.key === null;
+export function isGearStorageEvent(event: StorageEvent, campaignId?: string) {
+  return event.key === campaignStorageKey(STORAGE_KEY, campaignId) || event.key === null;
 }
 
 function replaceItem(items: GearItem[], item: GearItem | null, id: string) {

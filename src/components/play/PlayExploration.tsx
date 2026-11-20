@@ -5,7 +5,7 @@ import type { OracleTable } from '../../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, roomShapeForRoll, type EncounterPlace } from '../../content/tables/exploration';
 import { DEFAULT_DOMAIN_PROGRESS, domainPlaceLabel, introEncounterCreature, markDomainPlace, removeDomainMark, stepDomainDie, type DomainProgress } from '../../lib/domain-progress';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
-import { capturePaperMapTile, paperMapKey, type PaperMapLocation } from '../../lib/paper-map';
+import { capturePaperMapTile, paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
 import { gearCount } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
@@ -127,6 +127,8 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
   const place = choice === 'shape' ? (intro ? null : rolledShape?.place ?? null) : choice;
   const placeLabel = place ? PLACE_LABELS[place] : null;
   const mapRecord = paperMap.find((record) => record.domainId === paperMapDomain && paperMapKey(record.paperId) === paperLocation);
+  const mapExits = !revisit && choice === 'shape' ? rolledShape?.exits
+    : mapRecord?.tile ? roomShapeForRoll(mapRecord.tile.roll)?.exits : undefined;
   const mapNote = mapRecord ? [...mapRecord.tags, mapRecord.note].filter(Boolean).join(' · ') : '';
   const descriptionRoll = place && !revisit ? descriptions[place] : null;
   const description = place && descriptionRoll !== null ? PLACE_DESCRIPTIONS[place].rows.find(({ min, max }) =>
@@ -238,10 +240,24 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
         ? capturePaperMapTile(shapeRoll, tile ?? (storedTile?.roll === shapeRoll ? storedTile : EMPTY_ROOM_SHAPE), record.area)
         : undefined;
       const savedTile = currentTile ?? storedTile;
-      const location = savedTile ? { ...record, tile: savedTile } : record;
+      const location = {
+        ...record,
+        ...(savedTile ? { tile: savedTile } : {}),
+        ...(stored?.area === record.area && stored.doors ? { doors: stored.doors } : {}),
+      };
       return index < 0 ? [...previous, location] : previous.map((item, i) => i === index ? location : item);
     });
     setPaperLocation(key);
+  };
+
+  const saveMapDoor = (report: PaperMapDoorReport) => {
+    if (!mapRecord) return;
+    onPaperMapChange?.((previous) => previous.map((record) => {
+      if (record.domainId !== mapRecord.domainId || paperMapKey(record.paperId) !== paperLocation) return record;
+      const doors = record.doors ?? [];
+      const index = doors.findIndex(({ exit }) => paperMapKey(exit) === paperMapKey(report.exit));
+      return { ...record, doors: index < 0 ? [...doors, report] : doors.map((door, i) => i === index ? report : door) };
+    }));
   };
 
   return (
@@ -276,7 +292,8 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
           }} roomShape={tile ?? (tileOpen ? EMPTY_ROOM_SHAPE : undefined)}
             afterResult={rolledShape && shapeRoll !== null && <PlayTileControls key={shapeRoll} exits={rolledShape.exits}
               state={tile ?? EMPTY_ROOM_SHAPE} open={tileOpen} onOpen={setTileOpen}
-              onChange={(state) => setTileDraft({ ...state, roll: shapeRoll })} />} />
+              onChange={(state) => setTileDraft({ ...state, roll: shapeRoll })}
+              onInvestigateExit={mapRecord && entryNextTension ? (exit) => actionsRef.current?.open('door', `${exit + 1}번 출입구`) : undefined} />} />
           {shapeRow?.ko.includes('막다른 곳') && (
             <p className="play-explore-note">더 갈 출입구가 없다면 출입구가 둘 이상 나올 때까지 다시 굴립니다. <XRef id="room-shape">모양 규칙</XRef></p>
           )}
@@ -392,7 +409,8 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
           {entryResolved && <ExplorationActionLinks room={place === 'room'} label="탐험 후속 행동" onSelect={(action) => actionsRef.current?.open(action)} />}
           {entryNextTension && <PlayExplorationActions actionsRef={actionsRef} room={place === 'room'} initialSides={entryNextTension}
             darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
-            onReport={setActionReport} onCombat={startEncounter} scavengeLimit={scavengeLimit} finishedSources={finishedSources} />}
+            onReport={setActionReport} onCombat={startEncounter} scavengeLimit={scavengeLimit} finishedSources={finishedSources}
+            mapLocation={mapRecord} mapExits={mapExits} onMapDoorSave={onPaperMapChange ? saveMapDoor : undefined} />}
           {entryResolved && <div className="play-explore-next">
             <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} data-play-next="" onClick={onWrapUp}>정리로</button>
           </div>}

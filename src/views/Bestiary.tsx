@@ -1,6 +1,7 @@
 import { useContext, useId, useMemo, useRef, useState } from 'react';
 import { entryById, hrefOf, tableById } from '../content';
 import { armorKo, creatures, PART_KO, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
+import { bestiaryEncounterHref } from '../lib/bestiary-encounter';
 import { tableSides } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
 import { Link, navigate, useLocation } from '../lib/router';
@@ -290,14 +291,20 @@ export function Bestiary() {
                     {c.traits.length ? c.traits.join(', ') : '—'}
                   </td>
                   <td data-label="등장" className="rolls">
-                    {rolls.join(' · ')}
-                    {via.map((v, i) => (
-                      <span key={v.href}>
-                        {rolls.length || i ? ' · ' : ''}
-                        <Link to={v.href}>{v.label}</Link>
+                    <div className="bestiary-creature-actions">
+                      <span>
+                        {rolls.join(' · ')}
+                        {via.map((v, i) => (
+                          <span key={v.href}>
+                            {rolls.length || i ? ' · ' : ''}
+                            <Link to={v.href}>{v.label}</Link>
+                          </span>
+                        ))}
+                        {!rolls.length && !via.length && '—'}
                       </span>
-                    ))}
-                    {!rolls.length && !via.length && '—'}
+                      <Link className="bestiary-encounter-link" to={bestiaryEncounterHref(c.id)}
+                        aria-label={`${c.name} 조우에 추가`}>조우에 추가</Link>
+                    </div>
                   </td>
                 </tr>
               );

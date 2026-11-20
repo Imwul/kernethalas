@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { campaignStorageKey, PLAY_ROOM_STORAGE_KEY, usePlayCampaignId } from './play-campaigns';
 import {
   appendPlayRoll, getSlot, planRollCorrection, playRollRequirements, playRollStage, readPlayRollHistory, safePlaySlot, sameSlot,
   type PlayRollDetails, type PlayRollEntry, type PlaySlots, type SlotValue,
@@ -6,12 +7,10 @@ import {
 
 type Change = { slot: string; before: SlotValue };
 type Room = { slots: PlaySlots; undo: Change[]; undoRollId?: string; history: PlayRollEntry[] };
-const STORAGE_KEY = 'kn-play-room-v1';
 const EMPTY_ROOM: Room = { slots: {}, undo: [], history: [] };
 
-function readRoom(): Room {
+function readRoom(raw: string | null): Room | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw) {
       const room = JSON.parse(raw) as Partial<Room> | null;
       if (room?.slots && typeof room.slots === 'object' && !Array.isArray(room.slots)) {
@@ -22,7 +21,12 @@ function readRoom(): Room {
       }
     }
   } catch { /* storage unavailable */ }
-  return EMPTY_ROOM;
+  return null;
+}
+
+function browserValue(storage: 'localStorage' | 'sessionStorage', key: string) {
+  try { return window[storage].getItem(key); }
+  catch { return null; }
 }
 
 interface DraftContext {
@@ -43,19 +47,79 @@ const Scope = createContext('');
 const directly = (action: () => void) => action();
 
 export function PlayDraftProvider({ children }: { children: ReactNode }) {
-  const [room, setRoom] = useState(readRoom);
+  const storageKey = campaignStorageKey(PLAY_ROOM_STORAGE_KEY, usePlayCampaignId());
+  const pendingKey = `${storageKey}:tab-copy`;
+  const [initial] = useState(() => {
+    const saved = browserValue('localStorage', storageKey);
+    const tab = browserValue('sessionStorage', storageKey);
+    const tabStatus = browserValue('sessionStorage', pendingKey);
+    const status: 'conflict' | 'temporary' | null = tabStatus === 'conflict' || tabStatus === 'temporary' ? tabStatus : null;
+    return {
+      saved,
+      status,
+      room: (status && readRoom(tab)) || readRoom(saved) || readRoom(tab) || EMPTY_ROOM,
+    };
+  });
+  const [room, setRoom] = useState(initial.room);
+  const [persistence, setPersistence] = useState<'conflict' | 'temporary' | null>(initial.status);
+  const [reopen, setReopen] = useState(false);
+  const persisted = useRef(initial.saved);
+  const conflict = useRef(initial.status === 'conflict');
   const current = useRef(room);
   const rolling = useRef(false);
   const clearedScopes = useRef<string[]>([]);
   const generation = useRef(0);
 
+  const save = useCallback((next: Room) => {
+    const raw = JSON.stringify(next);
+    let status: 'conflict' | 'temporary' | null = null;
+    try {
+      const latest = localStorage.getItem(storageKey);
+      if (conflict.current || latest !== persisted.current && latest !== raw) {
+        conflict.current = true;
+        status = 'conflict';
+      } else {
+        if (latest !== raw) localStorage.setItem(storageKey, raw);
+        persisted.current = raw;
+      }
+    } catch { status = 'temporary'; }
+    try {
+      sessionStorage.setItem(storageKey, raw);
+      if (status) sessionStorage.setItem(pendingKey, status);
+      else sessionStorage.removeItem(pendingKey);
+    } catch { /* the draft remains available in memory */ }
+    setPersistence(status);
+  }, [storageKey, pendingKey]);
+
+  useEffect(() => {
+    const checkLatest = () => {
+      try {
+        if (localStorage.getItem(storageKey) === persisted.current) return;
+        conflict.current = true;
+        setPersistence('conflict');
+      } catch { /* the next save handles storage failures */ }
+    };
+    const receive = (event: StorageEvent) => {
+      if (event.storageArea === localStorage && (event.key === storageKey || event.key === null)) checkLatest();
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') checkLatest(); };
+    window.addEventListener('storage', receive);
+    window.addEventListener('focus', checkLatest);
+    document.addEventListener('visibilitychange', onVisibility);
+    checkLatest();
+    return () => {
+      window.removeEventListener('storage', receive);
+      window.removeEventListener('focus', checkLatest);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [storageKey]);
+
   const publish = useCallback((next: Room) => {
     current.current = next;
     if (rolling.current) return;
     setRoom(next);
-    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
-    catch { /* the draft remains available in memory */ }
-  }, []);
+    save(next);
+  }, [save]);
 
   const write = useCallback(<T,>(origin: number, slot: string, update: SetStateAction<T>, initial: T) => {
     if (origin !== generation.current) return;
@@ -131,7 +195,25 @@ export function PlayDraftProvider({ children }: { children: ReactNode }) {
   }, [publish]);
 
   return <Draft.Provider value={{ slots: room.slots, history: room.history, canUndo: !!room.undo.length || !!room.undoRollId,
-    generation: generation.current, write, dropScope, replaceRoom, commitRoll, undoRoll, rewindRoll }}>{children}</Draft.Provider>;
+    generation: generation.current, write, dropScope, replaceRoom, commitRoll, undoRoll, rewindRoll }}>
+    {persistence && <div className="campaign-storage-status">
+      <p role="status">{persistence === 'conflict'
+        ? '다른 탭에서 이 캠페인을 변경했습니다. 이 탭의 진행은 저장 파일로 내보낼 수 있습니다.'
+        : '브라우저에 저장할 수 없어 진행을 이 탭에 보관 중입니다.'}</p>
+      {persistence === 'conflict' && (reopen ? <div className="campaign-selector-actions">
+        <p>이 탭의 사본을 닫고 브라우저에 저장된 진행을 엽니다.</p>
+        <button type="button" className="btn primary" onClick={() => {
+          if (!readRoom(browserValue('localStorage', storageKey))) { setReopen(false); return; }
+          try {
+            sessionStorage.removeItem(pendingKey);
+            window.location.reload();
+          } catch { setReopen(false); }
+        }}>저장된 진행 열기</button>
+        <button type="button" className="btn ghost" onClick={() => setReopen(false)}>취소</button>
+      </div> : <button type="button" className="btn ghost" onClick={() => setReopen(true)}>최근 저장 확인</button>)}
+    </div>}
+    {children}
+  </Draft.Provider>;
 }
 
 export function PlayDraftScope({ name, children }: { name: string; children: ReactNode }) {

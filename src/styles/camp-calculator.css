@@ -91,6 +91,23 @@
 .camp-ledger dt { color: var(--ink-2); }
 .camp-ledger dd { margin: 0; overflow-wrap: anywhere; }
 .camp-verdict p + p { margin-top: var(--s1); }
+.camp-stock {
+  display: grid;
+  gap: var(--s2);
+  min-width: 0;
+  padding-block: var(--s2);
+  border-block: 1px solid var(--rule-soft);
+}
+.camp-stock dl { display: grid; gap: var(--s1); margin: 0; font: 14px/1.45 var(--f-ui); }
+.camp-stock dl > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 2px var(--s2);
+}
+.camp-stock dt, .camp-stock dd { min-width: 0; overflow-wrap: anywhere; }
+.camp-stock dt { font-weight: 650; }
+.camp-stock dd { display: flex; flex-wrap: wrap; gap: 2px var(--s2); margin: 0; color: var(--ink-2); }
+.camp-stock dd strong { color: var(--oxblood-ink); }
 .camp-benefits { display: grid; gap: var(--s2); }
 .camp-roll-form { display: grid; gap: var(--s2); min-width: 0; }
 .camp-roll-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }

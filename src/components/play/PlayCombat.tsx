@@ -13,6 +13,7 @@ import { EncounterStart } from '../EncounterStart';
 import { XRef } from '../bits';
 import { IDie } from '../icons';
 import { PlayCreatureSearch } from './PlayCreatureSearch';
+import { PlayBestiaryAdd } from './PlayBestiaryAdd';
 import { EncounterLibraryControls, PlayCustomEncounterEditor } from './PlayCustomEncounter';
 import { PlayDamageComparison } from './PlayDamageComparison';
 import { PlayFlee } from './PlayFlee';
@@ -140,6 +141,8 @@ interface PlayCombatProps {
   fled?: boolean;
   finished?: boolean;
   seed?: EncounterSeed;
+  bestiaryCreatureId?: string | null;
+  onCloseBestiaryRequest: () => void;
   customSets: EncounterSet[];
   customSetId?: string;
   onCustomSetSelect: (id: string) => void;
@@ -158,7 +161,8 @@ function restoredLineup(seed: EncounterSeed | undefined) {
 }
 
 export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatureChange, onTargetsChange, onBattleEnd, onFlee, fled, finished,
-  seed, customSets, customSetId, onCustomSetSelect, onCustomSetsChange, onMasterySheetChange, onMasteryJournalChange }: PlayCombatProps) {
+  seed, bestiaryCreatureId, onCloseBestiaryRequest, customSets, customSetId, onCustomSetSelect, onCustomSetsChange, onMasterySheetChange,
+  onMasteryJournalChange }: PlayCombatProps) {
   const methodId = useId();
   const addTargetId = useId();
   const [method, setMethod] = usePlayDraftState<EncounterMethod>('method', initialKind === 'overseer' ? 't-overseer' : 'encounter');
@@ -172,6 +176,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
   const tableId = method === 'encounter' ? choice?.table : isEncounterTable(method) ? method : undefined;
   const table = tableId ? tableById.get(tableId) : undefined;
   const customSet = customSets.find(({ id }) => id === customSetId) ?? customSets[0];
+  const requestedCreature = bestiaryCreatureId ? creatureById.get(bestiaryCreatureId) : undefined;
 
   const targets = useMemo(() => lineup.targets.flatMap((target) => {
     const creature = creatureById.get(target.creatureId);
@@ -205,10 +210,10 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
     }
   }, [selected]);
 
-  const selectCreature = (creature: CreatureRecord, source: string) => {
+  const selectCreature = (creature: CreatureRecord, source: string, count = 1) => {
     pendingFocus.current = 'target';
-    const target = newTarget(creature.id, source);
-    setLineup((previous) => appendTarget(previous, target));
+    const additions = Array.from({ length: count }, () => newTarget(creature.id, source));
+    setLineup((previous) => additions.reduce(appendTarget, previous));
     setAddingTarget(false);
     setCustomGap(null);
   };
@@ -242,6 +247,14 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
 
   return (
     <section className="play-combat" aria-label="조우와 전투 도구">
+      {requestedCreature && <PlayBestiaryAdd key={requestedCreature.id} creature={requestedCreature} finished={finished || fled}
+        onCancel={() => {
+          onCloseBestiaryRequest();
+          requestAnimationFrame(() => (combatHeading.current ?? methodInput.current)?.focus());
+        }} onAdd={(count) => {
+          selectCreature(requestedCreature, '도감에서 추가', count);
+          onCloseBestiaryRequest();
+        }} />}
       {selected && primary && profile ? (
         <>
           <div className="play-combat-lineup">

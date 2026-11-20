@@ -3,12 +3,13 @@ import { ROOM_EXIT_MARKS, type RoomExitMark, type RoomShapeState } from '../Room
 
 export const EMPTY_ROOM_SHAPE: RoomShapeState = { turns: 0, entrance: null, marks: {} };
 
-export function PlayTileControls({ exits, state, open, onOpen, onChange }: {
+export function PlayTileControls({ exits, state, open, onOpen, onChange, onInvestigateExit }: {
   exits: number;
   state: RoomShapeState;
   open: boolean;
   onOpen: (value: boolean) => void;
   onChange: (state: RoomShapeState) => void;
+  onInvestigateExit?: (exit: number) => void;
 }) {
   const [selected, setSelected] = useState(0);
   const activeExit = Math.min(selected, exits - 1);
@@ -65,6 +66,8 @@ export function PlayTileControls({ exits, state, open, onOpen, onChange }: {
               ? [`${index + 1}번 ${ROOM_EXIT_MARKS[state.marks[index]]}`] : []),
           ].filter(Boolean).join(' · ')}
         </p>
+        {onInvestigateExit && <button type="button" className="btn ghost play-explore-action-btn"
+          onClick={() => onInvestigateExit(activeExit)}>{activeExit + 1}번 출입구 조사</button>}
       </section>
     </details>
   );

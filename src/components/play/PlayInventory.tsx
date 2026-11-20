@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { readEquipmentCount } from '../../lib/play-equipment';
+import { campaignStorageKey, usePlayCampaignId } from '../../lib/play-campaigns';
 import {
   ARMOR_DICE, GEAR_LOCATIONS, GEAR_WEIGHTS, applyGearEffect, availableQuickUses, gearKey, gearWeight, isGearStorageEvent, isQuickGear, matchingGear,
   readGearLedger, sameGearItem, saveGearItem, showIntegrity, storeGearLedger, undoGearEntry,
@@ -11,15 +12,16 @@ import '../../styles/play-inventory.css';
 type LedgerOperation = (ledger: GearLedger) => ReturnType<typeof saveGearItem>;
 
 export function useGearLedger() {
-  const [ledger, setLedger] = useState<GearLedger>(() => readGearLedger() ?? { items: [], entries: [] });
+  const campaignId = usePlayCampaignId();
+  const [ledger, setLedger] = useState<GearLedger>(() => readGearLedger(campaignId) ?? { items: [], entries: [] });
   const current = useRef(ledger);
   const [error, setError] = useState('');
   const [temporary, setTemporary] = useState(false);
   const storageUnavailable = useRef(false);
   useEffect(() => {
     const receive = (event: StorageEvent) => {
-      if (!isGearStorageEvent(event) || storageUnavailable.current) return;
-      const stored = readGearLedger();
+      if (!isGearStorageEvent(event, campaignId) || storageUnavailable.current) return;
+      const stored = readGearLedger(campaignId);
       if (stored) {
         current.current = stored;
         setLedger(stored);
@@ -27,10 +29,10 @@ export function useGearLedger() {
     };
     window.addEventListener('storage', receive);
     return () => window.removeEventListener('storage', receive);
-  }, []);
+  }, [campaignId]);
   const change = async (operation: LedgerOperation) => {
     const commit = () => {
-      const latest = storageUnavailable.current ? current.current : readGearLedger() ?? current.current;
+      const latest = storageUnavailable.current ? current.current : readGearLedger(campaignId) ?? current.current;
       const result = operation(latest);
       if ('error' in result) {
         current.current = latest;
@@ -38,7 +40,7 @@ export function useGearLedger() {
         setError(result.error);
         return false;
       }
-      storageUnavailable.current = !storeGearLedger(result.ledger);
+      storageUnavailable.current = !storeGearLedger(result.ledger, campaignId);
       current.current = result.ledger;
       setLedger(result.ledger);
       setTemporary(storageUnavailable.current);
@@ -46,7 +48,7 @@ export function useGearLedger() {
       return true;
     };
     if (navigator.locks) {
-      try { return await navigator.locks.request('kn-play-gear', commit); }
+      try { return await navigator.locks.request(campaignStorageKey('kn-play-gear', campaignId), commit); }
       catch { setError('장부에 변경을 저장할 수 없습니다. 다시 시도하세요.'); return false; }
     }
     return commit();

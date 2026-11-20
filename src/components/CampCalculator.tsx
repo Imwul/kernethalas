@@ -3,7 +3,7 @@ import { CAMP_ACTIVITIES, CAMP_BARRICADE, campTotals, resolveCampCheck, type Cam
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
-import { gearCount, type PaperChange } from '../lib/play-inventory';
+import { GEAR_LOCATIONS, gearCount, gearKey, type GearItem, type PaperChange } from '../lib/play-inventory';
 import { XRef } from './bits';
 import { JournalRoll } from './LootJournal';
 import { PlayDieHint } from './play/PlayDieHints';
@@ -72,6 +72,7 @@ type CampBenefit = 'full' | 'half';
 export interface CampReport {
   summary: string;
   sheet: PaperChange[];
+  canCompleteRest?: boolean;
 }
 
 const EMPTY_REPORT: CampReport = { summary: '', sheet: [] };
@@ -81,6 +82,7 @@ interface CampProps {
   encounterResolved?: boolean | string | readonly string[];
   domainDarkness?: boolean;
   attunementBlocked?: boolean;
+  inventory?: GearItem[];
   onReport?: (report: CampReport) => void;
 }
 
@@ -95,7 +97,7 @@ function recoveryAmounts(benefit: CampBenefit, lostToughness: string, sanityDie:
   return { lost, sanity, toughness, sanityRecovery, exhaustion: benefit === 'half' ? '−5' : '−10' };
 }
 
-export function CampCalculator({ onEncounter, encounterResolved, domainDarkness, attunementBlocked, onReport }: CampProps = {}) {
+export function CampCalculator({ onEncounter, encounterResolved, domainDarkness, attunementBlocked, inventory, onReport }: CampProps = {}) {
   const id = useId();
   const [draft, setDraft] = usePlayDraftState('camp-plan', INITIAL_CAMP);
   const [manual, setManual] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
         { id: 'camp:exhaustion', text: `Exhaustion ${amounts.exhaustion} (야영 회복)` });
     }
     const outcome = result.passed ? '성공' : needsEncounter ? '실패 · 조우 대기' : '실패 · 조우 종료';
-    return { summary: `야영 D20 ${roll} ${signed(plan.check)} = ${result.total} (${outcome})`, sheet };
+    return { summary: `야영 D20 ${roll} ${signed(plan.check)} = ${result.total} (${outcome})`, sheet, canCompleteRest: !needsEncounter };
   }, [plan, result, roll, needsEncounter, lostToughness, sanityDie]);
   useEffect(() => { onReport?.(report); }, [onReport, report]);
   const spend = plan ? materials(plan.spent) : '';
@@ -199,6 +201,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
           </label>
         </fieldset>
       </details>
+      {inventory && plan && roll === null && Object.keys(plan.spent).length > 0 && <CampStock spent={plan.spent} inventory={inventory} />}
       <div className="camp-grid">
         <CampNumberField label="기타 판정 보정" value={other} onChange={(value) => setField('other', value)} canBeNegative
           invalid={extraCheck === null} error="정수 보정을 입력하세요." />
@@ -270,6 +273,34 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
         <XRef id="camp-activities">야영 활동</XRef>
         {result && <XRef id="exhaustion">Exhaustion 규칙</XRef>}
       </div>
+    </section>
+  );
+}
+
+function CampStock({ spent, inventory }: { spent: ReturnType<typeof campTotals>['spent']; inventory: GearItem[] }) {
+  return (
+    <section className="camp-stock" aria-label="야영 전 보급 대조">
+      <h3>야영 전 보급 대조</h3>
+      <dl>
+        {Object.entries(spent).map(([name, required]) => {
+          const matches = inventory.filter((item) => gearKey(item.name) === gearKey(name) && item.integrity !== 'broken');
+          const total = matches.reduce((sum, item) => sum + item.count, 0);
+          const locations = Object.entries(GEAR_LOCATIONS).flatMap(([id, label]) => {
+            const stored = matches.filter(({ location }) => location === id);
+            return stored.length ? [`${label} ${stored.reduce((sum, { count }) => sum + count, 0)}개`] : [];
+          });
+          return (
+            <div key={name}>
+              <dt>{name}</dt>
+              <dd>
+                <span>필요 {required}개</span>
+                <span>{locations.length ? locations.join(' · ') : '장부 미기록'}</span>
+                {locations.length > 0 && total < required && <strong>장부 기준 {required - total}개 부족</strong>}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
     </section>
   );
 }

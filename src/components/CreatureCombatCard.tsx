@@ -31,6 +31,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   showEncounterStart?: boolean;
 }) {
   const checkPane = useId();
+  const actionPane = `${checkPane}-action`;
   const [levelText, setLevelText] = usePlayDraftState('creature-level', '');
   const [mode, setMode] = usePlayDraftState<'action' | 'hit' | 'check' | 'damage'>('creature-mode', 'action');
   const [enemyAttacking, setEnemyAttacking] = usePlayDraftState('creature-attacking', false);
@@ -87,7 +88,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
       </details>}
       <div className="creature-roll-tools">
         <div className="seg" role="group" aria-label="전투 도구">
-          <button type="button" aria-pressed={mode === 'action'} onClick={() => setMode('action')}>행동 {action.dice}</button>
+          <button type="button" aria-controls={actionPane} aria-pressed={mode === 'action'} onClick={() => setMode('action')}>행동 {action.dice}</button>
           <button type="button" ref={hitTab} aria-pressed={mode === 'hit'} onClick={() => setMode('hit')}>명중 부위{hitDie ? ` ${hitDie}` : ''}</button>
           <button type="button" ref={checkTab} aria-controls={checkPane} aria-pressed={mode === 'check'} onClick={() => setMode('check')}>공격 판정</button>
           <button type="button" ref={damageTab} aria-pressed={mode === 'damage'} onClick={() => setMode('damage')}>피해 계산</button>
@@ -101,7 +102,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
             </div>
           </div>
         )}
-        <div hidden={mode !== 'action'}>
+        <div id={actionPane} hidden={mode !== 'action'}>
           <OracleBody t={action} value={actionValue} onValue={(value) => {
             clearScope(actionScope);
             setActionRevision((revision) => revision + 1);

@@ -7,6 +7,12 @@ export const PAPER_MAP_TAGS = ['잠긴 문', '미개봉 용기', '미탐색 출�
 export type PaperMapTag = typeof PAPER_MAP_TAGS[number];
 export type PaperMapTile = RoomShapeState & { roll: number };
 
+export interface PaperMapDoorReport {
+  exit: string;
+  text: string;
+  opened: boolean;
+}
+
 export interface PaperMapLocation {
   domainId: number;
   paperId: string;
@@ -14,6 +20,7 @@ export interface PaperMapLocation {
   note: string;
   tags: PaperMapTag[];
   tile?: PaperMapTile;
+  doors?: PaperMapDoorReport[];
 }
 
 export function paperMapKey(paperId: string) {
@@ -22,6 +29,14 @@ export function paperMapKey(paperId: string) {
 
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function isPaperMapDoorReports(value: unknown): value is PaperMapDoorReport[] {
+  return Array.isArray(value) && value.every((door: unknown) => record(door)
+    && typeof door.exit === 'string' && !!door.exit.trim() && door.exit.length <= 48
+    && typeof door.text === 'string' && !!door.text.trim() && door.text.length <= 600
+    && typeof door.opened === 'boolean')
+    && new Set(value.map(({ exit }) => paperMapKey(exit))).size === value.length;
 }
 
 function isExit(value: unknown, exits: number) {

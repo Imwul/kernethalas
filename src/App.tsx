@@ -2,10 +2,13 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { pageMeta } from './lib/meta';
 import { Link, match, useLocation } from './lib/router';
 import { nav, useNav } from './lib/store';
+import { BESTIARY_CREATURE_PARAM } from './lib/bestiary-encounter';
+import { PLAY_CAMPAIGN_PARAM } from './lib/play-campaigns';
 import { Palette } from './components/Palette';
 import { ReferenceContext, type PreviewReference } from './components/ReferenceContext';
 import { ReferencePanel, type ReferenceFrame } from './components/ReferencePanel';
-import { Crest, IBeast, IBench, IDie, IDrawer, IMoon, IPlan, IQuestion, IRecord, ISearch, ISun, ISystem } from './components/icons';
+import { ReadingSettings } from './components/ReadingSettings';
+import { Crest, IBeast, IBench, IDie, IDrawer, IPlan, IQuestion, IRecord, ISearch } from './components/icons';
 import { Home } from './views/Home';
 import { ReferenceIndex, ReferencePage } from './views/Reference';
 import { OracleIndex, OraclePage } from './views/Oracle';
@@ -15,6 +18,7 @@ import { Workbench, Dock } from './views/Workbench';
 import { Sources } from './views/Sources';
 import { Bestiary } from './views/Bestiary';
 import { Play } from './views/Play';
+import { CampaignPlay } from './components/play/PlayCampaign';
 import { NotFound } from './views/NotFound';
 import { CATEGORY_LABEL } from './content';
 import type { SearchFilter } from './lib/search';
@@ -31,7 +35,7 @@ const SECTIONS = [
 function route(path: string, onSearch: (q?: string) => void) {
   let m;
   if (path === '/') return <Home onSearch={onSearch} />;
-  if (path === '/play') return <Play />;
+  if (path === '/play') return <CampaignPlay><Play /></CampaignPlay>;
   if (path === '/ref') return <ReferenceIndex />;
   if ((m = match('/ref/:id', path))) return <ReferencePage id={m.id} />;
   if (path === '/oracle') return <OracleIndex />;
@@ -55,8 +59,10 @@ function useTitle(path: string) {
 }
 
 export function App() {
-  const { path } = useLocation();
-  const { open: benchOpen, theme } = useNav();
+  const { path, search } = useLocation();
+  const bestiaryRequest = path === '/play' ? search.get(BESTIARY_CREATURE_PARAM) : null;
+  const campaignRequest = path === '/play' ? search.get(PLAY_CAMPAIGN_PARAM) : null;
+  const { open: benchOpen } = useNav();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<SearchFilter>('all');
@@ -87,7 +93,7 @@ export function App() {
   };
   useTitle(path);
 
-  useEffect(() => { setStack([]); }, [path]);
+  useEffect(() => { setStack([]); }, [path, bestiaryRequest, campaignRequest]);
   useEffect(() => { if (currentId) nav.visit(currentId); }, [currentId]);
 
   useEffect(() => {
@@ -108,7 +114,6 @@ export function App() {
     };
   }, [openSearch]);
 
-  const nextTheme = theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system';
   const playing = path === '/play';
   const showDock = path !== '/workbench' && !playing;
 
@@ -140,9 +145,7 @@ export function App() {
               <span className="label">검색</span>
               <kbd style={{ marginLeft: 'auto' }}>/</kbd>
             </button>
-            <button className="iconbtn" onClick={() => nav.setTheme(nextTheme)} aria-label={`테마: ${theme === 'system' ? '시스템' : theme === 'dark' ? '어두움' : '밝음'} — 바꾸기`} title="테마 바꾸기">
-              {theme === 'system' ? <ISystem /> : theme === 'dark' ? <IMoon /> : <ISun />}
-            </button>
+            <ReadingSettings />
           </div>
         </div>
       </header>

@@ -43,6 +43,24 @@ describe('play checkpoint files', () => {
     expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
   });
 
+  test('retains room organizers, skill references and ongoing effects in campaign checkpoints', () => {
+    const saved = checkpoint();
+    Object.assign(saved.data.slots, {
+      ongoingEffects: { conditions: ['bleeding'], abilities: [{ id: 'manual:amulet', name: 'Amulet', used: 'camp', reserved: 4 }] },
+      skillPresets: { Scavenge: 55, Perception: 61 },
+      pendingRolls: [{ id: 'pending-1', roomId: 'room-7', place: 'B-07', stage: 'wrapup', field: 'wrap/journal:Toughness',
+        label: 'Toughness', dice: 'D4', target: 'PC', wrapBattleId: 'place' }],
+      paperMap: [{ domainId: 1, paperId: 'B-07', area: 'room', note: '', tags: [],
+        doors: [{ exit: '2번 출입구', text: '함정 없음 · 문 개방', opened: true }] }],
+      'combat/place/target-one/attack-defense-mode-pc': 'unopposed',
+      'combat/place/target-one/attack-inputs': { 'pc-attack': { skill: '61', modifiers: [{ reason: '상태·어둠', amount: '−10' }] } },
+    });
+    saved.data.history![0].breakdown = '기본 55 · 상태·어둠 −10 = 45';
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+    saved.data.slots.ongoingEffects = { conditions: ['bleeding', 'bleeding'], abilities: [] };
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
+  });
+
   test('rejects invalid metadata, gear, dice and historical changes', () => {
     const saved = checkpoint();
     const visit = (update: (value: PlayCheckpoint) => void) => {

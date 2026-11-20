@@ -5,6 +5,7 @@ import { d100FromValue, resolveCheck, rollDie, type Edge } from '../../lib/dice'
 import { followUpSteps } from '../../lib/exploration-follow-up';
 import type { LockTarget } from '../../lib/lock-trap';
 import { readOracleValue } from '../../lib/oracle';
+import { paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
 import { activeDarkness } from '../../lib/play-domain';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
 import { gearCount, type GearEffect, type PaperChange } from '../../lib/play-inventory';
@@ -18,6 +19,8 @@ import { ExplorationFollowUp, type FollowUpReport } from './ExplorationFollowUp'
 import { PlayRoll } from './PlayRoll';
 import { PlayDieHint, PlayZeroKey } from './PlayDieHints';
 import { SpoilsRoll } from './PlayWrapUp';
+import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../../lib/play-skill';
+import { SkillAdjustments } from './SkillAdjustments';
 
 export type ActionSheetItem = PaperChange;
 type SearchReport = { used: boolean; needsEncounter: boolean; text: string; item: string; gear?: GearEffect };
@@ -31,7 +34,7 @@ export interface ExplorationActionReport {
 export type ExplorationAction = 'door' | 'environment' | 'scavenge' | 'deep';
 
 export interface ExplorationActionsHandle {
-  open: (action: ExplorationAction) => void;
+  open: (action: ExplorationAction, mapExit?: string) => void;
 }
 
 interface ActionRoll {
@@ -56,6 +59,9 @@ interface Props {
   onCombat: (source: string) => void;
   scavengeLimit?: 1 | 2 | 3;
   finishedSources: string[];
+  mapLocation?: PaperMapLocation;
+  mapExits?: number;
+  onMapDoorSave?: (report: PaperMapDoorReport) => void;
 }
 
 const DOOR_TABLE = tableById.get('t-door')!;
@@ -101,13 +107,15 @@ function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetIt
 }
 
 export function PlayExplorationActions({ room, actionsRef, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat,
-  scavengeLimit = 1, finishedSources }: Props) {
+  scavengeLimit = 1, finishedSources, mapLocation, mapExits = 0, onMapDoorSave }: Props) {
   const [rolls, setRolls] = usePlayDraftState<ActionRoll[]>('action-tension', []);
   const [doorOpen, setDoorOpen] = usePlayDraftState('door-panel', false);
   const [searchOpen, setSearchOpen] = usePlayDraftState('scavenge-panel', false);
   const [searchAttempt, setSearchAttempt] = usePlayDraftState('scavenge-selected', 1);
   const [deepOpen, setDeepOpen] = usePlayDraftState('deep-panel', false);
   const [door, setDoor] = usePlayDraftState<'roll' | 'present'>('door-choice', 'roll');
+  const [mapExit, setMapExit] = usePlayDraftState('door-map-exit', '');
+  const [manualExit, setManualExit] = usePlayDraftState('door-manual-exit', '');
   const [finishedDoors, setFinishedDoors] = usePlayDraftState<DoorRecord[]>('finished-doors', []);
   const [environmentOpen, setEnvironmentOpen] = usePlayDraftState('environment-panel', false);
   const [doorRoll, setDoorRoll] = usePlayDraftState<number | null>('door-roll', null);
@@ -122,6 +130,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const [lootItem, setLootItem] = useState('');
   const [lootGear, setLootGear] = useState<GearEffect>();
   const [followUps, setFollowUps] = useState<Record<string, ActionSheetItem[]>>({});
+  const [savedDoorMessage, setSavedDoorMessage] = useState('');
   const panelId = useId();
   const panel = useRef<HTMLElement>(null);
   const currentSearch = Math.min(searchAttempt, scavengeLimit);
@@ -131,8 +140,12 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   }, []);
 
   useImperativeHandle(actionsRef, () => ({
-    open(action) {
+    open(action, exit) {
       if (action === 'door' || action === 'environment') setDoorOpen(true);
+      if (action === 'door' && exit) {
+        setMapExit(`exit:${exit}`);
+        setSavedDoorMessage('');
+      }
       if (action === 'environment') setEnvironmentOpen(true);
       if (action === 'scavenge') setSearchOpen(true);
       if (action === 'deep') setDeepOpen(true);
@@ -142,7 +155,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
         summary?.scrollIntoView({ block: 'start' });
       });
     },
-  }), [setDoorOpen, setEnvironmentOpen, setSearchOpen, setDeepOpen]);
+  }), [setDoorOpen, setEnvironmentOpen, setSearchOpen, setDeepOpen, setMapExit]);
 
   const doorPresent = door === 'present' || door === 'roll' && doorRoll !== null && doorRoll <= 5;
   const readyDeep = room && deepStarted && tensionResolved(rolls.find(({ id }) => id === 'deep'));
@@ -157,6 +170,13 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const doorKey = `door-${doorNumber}`;
   const doorText = door === 'roll' && doorRoll !== null && !doorPresent ? '문 없음' : doorPresent ? activeDoor?.text || '문 있음' : '';
   const canArchiveDoor = !!doorText && !activeDoor?.pendingTension;
+  const mappedExit = mapLocation ? (mapExit === 'manual' ? manualExit.trim() : mapExit.startsWith('exit:') ? mapExit.slice(5) : '') : '';
+  const doorTitle = mappedExit && mapLocation ? `${mapLocation.paperId} · ${mappedExit}` : `문 ${doorNumber}`;
+  const exitOptions = [...new Set([
+    ...Array.from({ length: mapExits }, (_, index) => `${index + 1}번 출입구`),
+    ...(mapLocation?.doors?.map(({ exit }) => exit) ?? []),
+  ])];
+  const previousDoor = mappedExit ? mapLocation?.doors?.find(({ exit }) => paperMapKey(exit) === paperMapKey(mappedExit)) : undefined;
   const darknessRecords = useMemo(() => {
     const prior = [...priorDarknessRolls];
     return rolls.flatMap(({ id, darkness, followUpId }) => {
@@ -180,7 +200,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const report = useMemo<ExplorationActionReport>(() => ({
     text: [
       ...finishedDoors.map(({ text }) => text),
-      doorText ? `문 ${doorNumber} · ${doorText}` : '',
+      doorText ? `${doorTitle} · ${doorText}` : '',
       environmentReport?.text,
       ...(room ? searchNumbers.flatMap((number) => {
         const result = scavenge[number];
@@ -212,7 +232,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
     ],
     nextTension,
     darknessRolls: rolls.flatMap(({ darkness }) => darkness === null ? [] : [darkness]),
-  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorNumber, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, rolls, room, scavenge, scavengeLimit, searchNumbers]);
+  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorTitle, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, rolls, room, scavenge, scavengeLimit, searchNumbers]);
   useEffect(() => { onReport(report); }, [onReport, report]);
 
   const renderTension = (actionId: string, label: string) => {
@@ -269,6 +289,28 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       <details className="fold" open={doorOpen} onToggle={(event) => setDoorOpen(event.currentTarget.open)}>
         <summary data-explore-action="door">문·함정 조사</summary>
         <div className="play-explore-action-body">
+          {mapLocation && onMapDoorSave && <section className="play-door-map" aria-label="종이 지도 출입구 연결">
+            <h4>{mapLocation.paperId} 출입구</h4>
+            <div className="play-door-map-fields">
+              <label className="field"><span>조사할 출입구</span>
+                <select value={mapExit} onChange={(event) => {
+                  setMapExit(event.target.value);
+                  setSavedDoorMessage('');
+                }}>
+                  <option value="">조사 순서로 기록</option>
+                  {exitOptions.map((exit) => <option key={exit} value={`exit:${exit}`}>{exit}</option>)}
+                  <option value="manual">종이 지도 표기 직접 입력</option>
+                </select>
+              </label>
+              {mapExit === 'manual' && <label className="field"><span>출입구 표기</span>
+                <input value={manualExit} maxLength={48} placeholder="예 북쪽 철문" onChange={(event) => {
+                  setManualExit(event.target.value);
+                  setSavedDoorMessage('');
+                }} />
+              </label>}
+            </div>
+            {previousDoor && <p className="play-explore-note"><strong>저장한 조사</strong> · {previousDoor.text}</p>}
+          </section>}
           <label className="field"><span>조사할 대상</span>
             <select value={door} onChange={(event) => setDoor(event.target.value as typeof door)}>
               <option value="roll">문 존재부터 굴리기</option>
@@ -279,12 +321,22 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
             <PlayRoll key={doorKey} label="문이 있는가?" table={DOOR_TABLE} value={doorRoll} onValue={setDoorRoll} />
           </PlayDraftScope>}
           {doorPresent && lock('door', setDoorReport, doorKey)}
-          {canArchiveDoor && <button className="btn ghost play-explore-action-btn" type="button" onClick={() => {
-            setFinishedDoors((previous) => [...previous, { text: `문 ${doorNumber} · ${doorText}`, sheet: lockSheet(doorKey, activeDoor) }]);
-            setDoor('roll');
-            setDoorRoll(null);
-            setDoorReport(null);
-          }}>다른 문 조사</button>}
+          {canArchiveDoor && <div className="play-explore-next">
+            {mappedExit && onMapDoorSave && <button type="button" className="btn ghost" onClick={() => {
+              onMapDoorSave({ exit: mappedExit, text: doorText.slice(0, 600), opened: !!activeDoor?.opened });
+              setSavedDoorMessage(`${doorTitle} 조사 기록을 저장했습니다.`);
+            }}>선택한 출입구에 조사 저장</button>}
+            <button className="btn ghost play-explore-action-btn" type="button" onClick={() => {
+              setFinishedDoors((previous) => [...previous, { text: `${doorTitle} · ${doorText}`, sheet: lockSheet(doorKey, activeDoor) }]);
+              setDoor('roll');
+              setDoorRoll(null);
+              setDoorReport(null);
+              setMapExit('');
+              setManualExit('');
+              setSavedDoorMessage('');
+            }}>다른 문 조사</button>
+          </div>}
+          {savedDoorMessage && <p className="play-explore-note" role="status">{savedDoorMessage}</p>}
           <details className="fold play-environment" open={environmentOpen} onToggle={(event) => setEnvironmentOpen(event.currentTarget.open)}>
             <summary data-explore-action="environment">환경 함정</summary>
             {lock('environment', setEnvironmentReport)}
@@ -374,10 +426,11 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const id = useId();
   const commitRoll = usePlayRoll();
   const recordCritical = useRecordSkillCritical();
-  const [check, setCheck] = usePlayDraftState<{ skill: string; roll: number; edge: Edge } | null>('scavenge-check', null);
+  const [check, setCheck] = usePlayDraftState<{ skill: string; roll: number; edge: Edge; modifiers?: SkillModifier[] } | null>('scavenge-check', null);
   const [draftSkill, setSkill] = useState<string | null>(null);
   const [draftRoll, setRoll] = useState<string | null>(null);
   const [draftEdge, setEdge] = useState<Edge | null>(null);
+  const [draftModifiers, setModifiers] = useState<SkillModifier[] | null>(null);
   const [invalid, setInvalid] = useState(false);
   const [bonus, setBonus] = usePlayDraftState('scavenge-bonus', false);
   const [tableRoll, setTableRoll] = usePlayDraftState<number | null>('scavenge-table', null);
@@ -390,8 +443,10 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const skill = draftSkill ?? check?.skill ?? '';
   const rawRoll = draftRoll ?? (check ? String(check.roll) : '');
   const edge = draftEdge ?? check?.edge ?? 'none';
-  const skillNumber = /^[+-]?\d+$/.test(skill.trim()) ? Number(skill) : NaN;
-  const checkOutcome = check && resolveCheck(d100FromValue(check.roll), Number(check.skill), check.edge);
+  const modifiers = draftModifiers ?? check?.modifiers ?? [];
+  const breakdown = skillBreakdown(skill, modifiers);
+  const confirmedSkill = check && skillBreakdown(check.skill, check.modifiers);
+  const checkOutcome = check && confirmedSkill ? resolveCheck(d100FromValue(check.roll), confirmedSkill.total, check.edge) : null;
   const allowsTable = checkOutcome?.outcome === 'success' || checkOutcome?.outcome === 'critical';
   const effective = tableRoll === null ? null : tableRoll + (bonus && checkOutcome?.outcome === 'critical' ? 5 : 0);
   const row = allowsTable ? rowAt(SCAVENGE_TABLE.rows, effective) : undefined;
@@ -421,20 +476,22 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
     setSpoilsGear(undefined);
   };
   const applyCheck = (roll: number | null, source: 'manual' | 'app') => {
-    if (roll === null || !Number.isSafeInteger(skillNumber)) {
+    if (roll === null || !breakdown) {
       setInvalid(true);
       return;
     }
     commitRoll(() => {
-      setCheck({ skill: skill.trim(), roll, edge });
-      recordCritical('Scavenge', resolveCheck(d100FromValue(roll), skillNumber, edge));
+      setCheck({ skill: skill.trim(), roll, edge, modifiers });
+      recordCritical('Scavenge', resolveCheck(d100FromValue(roll), breakdown.total, edge));
       setBonus(false);
       setTableRoll(null);
       resetRewards();
-    }, { label: rollLabel, dice: 'D100', value: roll === 100 ? '00' : String(roll), source, field: diceField['data-play-roll-field'] });
+    }, { label: rollLabel, dice: 'D100', value: roll === 100 ? '00' : String(roll), source, field: diceField['data-play-roll-field'],
+      breakdown: formatSkillBreakdown(breakdown) });
     setSkill(null);
     setRoll(null);
     setEdge(null);
+    setModifiers(null);
     setInvalid(false);
   };
 
@@ -454,9 +511,10 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
         <label className="field"><span>이점</span><select value={edge} onChange={(event) => setEdge(event.target.value as Edge)}>
           <option value="none">없음</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option>
         </select></label>
+        <SkillAdjustments skill="Scavenge" base={skill} onBase={setSkill} modifiers={modifiers} onModifiers={setModifiers} />
         <PlayZeroKey onInput={() => { setRoll('00'); setInvalid(false); }} />
         <button className="btn ghost" type="submit">뒤지기 판정 확인</button>
-        <button className="btn ghost" type="button" onClick={() => applyCheck(Number.isSafeInteger(skillNumber) ? rollDie(100) : null, 'app')}>D100 굴리기</button>
+        <button className="btn ghost" type="button" onClick={() => applyCheck(breakdown ? rollDie(100) : null, 'app')}>D100 굴리기</button>
         {invalid && <p className="field-err" id={`${id}-scavenge-error`} role="alert">Skill 정수와 1–100 사이의 주사위(또는 00)를 입력하세요.</p>}
       </form>
       {checkOutcome && <div className="play-explore-note" role="status">

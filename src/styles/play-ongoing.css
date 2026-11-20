@@ -1,0 +1,15 @@
+.play-ongoing > summary, .play-ongoing-add > summary { display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.play-ongoing > summary > span + span { color: var(--copper-ink); font: 14px/1.4 var(--f-ui); }
+.play-ongoing-body { display: grid; justify-items: start; gap: var(--s2); min-width: 0; padding: 0 var(--s2) var(--s3); font: 14px/1.45 var(--f-ui); }
+.play-ongoing-body p { margin: 0; }
+.play-ongoing-conditions { display: flex; flex-wrap: wrap; gap: 0 var(--s3); min-width: 0; margin: 0; border: 0; padding: 0; }
+.play-ongoing-conditions label { display: flex; align-items: center; min-height: 44px; gap: var(--s1); }
+.play-ongoing-abilities { display: grid; gap: var(--s1); width: 100%; list-style: none; margin: 0; padding: 0; }
+.play-ongoing-abilities li { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--s2); padding: var(--s2); border: 1px solid var(--rule-soft); background: var(--paper); }
+.play-ongoing-abilities li > div:first-child { display: grid; gap: var(--s1); min-width: 0; overflow-wrap: anywhere; }
+.play-ongoing-abilities li span { color: var(--ink-2); }
+.play-ongoing-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.play-ongoing-actions :is(.btn, .linkbtn), .play-ongoing-form :is(input, select, .btn) { min-height: 44px; }
+.play-ongoing-add { width: 100%; }
+.play-ongoing-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); align-items: end; gap: var(--s2); }
+.play-ongoing-form .btn { justify-self: start; }

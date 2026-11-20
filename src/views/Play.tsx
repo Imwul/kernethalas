@@ -11,22 +11,30 @@ import { PlayExploration, type ExplorationReport } from '../components/play/Play
 import { ExplorationActionLinks, type ExplorationActionsHandle } from '../components/play/PlayExplorationActions';
 import { PlayFocusMode } from '../components/play/PlayFocus';
 import { PlayInventory, useGearLedger } from '../components/play/PlayInventory';
+import { PlayOngoingEffects } from '../components/play/PlayOngoingEffects';
 import { findPaperCorrections, paperReceiptKey, PlayPaperCorrections, type PaperReceipt } from '../components/play/PlayPaperCorrections';
+import { PlayPendingRolls } from '../components/play/PlayPendingRolls';
 import { PlayPinnedTool } from '../components/play/PlayPinnedTool';
 import { PlayWrapUp } from '../components/play/PlayWrapUp';
 import { focusPlayRoll, PlayActionBar, PlayRollHistory, usePhysicalFirst, usePlayPreference } from '../components/play/PlayWorkflow';
+import { BESTIARY_CREATURE_PARAM } from '../lib/bestiary-encounter';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
 import { introEncounterCreature, nameDomainDiscoveries, newDomainProgress } from '../lib/domain-progress';
 import { PlayDraftProvider, PlayDraftScope, usePlayDraft, usePlayDraftState } from '../lib/play-draft';
+import { usePlayCampaignId } from '../lib/play-campaigns';
 import type { PlayCheckpointData } from '../lib/play-checkpoints';
+import { LINGERING_CONDITIONS, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT, readPlayOngoing } from '../lib/play-effects';
 import { PAPER_MAP_SLOT, paperMapKey, type PaperMapLocation } from '../lib/paper-map';
-import { playRollStage } from '../lib/play-roll-history';
+import { PLAY_PENDING_ROLLS_SLOT, type PendingPlayRoll } from '../lib/play-pending-rolls';
+import { playRollStage, type PlayRollEntry } from '../lib/play-roll-history';
 import { appendPlayTimeline, createPlayTimelineEntry, PLAY_TIMELINE_SLOT, type PlayTimelineEntry } from '../lib/play-timeline';
 import {
   activeDarkness, darknessDetails, domainOverseer, influenceText, newPlayDomain, tensionSides,
   type DarknessEvent, type PlayDomainRecord, type RetreatedEncounter, type TensionSides,
 } from '../lib/play-domain';
 import { isQuickUseEntry, type PaperChange } from '../lib/play-inventory';
+import { SKILL_PRESETS_SLOT } from '../lib/play-skill';
+import { navigate, useLocation } from '../lib/router';
 import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
 import '../styles/play.css';
 import '../styles/play-workflow.css';
@@ -112,11 +120,18 @@ export function Play() {
 
 function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFocusMode: () => void }) {
   const draft = usePlayDraft()!;
+  const campaignId = usePlayCampaignId();
+  const { search } = useLocation();
+  const requestedCreature = search.get(BESTIARY_CREATURE_PARAM);
+  const bestiaryCreature = requestedCreature && creatureById.has(requestedCreature) ? requestedCreature : null;
   const gear = useGearLedger();
   const pendingGrowth = usePendingSkillGrowth();
   const skillCriticalHistory = useSkillCriticalHistory();
   const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
   const [paperMap, setPaperMap] = usePlayDraftState<PaperMapLocation[]>(PAPER_MAP_SLOT, []);
+  const [pendingRolls, setPendingRolls] = usePlayDraftState<PendingPlayRoll[]>(PLAY_PENDING_ROLLS_SLOT, []);
+  const [ongoingChanges] = usePlayDraftState<PaperChange[]>(PLAY_EFFECT_CHANGES_SLOT, []);
+  const ongoing = readPlayOngoing(draft.slots);
   const [timeline, setTimeline] = usePlayDraftState<PlayTimelineEntry[]>(PLAY_TIMELINE_SLOT, []);
   const [physicalFirst, togglePhysicalFirst] = usePhysicalFirst();
   const [revision, setRevision] = useState(0);
@@ -154,7 +169,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [actionDarkness, setActionDarkness] = useState<number[]>([]);
   const [breatherDarkness, setBreatherDarkness] = useState<number | null>(null);
   const [dismissed, setDismissed] = usePlayDraftState<string[]>('dismissedDarkness', []);
-  const [customSets, setCustomSets] = useState(readEncounterLibrary);
+  const [customSets, setCustomSets] = useState(() => readEncounterLibrary(campaignId));
   const equipment = useRef<HTMLDetailsElement>(null);
   const inventory = useRef<HTMLDetailsElement>(null);
   const explorationActions = useRef<ExplorationActionsHandle>(null);
@@ -229,6 +244,21 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       heading?.focus({ preventScroll: true });
       heading?.scrollIntoView({ block: 'start' });
     });
+  };
+  useEffect(() => {
+    if (bestiaryCreature) goTo('combat');
+  }, [bestiaryCreature]);
+  const closeBestiaryRequest = () => {
+    const params = new URLSearchParams(search);
+    params.delete(BESTIARY_CREATURE_PARAM);
+    navigate(`/play${params.size ? `?${params}` : ''}`, { replace: true, keepScroll: true });
+  };
+  const goToRecordedField = ({ stage, field, scope }: Pick<PlayRollEntry, 'stage' | 'field'> & { scope?: string }, after?: (focused: boolean) => void) => {
+    const battleId = stage === 'combat'
+      ? Object.keys(battles).find((id) => (scope ?? field)?.startsWith(`combat/${encodeURIComponent(id)}/`)) : undefined;
+    if (battleId) setCombatId(battleId);
+    selectStage(stage);
+    focusPlayRoll(stage, field, after);
   };
   const changeBattle = useCallback((update: (previous: Battle) => Battle) => {
     setBattles((previous) => {
@@ -331,7 +361,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   };
   const saveCustomSets = (sets: EncounterSet[]) => {
     setCustomSets(sets);
-    storeEncounterLibrary(sets);
+    storeEncounterLibrary(sets, campaignId);
   };
 
   const exploreTension = tensionSides(exploration?.nextTension);
@@ -356,7 +386,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides, nextTimeline = timeline) => {
     draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
       roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth,
-      [PAPER_MAP_SLOT]: paperMap, [PLAY_TIMELINE_SLOT]: nextTimeline });
+      [PAPER_MAP_SLOT]: paperMap, [PLAY_TIMELINE_SLOT]: nextTimeline, [PLAY_EFFECTS_SLOT]: ongoing,
+      [PLAY_PENDING_ROLLS_SLOT]: pendingRolls, [SKILL_PRESETS_SLOT]: draft.slots[SKILL_PRESETS_SLOT] ?? {} });
     resetReports();
     focusStage('explore');
   };
@@ -401,6 +432,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     { label: '조우', value: exploration?.encounter && !fightFacts.length ? ENCOUNTER_LABELS[exploration.encounter] : null },
     { label: '적', value: fightFacts.join(' / ') },
     { label: '능력', value: Object.values(masteryReports).filter(Boolean).join(' / ') },
+    { label: '상태·유지', value: ongoingChanges.map(({ text }) => text).join(' / ') },
     { label: '탐험 행동', value: exploration?.actions },
     { label: '대성공·대실패', value: skillCriticalHistory.join(' / ') },
     { label: '휴식·전리품', value: wrapFacts.join(' / ') },
@@ -417,6 +449,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     ...sheetShared,
     ...equipmentSheet,
     ...advancementSheet,
+    ...ongoingChanges,
     ...Object.entries(masterySheet).flatMap(([id, items]) => items.map((item) => ({ ...item, id: `${id}:${item.id}` }))),
   ];
   const gearChanges = sheet.filter((item) => item.gear);
@@ -492,6 +525,17 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
         onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
         timeline={timeline} onTimelineChange={setTimeline} />
+      <PlayOngoingEffects />
+      <PlayPendingRolls stage={active} roomId={roomLedgerId} wrapBattleId={wrapId}
+        place={`${domain.name.trim() || `도메인 ${domain.id}`} · ${placeName.trim() || paperId || `장소 ${roomNumber}`}`}
+        rolls={pendingRolls} onChange={setPendingRolls} onJump={(roll, after) => {
+          if (roll.wrapBattleId) {
+            const outcome = battles[roll.wrapBattleId]?.outcome;
+            if (!outcome || outcome === 'fled') { after(false); return; }
+            setWrapId(roll.wrapBattleId);
+          }
+          goToRecordedField(roll, after);
+        }} />
       <details className="fold play-gear-fold" ref={inventory}>
         <summary>장비 장부{gear.ledger.items.length > 0 ? ` · ${gear.ledger.items.length}종` : ''}</summary>
         <PlayInventory state={gear} changes={gearChanges} roomId={roomLedgerId} />
@@ -508,6 +552,9 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           <section className="play-stage" id="play-stage-explore" aria-labelledby="play-explore" hidden={active !== 'explore'}>
             {stageHeading('explore')}
             <EffectNotice effects={effects} types={EXPLORE_EFFECTS} />
+            {ongoing.conditions.length > 0 && <p className="play-effect-note">
+              다음 방 · {LINGERING_CONDITIONS.filter(({ id }) => ongoing.conditions.includes(id)).map(({ label }) => label).join(' · ')} · Health −{ongoing.conditions.length} · Armor 무시
+            </p>}
             {!!domain.retreats?.length && (
               <details className="fold play-reentries">
                 <summary>후퇴했던 장소 다시 열기</summary>
@@ -540,6 +587,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                   customSets={customSets} customSetId={domain.encounterSetId}
                   onCustomSetSelect={(encounterSetId) => updateDomain({ encounterSetId })} onCustomSetsChange={saveCustomSets}
                   seed={combat.seed} fled={combat.outcome === 'fled'} finished={!!combat.outcome} onFlee={flee}
+                  bestiaryCreatureId={bestiaryCreature} onCloseBestiaryRequest={closeBestiaryRequest}
                   onMasterySheetChange={reportMasterySheet} onMasteryJournalChange={reportMasteryLine}
                   onCreatureChange={chooseCreature} onTargetsChange={reportTargets} onBattleEnd={endBattle} />
               </PlayDraftScope>
@@ -635,12 +683,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                 </div>
               ) : <p className="play-empty">도구에서 굴림이나 결과를 확인하면 여기에 모입니다.</p>}
             </div>
-            <PlayRollHistory key={revision} paperCommitted={paperCommitted} onCorrection={(entry) => {
-              const battleId = entry.stage === 'combat' ? Object.keys(battles).find((id) => entry.scope.startsWith(`combat/${encodeURIComponent(id)}/`)) : undefined;
-              if (battleId) setCombatId(battleId);
-              selectStage(entry.stage);
-              focusPlayRoll(entry.stage, entry.field);
-            }} />
+            <PlayRollHistory key={revision} paperCommitted={paperCommitted}
+              onCorrection={goToRecordedField} />
           </section>
         </div>
         <aside className="play-context" aria-label="플레이 중 참고">

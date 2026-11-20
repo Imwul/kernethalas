@@ -3,10 +3,13 @@ import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { LINGERING_CONDITIONS as CONDITIONS, usePlayOngoingEffects } from '../../lib/play-effects';
 import { gearCount, type PaperChange } from '../../lib/play-inventory';
+import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../../lib/play-skill';
 import { isGrowthSkill, skillGrowthKey, skillGrowthName, useClearSkillGrowth, usePendingSkillGrowth, useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
+import { SkillAdjustments } from './SkillAdjustments';
 import '../../styles/play-survival.css';
 
 export type SurvivalPane = 'treatment' | 'rot' | 'growth';
@@ -29,15 +32,16 @@ interface CheckDraft {
   target: string;
   edge: Edge;
   roll: number | null;
+  modifiers?: SkillModifier[];
 }
 
 const EMPTY_CHECK: CheckDraft = { target: '', edge: 'none', roll: null };
 const CHECK_LABEL = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패' } as const;
 const passed = ({ outcome }: CheckResult) => outcome === 'success' || outcome === 'critical';
 
-function resolveDraft({ target, edge, roll }: CheckDraft) {
-  const score = encounterInteger(target);
-  return score === null || roll === null ? null : resolveCheck(d100FromValue(roll), score, edge);
+function resolveDraft({ target, edge, roll, modifiers }: CheckDraft) {
+  const score = skillBreakdown(target, modifiers);
+  return score === null || roll === null ? null : resolveCheck(d100FromValue(roll), score.total, edge);
 }
 
 function CheckInputs({ label, value, result, onChange }: {
@@ -46,7 +50,8 @@ function CheckInputs({ label, value, result, onChange }: {
   result: CheckResult | null;
   onChange: (next: CheckDraft) => void;
 }) {
-  const invalid = !!value.target.trim() && encounterInteger(value.target) === null;
+  const calculation = skillBreakdown(value.target, value.modifiers);
+  const invalid = !!value.target.trim() && calculation === null;
   const recordCritical = useRecordSkillCritical();
   const growthEligible = isGrowthSkill(label);
   return (
@@ -64,8 +69,10 @@ function CheckInputs({ label, value, result, onChange }: {
           </select>
         </label>
       </div>
-      {invalid && <p className="field-err" role="alert">보정 수치는 정수로 입력하세요.</p>}
-      <JournalRoll die="D100" label={label} value={value.roll} onValue={(roll) => {
+      <SkillAdjustments skill={label} base={value.target} onBase={(target) => onChange({ ...value, target, roll: null })}
+        modifiers={value.modifiers ?? []} onModifiers={(modifiers) => onChange({ ...value, modifiers, roll: null })} />
+      {invalid && <p className="field-err" role="alert">기본 수치와 보정 수치는 정수로 입력하세요.</p>}
+      <JournalRoll die="D100" label={label} value={value.roll} breakdown={calculation ? formatSkillBreakdown(calculation) : undefined} onValue={(roll) => {
         const next = { ...value, roll };
         onChange(next);
         const rolled = resolveDraft(next);
@@ -75,11 +82,6 @@ function CheckInputs({ label, value, result, onChange }: {
   );
 }
 
-const CONDITIONS = [
-  { id: 'bleeding', label: '출혈' },
-  { id: 'burning', label: '화상' },
-  { id: 'poisoned', label: '중독' },
-] as const;
 type Condition = typeof CONDITIONS[number]['id'];
 type Treatment = 'heal' | 'bleeding' | 'poisoned';
 const TREATMENTS = { heal: 'Toughness 회복', bleeding: '출혈 해제', poisoned: '중독 해제' } as const;
@@ -94,7 +96,7 @@ interface TreatmentDraft {
 const EMPTY_TREATMENT: TreatmentDraft = { purpose: 'heal', check: EMPTY_CHECK, recovery: null, damage: [null, null] };
 
 function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord: SaveRecord }) {
-  const [conditions, setConditions] = usePlayDraftState<Condition[]>('lingering', []);
+  const { current: { conditions }, setCondition } = usePlayOngoingEffects();
   const [draft, setDraft] = usePlayDraftState<TreatmentDraft>('bandage', EMPTY_TREATMENT);
   const commitRoll = usePlayRoll();
   const { purpose, check, recovery, damage } = draft;
@@ -111,7 +113,7 @@ function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord
     ...(fumble && fumbleDamage !== null ? [`Bludgeoning 피해 ${fumbleDamage}`] : []),
   ];
   const resetDice = (next: Pick<TreatmentDraft, 'purpose' | 'check'>) => setDraft({ ...EMPTY_TREATMENT, ...next });
-  const clear = (condition: Condition) => setConditions((previous) => previous.filter((item) => item !== condition));
+  const clear = (condition: Condition) => setCondition(condition, false);
   const save = () => {
     if (!result || !canTreat || (needsRecovery && recovery === null) || (fumble && fumbleDamage === null)) return;
     commitRoll(() => {
@@ -130,8 +132,7 @@ function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord
         <legend>전투 후 남은 상태</legend>
         {CONDITIONS.map(({ id, label }) => (
           <label key={id}><input type="checkbox" checked={conditions.includes(id)} onChange={(event) => {
-            if (event.target.checked) setConditions((previous) => [...previous, id]);
-            else clear(id);
+            setCondition(id, event.target.checked);
           }} />{label}</label>
         ))}
       </fieldset>

@@ -8,6 +8,7 @@ import { resolveAttack, type CheckResult, type RollResult } from '../../lib/dice
 import { encounterInteger } from '../../lib/encounter-start';
 import { abilityRoll, describeMasteryAbility, readMasteryInteger, type MasteryAbility } from '../../lib/mastery-play';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { abilityRestLimit, usePlayOngoingEffects } from '../../lib/play-effects';
 import { gearCount, type PaperChange } from '../../lib/play-inventory';
 import { DamageTypeGuide } from '../DamageTypeGuide';
 import { PhysicalDiceRoll } from '../PhysicalDiceRoll';
@@ -226,6 +227,7 @@ function AbilityForm({ ability, targets, records, onRecord }: {
 }) {
   const [draft, setDraft] = usePlayDraftState('cast', EMPTY_CAST);
   const commit = usePlayRoll();
+  const ongoing = usePlayOngoingEffects();
   const clear = useClearPlayDraftScope();
   const patch = (next: Partial<CastDraft>) => setDraft((previous) => ({ ...previous, ...next }));
   const level = readCreatureLevel(draft.level);
@@ -252,11 +254,12 @@ function AbilityForm({ ability, targets, records, onRecord }: {
   const usedTargets = new Set(prior.flatMap(({ affected }) => affected));
   const frequency = useLimit(ability);
   const usedOnce = frequency === 'once' && prior.length > 0 || frequency === 'target' && chosen.some(({ id }) => usedTargets.has(id));
-  const stillSustained = ability.sustained && prior.at(-1)?.sustained === true;
-  const restLimit = /휴식당 1회/.test(ability.text);
+  const tracked = ongoing.current.abilities.find(({ id }) => id === ability.id);
+  const stillSustained = ability.sustained && tracked?.reserved;
+  const restLimit = abilityRestLimit(ability.text);
   const passive = ability.passive && !ACTIVE_PAPER_PASSIVES[ability.name];
   const complete = !passive && !draft.blocked && !invalidAether && (!variableCost || spent !== null) && validCount
-    && !usedOnce && !stillSustained && (!restLimit || prior.length === 0 || draft.resuming);
+    && !usedOnce && !stillSustained && !tracked?.used;
   const results = complete ? chosen.map((target) => ({ ...target, result: targetEffect(ability, target, draft.rolls[target.id] ?? {}, spent) })) : [];
   const allResolved = !!results.length && results.every(({ result }) => result !== null);
   const detail = allResolved ? results.flatMap(({ label, result }) => result ? [`${label ? `${label} · ` : ''}${result.text}`] : []) : [];
@@ -321,11 +324,12 @@ function AbilityForm({ ability, targets, records, onRecord }: {
         </p>}
         <label className="mastery-tick"><input type="checkbox" checked={draft.blocked} onChange={(event) => patch({ blocked: event.target.checked })} />현재 Blinded 또는 Prone</label>
         {draft.blocked && <p className="mastery-note" role="status">이 상태에서는 Mastery 능력을 사용할 수 없습니다.</p>}
-        {restLimit && prior.length > 0 && <label className="mastery-tick"><input type="checkbox" checked={draft.resuming} onChange={(event) => patch({ resuming: event.target.checked })} />지정된 휴식 후 사용 가능함을 시트에서 확인</label>}
+        {tracked?.used && <p className="mastery-note" role="status">이미 사용했습니다. {tracked.used === 'camp' ? '야영' : '숨 고르기 또는 야영'} 완료를 확인하면 다시 쓸 수 있습니다.</p>}
         {usedOnce && <p className="mastery-note" role="status">이번 전투·장소 기록에 이 사용 제한이 적용됩니다.</p>}
-        {stillSustained && <button type="button" className="btn ghost mastery-action" onClick={() => commit(() => {
-          onRecord({ ability: ability.id, summary: `${ability.name} 해제 · 최대 Aether 제한 ${ability.aether} 해제`,
-            changes: [{ text: `최대 Aether 제한 ${ability.aether} 해제 (${ability.name})` }], affected: [], sustained: false });
+        {!!stillSustained && tracked && <button type="button" className="btn ghost mastery-action" onClick={() => commit(() => {
+          ongoing.release(tracked, false);
+          onRecord({ ability: ability.id, summary: `${ability.name} 해제 · 최대 Aether 제한 ${stillSustained} 해제`,
+            changes: [{ text: `최대 Aether +${stillSustained} (${ability.name} 유지 해제)` }], affected: [], sustained: false });
           reset();
         })}>전투 밖에서 유지 해제 기록</button>}
         {complete && <PlayDraftScope name="rolls">
@@ -341,6 +345,8 @@ function AbilityForm({ ability, targets, records, onRecord }: {
           <button type="button" className="btn primary" onClick={() => commit(() => {
             onRecord({ ability: ability.id, summary: `${ability.name} · ${changes.map(({ text }) => text).join(' · ')}`, changes,
               affected: results.filter(({ result }) => result?.applies).map(({ id }) => id), sustained: ability.sustained });
+            ongoing.trackAbility({ id: ability.id, name: ability.name, ...(restLimit ? { used: restLimit } : {}),
+              ...(ability.sustained && cost.aether > 0 ? { reserved: cost.aether } : {}) });
             reset();
           })}>능력 사용 기록</button>
         </div>}

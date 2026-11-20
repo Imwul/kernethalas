@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { tableById, hrefOf, titleOf, kindOf } from '../content';
 import { SITUATION_GROUPS, situations } from '../content/situations';
 import { Link } from '../lib/router';
+import { campaignHref, campaignSummary, DEFAULT_PLAY_CAMPAIGN, usePlayCampaigns } from '../lib/play-campaigns';
 import { useNav } from '../lib/store';
 import { ISearch, IDie } from '../components/icons';
 import { XRef } from '../components/bits';
@@ -13,6 +14,9 @@ const byId = new Map(docs.map((d) => [d.id, d]));
 
 export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
   const { pins, recent } = useNav();
+  const { last, campaigns } = usePlayCampaigns();
+  const resume = campaigns.find(({ id }) => id === (last ?? DEFAULT_PLAY_CAMPAIGN));
+  const place = resume ? campaignSummary(resume.id) : '';
   return (
     <div className="home archive-home">
       <section className="home-hero" aria-labelledby="home-title">
@@ -21,7 +25,10 @@ export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
           <p>Ker Nethalas · Gravebound Edition v1.2</p>
         </div>
         <div className="home-launch-tools">
-          <Link to="/play" className="btn primary home-play-launch"><IDie /> 플레이 시작</Link>
+          {resume && (resume.playedAt || place) ? <div className="home-play-resume">
+            <Link to={campaignHref(resume.id)} className="btn primary home-play-launch"><IDie /> {resume.name} 이어하기</Link>
+            {place && <span className="home-play-resume-info">{place}</span>}
+          </div> : <Link to="/play" className="btn primary home-play-launch"><IDie /> 플레이 시작</Link>}
           <button className="bigsearch" onClick={() => onSearch()} aria-label="규칙 검색 열기">
             <ISearch />
             <span>규칙, 표, 절차 검색</span>

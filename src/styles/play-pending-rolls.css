@@ -1,0 +1,39 @@
+.play-pending-rolls > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+  min-height: 44px;
+}
+.play-pending-rolls > summary > span + span,
+.play-pending-entry > span {
+  color: var(--ink-2);
+  font: 13px/1.45 var(--f-ui);
+}
+.play-pending-body, .play-pending-list, .play-pending-entry {
+  display: grid;
+  min-width: 0;
+  gap: var(--s2);
+}
+.play-pending-body { padding: 0 var(--s2) var(--s2); }
+.play-pending-form {
+  display: grid;
+  align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--s2);
+}
+.play-pending-form .field { min-width: 0; }
+.play-pending-form :is(.btn, input, select), .play-pending-buttons .btn { min-height: 44px; }
+.play-pending-form .btn { justify-self: start; }
+.play-pending-list { list-style: none; margin: 0; padding: 0; }
+.play-pending-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s2);
+  padding-block: var(--s2);
+  border-block-start: 1px solid var(--rule);
+}
+.play-pending-entry { flex: 1 1 11rem; gap: 2px; overflow-wrap: anywhere; }
+.play-pending-buttons { display: flex; flex-wrap: wrap; gap: var(--s1); }

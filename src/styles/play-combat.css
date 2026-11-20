@@ -14,6 +14,26 @@
   border-top: 3px solid var(--copper);
   background: var(--paper);
 }
+.play-bestiary-add {
+  display: grid;
+  justify-items: start;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--copper);
+  background: var(--paper);
+}
+.play-bestiary-add h3 {
+  margin: 0;
+  font: 400 20px/1.4 var(--f-ko-display);
+}
+.play-bestiary-add p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: 14px/1.45 var(--f-ui);
+}
+.play-bestiary-add input { width: 8rem; max-width: 100%; min-height: 44px; }
 
 .play-combat-lookup .field { min-width: 0; }
 .play-combat-lookup input,

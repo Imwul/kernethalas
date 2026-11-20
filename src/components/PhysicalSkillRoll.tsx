@@ -1,18 +1,19 @@
 import { useId, useState } from 'react';
 import { d100FromValue, resolveCheck, rollDie, type CheckOutcome, type CheckResult, type Edge } from '../lib/dice';
-import { encounterInteger } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
+import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../lib/play-skill';
 import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
 import { GROWTH_SKILLS, isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
+import { SkillAdjustments } from './play/SkillAdjustments';
 import '../styles/physical-skill-roll.css';
 
 const DIFFICULTY = [30, 20, 10, 0, 0, -10, -20, -30];
 const OUTCOMES = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패' } as const;
-type Inputs = { skill: string; roll: string; difficulty: string; edge: Edge; weapon?: string };
+type Inputs = { skill: string; roll: string; difficulty: string; edge: Edge; weapon?: string; modifiers?: SkillModifier[] };
 const EMPTY: Inputs = { skill: '', roll: '', difficulty: '', edge: 'none' };
 const WEAPON_SKILLS = GROWTH_SKILLS.filter((name) => name.endsWith('Weapons'));
 
@@ -65,23 +66,25 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   const chooseWeapon = context !== 'npc' && skill.includes('무기 Skill');
   const difficultyDie = readOracleValue(inputs.difficulty.trim(), 8);
   const difficulty = randomDifficulty && difficultyDie !== null ? DIFFICULTY[difficultyDie - 1] ?? 0 : 0;
+  const fixed = [{ label: '규칙 보정', value: modifier }, { label: '난이도 D8', value: difficulty }];
+  const breakdown = skillBreakdown(inputs.skill, inputs.modifiers, fixed);
   const update = (patch: Partial<Inputs>) => {
     setDraft((current) => ({ ...current, ...patch }));
     setInvalid(false);
   };
 
   const apply = (roll: number | null, source: PlayRollDetails['source']) => {
-    const base = encounterInteger(inputs.skill);
-    if (roll === null || base === null || randomDifficulty && difficultyDie === null || !Number.isSafeInteger(base + modifier + difficulty)) {
+    if (roll === null || breakdown === null || randomDifficulty && difficultyDie === null) {
       setInvalid(true);
       return;
     }
-    const result = resolveCheck(d100FromValue(roll), base + modifier + difficulty, inputs.edge);
+    const result = resolveCheck(d100FromValue(roll), breakdown.total, inputs.edge);
     commitRoll(() => {
       setConfirmed({ inputs: { ...inputs, roll: String(roll) }, result });
       if (!existingRoll && context !== 'npc') recordCritical(inputs.weapon || skill, result, context === 'skill' ? skill : null);
       onResult(result);
-    }, existingRoll ? undefined : { label, dice: 'D100', value: roll === 100 ? '00' : String(roll), source, field: field['data-play-roll-field'] });
+    }, existingRoll ? undefined : { label, dice: 'D100', value: roll === 100 ? '00' : String(roll), source, field: field['data-play-roll-field'],
+      breakdown: formatSkillBreakdown(breakdown) });
     setDraft({});
     setInvalid(false);
   };
@@ -108,6 +111,9 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
           <PlayDieHint dice="D8" sides={8} />
           <input id={`${id}-difficulty`} value={inputs.difficulty} inputMode="numeric" placeholder="1–8" onChange={(event) => update({ difficulty: event.target.value })} />
         </div>}
+        {context !== 'npc' && !existingRoll && <SkillAdjustments skill={chooseWeapon ? inputs.weapon : skill} base={inputs.skill}
+          onBase={(value) => update({ skill: value })} modifiers={inputs.modifiers ?? []} fixed={fixed}
+          onModifiers={(modifiers) => update({ modifiers })} />}
         <label className="field"><span>유불리</span>
           <select value={inputs.edge} onChange={(event) => update({ edge: event.target.value as Edge })}>
             <option value="none">없음</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option>
