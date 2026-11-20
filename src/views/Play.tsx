@@ -506,8 +506,10 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           <p>종이 시트와 저널 옆에서 이번 장소의 판정과 결과를 모읍니다.</p>
         </div>
         <div className="play-header-actions">
-          <button className="btn ghost" type="button" aria-pressed={physicalFirst} onClick={togglePhysicalFirst}>실물 입력 우선</button>
-          <button className="btn ghost" type="button" aria-pressed={focusMode} onClick={toggleFocusMode}>집중 보기</button>
+          <div className="play-header-toggles" role="group" aria-label="보기 설정">
+            <button className="play-toggle" type="button" aria-pressed={physicalFirst} onClick={togglePhysicalFirst}>실물 입력 우선</button>
+            <button className="play-toggle" type="button" aria-pressed={focusMode} onClick={toggleFocusMode}>집중 보기</button>
+          </div>
           <button className="btn ghost" type="button" disabled={!draft.canUndo} onClick={draft.undoRoll}>직전 굴림 되돌리기</button>
           <button className="btn ghost" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
             onClick={() => setConfirmReset((open) => !open)}>새 장소 시작</button>

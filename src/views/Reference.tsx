@@ -43,23 +43,32 @@ export function ReferenceIndex() {
         <p className="lede">규칙·상태·생물·장비 전체. 항목마다 원본 쪽수와 검증 상태를 표시합니다.</p>
       </header>
       <RulingNotesIndex />
-      <div className="filterbar" role="group" aria-label="범주">
-        <button aria-pressed={!cat} onClick={() => setQ('c', null)}>
-          전체<span className="count">{entries.length}</span>
-        </button>
-        {ORDER.map((c) => (
-          <button key={c} aria-pressed={cat === c} onClick={() => setQ('c', c)}>
-            {CATEGORY_LABEL[c].ko}
-            <span className="count">{counts[c]}</span>
-          </button>
-        ))}
-      </div>
-      <div className="filterbar" role="group" aria-label="검증 상태">
-        {(['verified', 'discrepancy', 'ambiguous', 'partial'] as const).map((s) => (
-          <button key={s} aria-pressed={v === s} onClick={() => setQ('v', v === s ? null : s)}>
-            {V_LABEL[s]}
-          </button>
-        ))}
+      <div className="ref-filters">
+        <div className="ref-filter-row">
+          <span className="ref-filter-label" id="ref-filter-category">범주</span>
+          <div className="filterbar" role="group" aria-labelledby="ref-filter-category">
+            <button aria-pressed={!cat} onClick={() => setQ('c', null)}>
+              전체<span className="count">{entries.length}</span>
+            </button>
+            {ORDER.map((c) => (
+              <button key={c} aria-pressed={cat === c} onClick={() => setQ('c', c)}>
+                {CATEGORY_LABEL[c].ko}
+                <span className="count">{counts[c]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="ref-filter-row">
+          <span className="ref-filter-label" id="ref-filter-verification">검증 상태</span>
+          <div className="filterbar" role="group" aria-labelledby="ref-filter-verification">
+            {(['verified', 'discrepancy', 'ambiguous', 'partial'] as const).map((s) => (
+              <button key={s} aria-pressed={v === s} onClick={() => setQ('v', v === s ? null : s)}>
+                <span className={`vd v-${s}`} aria-hidden="true" />
+                {V_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="plates">
         {!list.length && <p className="empty" role="status">선택한 조건에 맞는 항목이 없습니다.</p>}

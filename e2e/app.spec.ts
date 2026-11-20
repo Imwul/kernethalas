@@ -65,9 +65,12 @@ test('rulings questions get the full row (regression: squeezed into one column)'
 
 test('search finds rules by Korean, initials and Hangul spelling of English', async ({ page }) => {
   await page.goto('/');
-  await page.keyboard.press('/');
   const box = page.getByRole('searchbox', { name: '검색어' });
-  await expect(box).toBeVisible();
+  // The shortcut listener attaches after the first render; retry until it is live.
+  await expect(async () => {
+    await page.keyboard.press('/');
+    await expect(box).toBeVisible({ timeout: 500 });
+  }).toPass();
   for (const [q, expected] of [
     ['넘어짐', '넘어짐'],
     ['ㄴㅇㅈ', '넘어짐'],

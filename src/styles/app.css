@@ -1307,6 +1307,42 @@ details.fold[open] > summary::before {
   gap: 6px;
   margin-bottom: var(--s5);
 }
+.filterbar .vd {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--copper);
+  background: var(--copper);
+}
+.filterbar .vd.v-discrepancy,
+.filterbar .vd.v-ambiguous { border-color: var(--ochre); background: var(--ochre); }
+.filterbar .vd.v-partial { border-style: dashed; border-color: var(--faded); background: transparent; }
+.filterbar button:has(.vd) { display: inline-flex; align-items: center; }
+
+/* Reference index: two labelled filter rows; the verification row doubles as the dot legend. */
+.ref-filters { display: grid; gap: var(--s2); margin-bottom: var(--s5); }
+.ref-filter-row { display: grid; gap: var(--s1); min-width: 0; }
+.ref-filter-row .filterbar { margin: 0; }
+.ref-filter-label { font: 600 13px/1.4 var(--f-ui); color: var(--faded); }
+@media (min-width: 768px) {
+  .ref-filter-row { grid-template-columns: 5.5em minmax(0, 1fr); align-items: start; gap: var(--s3); }
+  .ref-filter-label { padding-top: 7px; }
+}
+/* Phones: one swipeable row per filter instead of four wrapped rows. */
+@media (max-width: 560px) {
+  .ref-filter-row .filterbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: calc(-1 * var(--gutter));
+    padding-inline: var(--gutter);
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+  .ref-filter-row .filterbar::-webkit-scrollbar { display: none; }
+  .ref-filter-row .filterbar button { flex: none; white-space: nowrap; }
+}
 .filterbar button {
   border: 1px solid var(--rule);
   background: transparent;
