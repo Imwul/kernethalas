@@ -25,7 +25,6 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
 
   for (const [index, die] of ['D10', 'D8', 'D6', 'D4'].entries()) {
     await place(page, '방');
-    await explore(page).getByText(`은신처 ${die}`, { exact: true }).click();
     const lair = explore(page).getByRole('region', { name: '은신처 소모 주사위' });
     await expect(lair).toContainText(`현재 주사위 ${die}`);
     await enter(lair, '직접 굴린 값', '2');
@@ -50,7 +49,6 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
 
   for (const die of ['D8', 'D6', 'D4']) {
     await place(page, '통로');
-    await explore(page).getByText(`출구 ${die}`, { exact: true }).click();
     const exit = explore(page).getByRole('region', { name: '출구 소모 주사위' });
     await enter(exit, '직접 굴린 값', '2');
     if (die !== 'D4') await advance(page);
@@ -73,11 +71,12 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
 
   await page.getByRole('button', { name: '탐험', exact: true }).click();
   await place(page, '방');
-  await explore(page).getByText('은신처 D10', { exact: true }).click();
+  await explore(page).getByText('은신처·출구 직접 표시', { exact: true }).click();
   await explore(page).getByRole('checkbox', { name: '이 방이 Overseer 은신처' }).check();
   await advance(page);
   await place(page, '통로');
-  await explore(page).getByText('출구 D8', { exact: true }).click();
+  await expect(explore(page).getByRole('region', { name: '출구 소모 주사위' })).toBeVisible();
+  await explore(page).getByText('은신처·출구 직접 표시', { exact: true }).click();
   await explore(page).getByRole('checkbox', { name: '지도에 표시된 출구 위치' }).check();
   await enter(explore(page), '긴장 주사위 굴린 값', '3');
   await explore(page).getByRole('button', { name: '출구로 이동 선택' }).click();

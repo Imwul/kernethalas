@@ -62,7 +62,7 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await selectCreature(combat, 'Necropede');
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
-  await combat.getByText('라운드 정리', { exact: true }).click();
+  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
 
   const board = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
   const position = board.getByRole('status');
@@ -107,7 +107,7 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
 
   await combat.getByRole('button', { name: '조우 다시 선택' }).click();
   await selectCreature(combat, 'Necropede');
-  await combat.getByText('라운드 정리', { exact: true }).click();
+  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
   await expect(position).toContainText('1라운드');
   await expect(board.getByRole('list', { name: '등록한 효과' })).toHaveCount(0);
 });

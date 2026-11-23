@@ -25,9 +25,10 @@ interface Props {
   beforeRoll?: ReactNode;
   roomShape?: RoomShapeState;
   afterResult?: ReactNode;
+  play?: boolean;
 }
 
-export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle, beforeRoll, roomShape, afterResult }: Props) {
+export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle, beforeRoll, roomShape, afterResult, play = false }: Props) {
   const id = useId();
   const [manual, setManual] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -177,12 +178,12 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
             <button type="button" aria-pressed={only} onClick={() => onOnly(true)}>{value === null ? '표 접기' : '결과만'}</button>
             <button type="button" aria-pressed={!only} onClick={() => onOnly(false)}>전체 표</button>
           </div>
-          {row && <CopyButton text={copyText} label="결과 복사" />}
+          {row && !play && <CopyButton text={copyText} label="결과 복사" />}
           {!only && row && <button className="btn ghost" type="button" onClick={onShowRow}>해당 행으로</button>}
         </div>
       )}
 
-      {history.length > 1 && (
+      {!play && history.length > 1 && (
         <details className="oracle-roll-history">
           <summary>이번 열람의 굴림 기록 ({history.length})</summary>
           <ol className="history">

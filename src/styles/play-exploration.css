@@ -195,3 +195,12 @@
 .play-scavenge-attempts { display: grid; gap: var(--s2); }
 .play-scavenge-attempts > .seg { flex-wrap: wrap; }
 .play-scavenge-attempts > .seg button { min-height: 44px; }
+
+.play-entry-dice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: start;
+  gap: var(--s4) var(--s3);
+  min-width: 0;
+}
+.play-entry-dice > .play-explore-lair { grid-column: 1 / -1; }

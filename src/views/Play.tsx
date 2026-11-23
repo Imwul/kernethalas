@@ -576,7 +576,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
               </details>
             )}
             <PlayDraftScope name="explore">
-              <PlayExploration key={revision} actionsRef={explorationActions} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')}
+              <PlayExploration key={revision} actionsRef={explorationActions} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')} onJournal={() => goTo('journal')}
                 finishedSources={finishedSources} initialTension={initialTension} lightCost={previousEffects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
                 onDarknessChange={setDarkness} onActionDarknessChange={setActionDarkness}
                 darknessEffectCount={previousEffects.length} onTrader={openTrader}

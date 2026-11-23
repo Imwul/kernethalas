@@ -73,9 +73,8 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   await combat.getByRole('button', { name: '다른 생물 추가' }).click();
   await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('Infernal Archon');
   await combat.getByRole('button', { name: 'Infernal Archon', exact: true }).last().click();
-  await combat.getByText('조우 시작', { exact: true }).click();
   await expect(combat.getByRole('textbox', { name: '적 최고 Mind' })).toHaveValue('50');
-  await combat.getByText('라운드 정리', { exact: true }).click();
+  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
   await expect(page.getByRole('link', { name: '지속 피해와 상태', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '연속 방어 페널티', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);

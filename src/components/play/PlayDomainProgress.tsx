@@ -33,45 +33,54 @@ export function PlayDomainProgress({ progress, place, placeId, placeName, revisi
   const stateLabel = kind === 'lair' && !progress.lair ? `은신처 ${progress.lairDie}`
     : kind === 'exit' && !progress.exit ? `출구 ${progress.exitDie}`
       : atExit ? '출구 위치' : atLair ? 'Overseer 은신처' : intro ? '도입 지도' : '도메인 진행';
+  const dieTool = kind && (
+    <div className="play-explore-step">
+      <h3 aria-hidden="true">{kind === 'lair' ? '은신처 주사위' : '출구 주사위'}</h3>
+      <UsageDieTool rule={kind === 'lair' ? 'lair-check' : 'domain-exit-check'} hideTitle progress={{
+        die: kind === 'lair' ? progress.lairDie : progress.exitDie,
+        recorded,
+        onRoll: (value) => onChange(applyDomainCheck(progress, kind, { id: placeId, name: placeName }, value)),
+      }} />
+    </div>
+  );
+  const arrivalField = revisit && (progress.lair || progress.exit) && (
+    <label className="field play-domain-arrival"><span>돌아온 위치</span>
+      <select value={recordedArrival ?? ''} onChange={(event) => {
+        const value = event.target.value;
+        onArrival(value === 'lair' || value === 'exit' ? value : null);
+      }}>
+        <option value="">일반 장소 재방문</option>
+        {progress.lair && <option value="lair">은신처 · {progress.lair.name}</option>}
+        {progress.exit && <option value="exit">출구 · {progress.exit.name}</option>}
+      </select>
+    </label>
+  );
+  const details = (
+    <div className="play-domain-progress-body">
+      {intro && <p className="play-explore-note">종이 지도에 표시된 은신처와 출구를 직접 지정합니다. <XRef id="first-domain-rules" /></p>}
+      {!revisit && !intro && !progress.lair && place === 'corridor' && !progress.corridorLair && (
+        <p className="play-explore-note">통로의 은신처 굴림은 도메인 설정에서 선택합니다.</p>
+      )}
+      {manualLair && <label className="play-explore-lair">
+        <input type="checkbox" checked={atLair} onChange={(event) => onLairMark(event.target.checked)} /> 이 {place === 'room' ? '방' : '통로'}이 Overseer 은신처
+      </label>}
+      {manualExit && <label className="play-explore-lair">
+        <input type="checkbox" checked={atExit} onChange={(event) => onExitMark(event.target.checked)} /> 지도에 표시된 출구 위치
+      </label>}
+      {progress.lair && !atLair && <p className="play-explore-note">찾은 은신처 · {progress.lair.name}</p>}
+      {progress.exit && !atExit && <p className="play-explore-note">찾은 출구 · {progress.exit.name}</p>}
+      <div className="play-explore-links"><XRef id="lair-check" /><XRef id="domain-exit-check" /></div>
+    </div>
+  );
   return (
     <section className="play-domain-progress" aria-label="은신처·출구 진행">
+      {/* A pending lair/exit roll is part of every room entry, so it stays open beside the tension die. */}
+      {dieTool}
+      {arrivalField}
+      {atLair && <p className="play-explore-note">이번 위치는 Overseer 은신처입니다. 전투 여부를 선택합니다.</p>}
       <details className="fold" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary>{stateLabel}</summary>
-        <div className="play-domain-progress-body">
-          {intro && <p className="play-explore-note">종이 지도에 표시된 은신처와 출구를 직접 지정합니다. <XRef id="first-domain-rules" /></p>}
-          {kind && (
-            <UsageDieTool rule={kind === 'lair' ? 'lair-check' : 'domain-exit-check'} progress={{
-              die: kind === 'lair' ? progress.lairDie : progress.exitDie,
-              recorded,
-              onRoll: (value) => onChange(applyDomainCheck(progress, kind, { id: placeId, name: placeName }, value)),
-            }} />
-          )}
-          {!revisit && !intro && !progress.lair && place === 'corridor' && !progress.corridorLair && (
-            <p className="play-explore-note">통로의 은신처 굴림은 도메인 설정에서 선택합니다.</p>
-          )}
-          {manualLair && <label className="play-explore-lair">
-            <input type="checkbox" checked={atLair} onChange={(event) => onLairMark(event.target.checked)} /> 이 {place === 'room' ? '방' : '통로'}이 Overseer 은신처
-          </label>}
-          {manualExit && <label className="play-explore-lair">
-            <input type="checkbox" checked={atExit} onChange={(event) => onExitMark(event.target.checked)} /> 지도에 표시된 출구 위치
-          </label>}
-          {revisit && (progress.lair || progress.exit) && (
-            <label className="field play-domain-arrival"><span>돌아온 위치</span>
-              <select value={recordedArrival ?? ''} onChange={(event) => {
-                const value = event.target.value;
-                onArrival(value === 'lair' || value === 'exit' ? value : null);
-              }}>
-                <option value="">일반 장소 재방문</option>
-                {progress.lair && <option value="lair">은신처 · {progress.lair.name}</option>}
-                {progress.exit && <option value="exit">출구 · {progress.exit.name}</option>}
-              </select>
-            </label>
-          )}
-          {atLair && <p className="play-explore-note">이번 위치는 Overseer 은신처입니다. 전투 여부를 선택합니다.</p>}
-          {progress.lair && !atLair && <p className="play-explore-note">찾은 은신처 · {progress.lair.name}</p>}
-          {progress.exit && !atExit && <p className="play-explore-note">찾은 출구 · {progress.exit.name}</p>}
-          <div className="play-explore-links"><XRef id="lair-check" /><XRef id="domain-exit-check" /></div>
-        </div>
+        <summary>{kind ? '은신처·출구 직접 표시' : stateLabel}</summary>
+        {details}
       </details>
     </section>
   );

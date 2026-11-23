@@ -106,6 +106,7 @@ test('the next-action shortcut follows search rewards, resolved encounters and c
   const bar = page.getByRole('region', { name: '다음 행동 바로가기' });
   const next = bar.getByRole('button', { name: '다음 행동', exact: true });
   await explore.getByRole('button', { name: '방', exact: true }).click();
+  await enter(explore.getByRole('region', { name: '은신처 소모 주사위', exact: true }), '직접 굴린 값', '5');
   await enter(explore.getByRole('region', { name: '긴장 주사위', exact: true }), '긴장 주사위 굴린 값', '3');
   await enter(explore.getByRole('region', { name: '조우 판정', exact: true }), '직접 굴린 값', '1');
   await enter(explore.getByRole('region', { name: '이벤트', exact: true }), '직접 굴린 값', '55');

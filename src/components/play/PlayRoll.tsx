@@ -14,7 +14,7 @@ export function PlayRoll({ label, table, value, onValue, roomShape, afterResult,
   condense?: boolean;
 }) {
   const row = condense && value !== null ? table.rows.find(({ min, max }) => value >= min && value <= max) : undefined;
-  const body = <OracleBody t={table} value={value} onValue={onValue} roomShape={roomShape} afterResult={afterResult} compact collapseTableBeforeRoll />;
+  const body = <OracleBody t={table} value={value} onValue={onValue} roomShape={roomShape} afterResult={afterResult} compact collapseTableBeforeRoll play />;
   return (
     <section className="play-explore-step" aria-label={label}>
       <h3>{label}</h3>

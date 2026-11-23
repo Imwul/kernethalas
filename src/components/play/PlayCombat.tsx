@@ -291,10 +291,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
             </div>
           </div>
           <PlayDraftScope key={`encounter-start-${lineup.encounterId}`} name={`encounter-start-${lineup.encounterId}`}>
-            <details className="fold creature-encounter">
-              <summary>조우 시작</summary>
-              <EncounterStart creature={profile} />
-            </details>
+            <EncounterStartFold creature={profile} />
           </PlayDraftScope>
           <PlayDraftScope key={`allocation-${targetIds}`} name={`allocation-${targetIds}`}>
             <PlayTargetAllocation targets={targets} />
@@ -407,5 +404,16 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
         </PlayDraftScope>
       </details>
     </section>
+  );
+}
+
+/** Every fight opens with initiative or surprise, so this step starts open; closing it is remembered per encounter. */
+function EncounterStartFold({ creature }: { creature: Parameters<typeof EncounterStart>[0]['creature'] }) {
+  const [open, setOpen] = usePlayDraftState('open', true);
+  return (
+    <details className="fold creature-encounter" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>조우 시작</summary>
+      <EncounterStart creature={creature} />
+    </details>
   );
 }

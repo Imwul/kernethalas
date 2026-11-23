@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useEffect, useId, useMemo, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { tableById } from '../../content';
 import { creatureById } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
@@ -13,7 +13,7 @@ import type { RoomShapeState } from '../RoomShapeDiagram';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
 import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
 import { PlayDomainExit, PlayDomainProgress, type DomainDestination } from './PlayDomainProgress';
-import { ExplorationActionLinks, PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport, type ExplorationActionsHandle } from './PlayExplorationActions';
+import { PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport, type ExplorationActionsHandle } from './PlayExplorationActions';
 import { PlayRoll } from './PlayRoll';
 import { PlayPaperMap } from './PlayPaperMap';
 import { PlayFinishedStep } from './PlayFocus';
@@ -38,6 +38,7 @@ interface Props {
   onReport: (report: ExplorationReport) => void;
   onCombat: (kind: 'encounter' | 'overseer', source?: string) => void;
   onWrapUp: () => void;
+  onJournal?: () => void;
   finishedSources: string[];
   initialTension?: TensionDie;
   lightCost?: number;
@@ -58,7 +59,8 @@ interface Props {
 }
 
 const SHAPE_TABLE = tableById.get('t-room-shape')!;
-const PLAY_SHAPE_TABLE = { ...SHAPE_TABLE, notes: undefined };
+// The description follow-on duplicates the description fold further down the step.
+const PLAY_SHAPE_TABLE = { ...SHAPE_TABLE, notes: undefined, rows: SHAPE_TABLE.rows.map((row) => ({ ...row, next: undefined })) };
 const ENCOUNTER_TABLE = tableById.get('t-encounter-check')!;
 const EVENT_TABLE = tableById.get('t-events')!;
 const DARKNESS_TABLE = tableById.get('t-growing-darkness')!;
@@ -89,7 +91,7 @@ const PLAY_ENCOUNTERS = {
 
 const EMPTY_ACTIONS: ExplorationActionReport = { text: '', sheet: [], nextTension: null, darknessRolls: [] };
 
-export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, finishedSources, initialTension = 8, lightCost = 1,
+export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJournal, finishedSources, initialTension = 8, lightCost = 1,
   onDarknessChange, onActionDarknessChange, darknessEffectCount, onTrader,
   domainProgress = DEFAULT_DOMAIN_PROGRESS, onDomainProgress, domainPlaceId = '1', domainPlaceName,
   domainDestinations, domainDefeated, onLeaveDomain, paperMapDomain = 1, paperMap = EMPTY_PAPER_MAP, onPaperMapChange }: Props) {
@@ -116,6 +118,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
   const [darknessFollow, setDarknessFollow] = useState(EMPTY_FOLLOW_UP);
   const [eventFollow, setEventFollow] = useState(EMPTY_FOLLOW_UP);
   const clear = useClearPlayDraftScope();
+  const actionsHeading = useId();
   const commit = usePlayRoll();
 
   const intro = domainProgress.mode === 'intro';
@@ -328,32 +331,28 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
               </label>
             )}
           </div>
-          {!revisit && <details className="fold">
-            <summary>{placeLabel} 환경 묘사</summary>
-            <div className="play-explore-action-body">
-              <PlayRoll label={`${placeLabel} 환경 묘사 굴림`} table={PLACE_DESCRIPTIONS[place]}
-                value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))} />
-            </div>
-          </details>}
-          {onDomainProgress && <PlayDomainProgress progress={domainProgress} place={place} placeId={domainPlaceId} placeName={namedPlace}
-            revisit={revisit} onChange={onDomainProgress} atLair={lairRoom} atExit={exitHere} onLairMark={markLair}
-            onExitMark={(marked) => onDomainProgress(marked
-              ? markDomainPlace(domainProgress, 'exit', { id: domainPlaceId, name: namedPlace })
-              : removeDomainMark(domainProgress, 'exit', domainPlaceId))}
-            recordedArrival={arrival} onArrival={setArrival} />}
-          {intro && !revisit && !lairRoom && <label className="play-explore-lair">
-            <input type="checkbox" checked={fixedIntroRoom} onChange={(event) => setFixedIntroRoom(event.target.checked)} /> 지도 지시로 이곳의 조우·이벤트 생략
-          </label>}
-          <section className="play-explore-step" aria-label="긴장 주사위">
-            <h3>긴장 주사위</h3>
-            <PlayFinishedStep summary={tension ? `D${tension.sides} ${tension.value} · ${tension.darkness ? '짙어지는 어둠' : `다음 D${tension.nextDie}`}` : null}>
-              <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
-                setTension(result);
-                if (enteredLightCost === null && place === 'room') setEnteredLightCost(lightCost);
-                applyDarkness(null);
-              }} />
-            </PlayFinishedStep>
-          </section>
+          {/* Lair/exit and tension are rolled on every entry, so they share one row next to the shape. */}
+          <div className="play-entry-dice">
+            {onDomainProgress && <PlayDomainProgress progress={domainProgress} place={place} placeId={domainPlaceId} placeName={namedPlace}
+              revisit={revisit} onChange={onDomainProgress} atLair={lairRoom} atExit={exitHere} onLairMark={markLair}
+              onExitMark={(marked) => onDomainProgress(marked
+                ? markDomainPlace(domainProgress, 'exit', { id: domainPlaceId, name: namedPlace })
+                : removeDomainMark(domainProgress, 'exit', domainPlaceId))}
+              recordedArrival={arrival} onArrival={setArrival} />}
+            {intro && !revisit && !lairRoom && <label className="play-explore-lair">
+              <input type="checkbox" checked={fixedIntroRoom} onChange={(event) => setFixedIntroRoom(event.target.checked)} /> 지도 지시로 이곳의 조우·이벤트 생략
+            </label>}
+            <section className="play-explore-step" aria-label="긴장 주사위">
+              <h3>긴장 주사위</h3>
+              <PlayFinishedStep summary={tension ? `D${tension.sides} ${tension.value} · ${tension.darkness ? '짙어지는 어둠' : `다음 D${tension.nextDie}`}` : null}>
+                <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
+                  setTension(result);
+                  if (enteredLightCost === null && place === 'room') setEnteredLightCost(lightCost);
+                  applyDarkness(null);
+                }} />
+              </PlayFinishedStep>
+            </section>
+          </div>
           {tension?.darkness && (
             <PlayRoll label="짙어지는 어둠" table={DARKNESS_TABLE} value={darknessRoll} onValue={applyDarkness} />
           )}
@@ -406,13 +405,24 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, fini
               {eventCanStartCombat && <button type="button" className="btn ghost" data-play-next="" onClick={startEventCombat}>이벤트에서 전투가 났다면 조우 표로</button>}
             </div>
           )}
-          {entryResolved && <ExplorationActionLinks room={place === 'room'} label="탐험 후속 행동" onSelect={(action) => actionsRef.current?.open(action)} />}
-          {entryNextTension && <PlayExplorationActions actionsRef={actionsRef} room={place === 'room'} initialSides={entryNextTension}
-            darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
-            onReport={setActionReport} onCombat={startEncounter} scavengeLimit={scavengeLimit} finishedSources={finishedSources}
-            mapLocation={mapRecord} mapExits={mapExits} onMapDoorSave={onPaperMapChange ? saveMapDoor : undefined} />}
+          {!revisit && <details className="fold">
+            <summary>{placeLabel} 환경 묘사</summary>
+            <div className="play-explore-action-body">
+              <PlayRoll label={`${placeLabel} 환경 묘사 굴림`} table={PLACE_DESCRIPTIONS[place]}
+                value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))} />
+            </div>
+          </details>}
+          {entryNextTension && <div className="play-explore-step" role="group" aria-labelledby={actionsHeading}>
+            <h3 id={actionsHeading}>탐험 후속 행동</h3>
+            <PlayExplorationActions actionsRef={actionsRef} room={place === 'room'} initialSides={entryNextTension}
+              darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
+              onReport={setActionReport} onCombat={startEncounter} scavengeLimit={scavengeLimit} finishedSources={finishedSources}
+              mapLocation={mapRecord} mapExits={mapExits} onMapDoorSave={onPaperMapChange ? saveMapDoor : undefined} />
+          </div>}
           {entryResolved && <div className="play-explore-next">
-            <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} data-play-next="" onClick={onWrapUp}>정리로</button>
+            {/* Most rooms end without loot or rest, so the journal is the usual next stop. */}
+            {onJournal && <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} data-play-next="" onClick={onJournal}>저널로</button>}
+            <button type="button" className={lairRoom || onJournal ? 'btn ghost' : 'btn primary'} data-play-next={onJournal ? undefined : ''} onClick={onWrapUp}>정리로</button>
           </div>}
           {exitHere && tensionReady && onLeaveDomain && <PlayDomainExit mode={domainProgress.mode} onLeave={onLeaveDomain} destinations={domainDestinations} />}
         </>

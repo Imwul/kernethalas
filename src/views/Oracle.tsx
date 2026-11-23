@@ -220,9 +220,11 @@ interface OracleBodyProps {
   sourceForRow?: (row: OracleTable['rows'][number]) => string | undefined;
   roomShape?: RoomShapeState;
   afterResult?: ReactNode;
+  /** Play desk: drop reference-only extras (copy, related links, per-table history). */
+  play?: boolean;
 }
 
-export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow, roomShape, afterResult }: OracleBodyProps) {
+export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow, roomShape, afterResult, play = false }: OracleBodyProps) {
   const [localOnly, setLocalOnly] = useState(compact);
   const [encounterPlace, setEncounterPlace] = useState<EncounterPlace | null>(null);
   const table = useRef<HTMLDivElement>(null);
@@ -249,6 +251,7 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
           sourceForRow={sourceForRow}
           roomShape={roomShape}
           afterResult={afterResult}
+          play={play}
           showUnrolledViewToggle={collapseTableBeforeRoll}
           beforeRoll={isEncounter && (
             <div className="oracle-encounter-place">
@@ -276,7 +279,7 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
             <TableView t={activeTable} hit={value} sourceForRow={contextual ? () => '' : sourceForRow} />
           </div>
         )}
-        {t.related.length > 0 && (
+        {!play && t.related.length > 0 && (
           <details className="oracle-related" open={!compact}>
             <summary>관련 항목</summary>
             <Relations related={t.related} />

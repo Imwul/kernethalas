@@ -59,7 +59,7 @@ export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
 
   return (
     <details className="fold play-combat-tools" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>라운드 정리</summary>
+      <summary>라운드 정리 · {position.round}라운드</summary>
       <section className="play-combat-tool-body" aria-label="전투 턴·라운드 체크판">
         <div className="play-round-status" role="status">
           <strong>{position.round}라운드</strong>

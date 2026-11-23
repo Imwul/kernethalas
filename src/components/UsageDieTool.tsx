@@ -10,6 +10,8 @@ import '../styles/usage-die.css';
 interface Props {
   rule: UsageDieRule;
   onReport?: (text: string) => void;
+  /** The caller shows the title above the card (play desk step headings). */
+  hideTitle?: boolean;
   progress?: {
     die: UsageDie;
     recorded?: { die: UsageDie; value: number };
@@ -17,7 +19,7 @@ interface Props {
   };
 }
 
-export function UsageDieTool({ rule, onReport, progress }: Props) {
+export function UsageDieTool({ rule, onReport, progress, hideTitle = false }: Props) {
   const profile = USAGE_DIE_PROFILES[rule];
   const id = useId();
   const [selectedDie, setDie] = usePlayDraftState<UsageDie | null>(`${rule}-die`, profile.start);
@@ -41,7 +43,7 @@ export function UsageDieTool({ rule, onReport, progress }: Props) {
 
   return (
     <section className="usage-die" aria-labelledby={`${id}-title`}>
-      <h3 id={`${id}-title`}>{profile.title}</h3>
+      <h3 id={`${id}-title`} className={hideTitle ? 'sr-only' : undefined}>{profile.title}</h3>
       {!progress?.recorded && (
         <>
           <div className="usage-die-inputs">

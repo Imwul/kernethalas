@@ -137,7 +137,7 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
-  await combat.getByText('라운드 정리', { exact: true }).click();
+  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
   const board = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
   await board.getByRole('button', { name: '다음 라운드' }).click();
   await board.getByText('확인 항목 추가', { exact: true }).click();

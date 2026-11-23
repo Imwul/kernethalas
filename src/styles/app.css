@@ -33,7 +33,7 @@
   --f-body: 'EB Garamond', 'Gowun Batang', Georgia, serif;
   --f-ko: 'Gowun Batang', 'EB Garamond', serif;
   --f-ui: 'Gowun Dodum', 'EB Garamond', system-ui, sans-serif;
-  --f-mono: 'Courier Prime', 'Courier New', monospace;
+  --f-mono: 'Courier Prime', 'Gowun Dodum', 'Courier New', monospace;
 
   --s1: 4px;
   --s2: 8px;
@@ -1900,6 +1900,9 @@ details.fold[open] > summary::before {
   font-family: var(--f-mono);
   font-size: 15px;
   min-width: 0;
+}
+.field select {
+  font-family: var(--f-ui);
 }
 .verdict {
   padding: 12px 14px;

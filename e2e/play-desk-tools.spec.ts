@@ -17,6 +17,7 @@ test('focus view folds finished steps, exposes follow-up rolls and returns to th
   const explore = region(page, '장소 탐험');
   await focus.click();
   await button(explore, '방').click();
+  await enter(region(explore, '은신처 소모 주사위'), '직접 굴린 값', '5');
   const tension = region(explore, '긴장 주사위');
   await enter(tension, '긴장 주사위 굴린 값', '3');
   const unfold = tension.getByRole('button', { name: 'D8 3 · 다음 D8 다시 보기' });
