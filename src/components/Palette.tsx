@@ -1,6 +1,7 @@
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { tableById } from '../content';
 import { automaticRollSides, rollTable } from '../lib/oracle';
+import { parseDice, roll, type RollResult } from '../lib/dice';
 import { search, docs, KIND_LABEL, SEARCH_FILTERS, querySuggestions, searchTerms, type Doc, type SearchFilter } from '../lib/search';
 import { nav, useNav } from '../lib/store';
 import { IClose, IDie, ISearch } from './icons';
@@ -118,6 +119,7 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
           ))}
         </div>
         <div className="search-results" id="search-results" ref={list}>
+          <QuickDice query={query} />
           {!results.length && (
             <div className="search-empty">
               <p>{query.trim() ? `‘${query.trim()}’ 검색 결과가 없습니다.` : '규칙명이나 플레이 중인 상황을 입력하세요.'}</p>
@@ -160,5 +162,26 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
         </div>
       </div>
     </dialog>
+  );
+}
+
+/** Typing a dice expression (2d6+2, d20) offers a roll; nothing is rolled until the button is pressed. */
+function QuickDice({ query }: { query: string }) {
+  const expr = query.trim();
+  const parsed = parseDice(expr);
+  const [result, setResult] = useState<RollResult | null>(null);
+  const label = parsed ? `${parsed.count > 1 ? parsed.count : ''}D${parsed.sides}${parsed.mod ? (parsed.mod > 0 ? `+${parsed.mod}` : parsed.mod) : ''}` : '';
+  const shown = result && result.expr === expr ? result : null;
+  if (!parsed) return null;
+  return (
+    <div className="search-dice">
+      <button type="button" className="btn ghost" onClick={() => setResult(roll(expr))}>
+        <IDie /> {label} 굴리기
+      </button>
+      <output aria-live="polite">
+        {shown && <><b>{shown.total}</b>
+          {(shown.dice.length > 1 || shown.mod !== 0) && <span>{shown.dice.join(' + ')}{shown.mod ? ` ${shown.mod > 0 ? '+' : '−'} ${Math.abs(shown.mod)}` : ''}</span>}</>}
+      </output>
+    </div>
   );
 }

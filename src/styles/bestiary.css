@@ -69,6 +69,8 @@
   color: var(--faded);
   font: 12px var(--f-mono);
 }
+/* the tinted pressed state lowers the faded tone below 4.5:1 in dark mode */
+.bestiary-lookup-tables button[aria-pressed='true'] .bestiary-lookup-hint { color: var(--ink-2); }
 .bestiary-lookup-entry {
   display: flex;
   align-items: flex-end;
@@ -122,6 +124,7 @@
   color: var(--ink);
   font: inherit;
 }
+@media (pointer: coarse) { .bestiary-sort select { min-height: 44px; } }
 .bestiary-count {
   margin-left: auto;
   color: var(--faded);
@@ -202,6 +205,22 @@
   font-family: var(--f-ui);
   font-size: 14px;
   color: var(--faded);
+}
+
+/* tablet widths: keep the table, but tighten it so short values stay on one line
+   and only the trait and appearance columns wrap */
+@container (min-width: 901px) and (max-width: 1180px) {
+  .bestiary-table { font-size: 14px; }
+  .bestiary-table thead th { padding: 8px 6px; }
+  .bestiary-table td,
+  .bestiary-table tbody th { padding: 9px 6px; }
+  .bestiary-table .name a { font-size: 16px; }
+  .bestiary-table td[data-label='유형'],
+  .bestiary-table td[data-label='Armor'],
+  .bestiary-table td[data-label='Health'] { white-space: nowrap; }
+  .bestiary-table td[data-label='유형'] { font-size: 13px; }
+  .bestiary-table .traits { min-width: 9em; font-size: 13px; }
+  .bestiary-table .rolls { font-size: 13px; }
 }
 
 /* narrow: each row becomes a card; stat cells flow as label/value pairs */

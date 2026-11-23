@@ -45,3 +45,29 @@
   .play-checkpoint-form, .play-checkpoint-row { grid-template-columns: minmax(0, 1fr); }
   .play-checkpoint-form > button { justify-self: start; }
 }
+
+.play-site-backup {
+  display: grid;
+  gap: var(--s2);
+  padding-block-start: var(--s3);
+  border-top: 1px solid var(--rule-soft);
+  min-inline-size: 0;
+}
+.play-site-backup :is(h3, h4, p) { margin: 0; }
+.play-site-backup h3 { font: 600 15px/1.4 var(--f-ui); color: var(--ink); }
+.play-site-backup h4 { font: 600 14px/1.4 var(--f-ui); }
+.play-site-backup-status { display: grid; gap: 2px; font: 14px/1.5 var(--f-ui); color: var(--ink-2); }
+.play-site-backup-status [data-stale] { color: var(--oxblood-ink); font-weight: 600; }
+.play-site-backup-help { font: 14px/1.5 var(--f-ui); color: var(--ink-2); overflow-wrap: anywhere; }
+.play-site-backup-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s2) var(--s3);
+  border-inline-start: 2px solid var(--copper-ink);
+  background: var(--copper-wash);
+  font: 14px/1.5 var(--f-ui);
+}
+.play-site-backup-undo .btn { min-block-size: 44px; }
+.play-checkpoints > summary .fold-flag { color: var(--oxblood-ink); font: 600 13px/1.4 var(--f-ui); }

@@ -133,7 +133,7 @@ export function AtlasPage({ id }: { id: string }) {
       )}
       <div className="atlas-notes">
         <Notes notes={p.notes} />
-        <details className="atlas-details">
+        <details className="fold atlas-details">
           <summary>원본 자료</summary>
           <ul className="atlas-source-links">
             {p.source.map(({ book, pages }) => (
@@ -193,14 +193,14 @@ function AttackComparison() {
   if (!ruling?.matrix || !attack) return null;
   return (
     <div className="atlas-attack">
-      <details className="atlas-details">
+      <details className="fold atlas-details">
         <summary>공격 판정 해석기</summary>
         <CheckCalculator attackOnly />
       </details>
       <div className="atlas-attack-links">
         {['multiple-targets', 'defense-reaction-penalty', 'damage-pool', 'armor'].map((id) => <XRef key={id} id={id} />)}
       </div>
-      <details className="atlas-details">
+      <details className="fold atlas-details">
         <summary>공격·방어 결과 비교</summary>
         <div className="atlas-comparison-body">
           <RulingMatrix matrix={ruling.matrix} compare />
@@ -208,7 +208,7 @@ function AttackComparison() {
           <ul className="bullets">
             {ruling.exceptions?.map((text) => <li key={text}>{text}</li>)}
           </ul>
-          <details className="atlas-details">
+          <details className="fold atlas-details">
             <summary>판정 전에 확인할 예외</summary>
             <ul className="bullets">
               {attack.exceptions?.map((text) => <li key={text}>{text}</li>)}

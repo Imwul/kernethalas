@@ -51,7 +51,8 @@
 .play-header-toggles + .btn { margin-inline-start: var(--s2); }
 @media (max-width: 560px) {
   .play-header-toggles { flex: 1 1 100%; }
-  .play-toggle { flex: 1 1 0; justify-content: center; }
+  .play-header-toggles { flex-wrap: wrap; }
+  .play-toggle { flex: 1 1 auto; justify-content: center; gap: 6px; padding-inline: var(--s2); white-space: nowrap; }
   .play-header-toggles + .btn { margin-inline-start: 0; }
 }
 
@@ -74,6 +75,7 @@
   overflow-wrap: anywhere;
 }
 .play-jump-roll > span { color: var(--copper-ink); font-size: 13px; }
+.play-jump-die { margin-inline-start: 0.15em; color: var(--copper-ink); font: 600 13px/1.35 var(--f-mono); white-space: nowrap; }
 .play-action-bar-tools { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .play-action-bar .play-action-bar-tools > .btn { flex: 1 0 auto; padding-inline: var(--s1); }
 
@@ -117,7 +119,9 @@
     inset-inline: 0;
     inset-block-end: 0;
     grid-template-columns: minmax(0, 1fr) auto;
-    padding-inline: max(var(--s2), env(safe-area-inset-left)) max(var(--s2), env(safe-area-inset-right));
+    /* align the bar's contents with the page column above it */
+    padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
+    border-block-start: 1px solid var(--rule);
     background: var(--bone);
   }
   .play-layout { padding-block-end: 5.5rem; }

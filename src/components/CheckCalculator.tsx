@@ -110,7 +110,7 @@ function HitLocation({ enemyAttacks, onHitLocation }: { enemyAttacks: boolean; o
   );
   const tables = procById.get('p-attack')?.nodes.find(({ id }) => id === 'loc')?.tables ?? [];
   return (
-    <details className="checkcalc-hit-tables">
+    <details className="fold checkcalc-hit-tables">
       <summary>적 명중 부위 표 선택</summary>
       <div className="checkcalc-follow-ups">{tables.map((id) => <XRef key={id} id={id} />)}</div>
     </details>

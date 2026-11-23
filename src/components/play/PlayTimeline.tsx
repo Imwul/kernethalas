@@ -1,10 +1,11 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import { formatPendingTimeline, pendingTimelineCount, type PlayTimelineEntry } from '../../lib/play-timeline';
+import { formatPendingTimeline, formatTimeline, pendingTimelineCount, type PlayTimelineEntry } from '../../lib/play-timeline';
 import { CopyButton } from '../bits';
 import '../../styles/play-timeline.css';
 
-export function PlayTimeline({ domainId, timeline, onChange }: {
+export function PlayTimeline({ domainId, domainName, timeline, onChange }: {
   domainId: number;
+  domainName: string;
   timeline: PlayTimelineEntry[];
   onChange: Dispatch<SetStateAction<PlayTimelineEntry[]>>;
 }) {
@@ -26,6 +27,7 @@ export function PlayTimeline({ domainId, timeline, onChange }: {
               <button type="button" aria-pressed={!pendingOnly} onClick={() => setPendingOnly(false)}>전체</button>
               <button type="button" aria-pressed={pendingOnly} onClick={() => setPendingOnly(true)}>미반영만</button>
             </div>
+            <CopyButton text={formatTimeline(entries, domainName)} label="도메인 전체 기록 복사" />
             {pendingCount > 0 && <CopyButton text={formatPendingTimeline(entries)} label="미반영만 복사" />}
           </div>
         )}

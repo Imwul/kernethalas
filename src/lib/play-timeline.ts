@@ -65,6 +65,21 @@ export function formatPendingTimeline(entries: readonly PlayTimelineEntry[]) {
   }).join('\n\n');
 }
 
+/** Every place in visiting order, for pasting a whole domain into a journal or notes app. */
+export function formatTimeline(entries: readonly PlayTimelineEntry[], heading: string) {
+  const places = entries.map((entry) => {
+    const number = `장소 ${entry.roomNumber}`;
+    let title = entry.title === number ? number : `${number} · ${entry.title}`;
+    if (entry.paperId && entry.title !== entry.paperId) title += ` · 지도 ${entry.paperId}`;
+    return [
+      title,
+      ...entry.facts.map(({ label, value }) => `${label} · ${value}`),
+      ...entry.sheet.map(({ text }) => `시트 · ${text}`),
+    ].join('\n');
+  });
+  return [heading, ...places].join('\n\n');
+}
+
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }

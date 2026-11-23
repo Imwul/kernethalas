@@ -478,6 +478,14 @@ kbd {
 .frame-main {
   min-width: 0;
 }
+/* One site column below the ultrawide layout: every page starts on the same edge. */
+@media (min-width: 768px) and (max-width: 1999px) {
+  .frame-main {
+    width: 100%;
+    max-width: 1240px;
+    justify-self: center;
+  }
+}
 .frame-dock {
   display: none;
 }
@@ -675,7 +683,7 @@ kbd {
 .btn.primary {
   background: var(--oxblood);
   border-color: var(--oxblood);
-  color: #f6efe2;
+  color: var(--bone);
   box-shadow: 2px 2px 0 var(--ink);
 }
 .btn.primary:hover {
@@ -1873,12 +1881,6 @@ details.fold[open] > summary::before {
   align-items: center;
   gap: var(--s1) var(--s3);
 }
-.checkcalc-hit-tables summary {
-  cursor: pointer;
-  padding-block: var(--s2);
-  color: var(--copper-ink);
-  font: 14px var(--f-ui);
-}
 .field {
   display: grid;
   gap: 4px;
@@ -2514,27 +2516,10 @@ details.fold[open] > summary::before {
   display: grid;
   gap: 6px;
 }
-/* centred pages: keep the footer on the same column as the page above it */
-.frame-main:has(> .archive-home) > .footer {
-  max-width: 1240px;
-  margin-inline: auto;
-}
-.frame-main:has(> .reference-record) > .footer {
-  max-width: 1220px;
-  margin-inline: auto;
-}
-.frame-main:has(> .sources-page) > .footer {
-  max-width: 960px;
-  margin-inline: auto;
-}
 .footer > * {
   max-width: 100ch;
 }
-/* the play desk is centred inside a full-width main; keep the footer on its column */
-.frame-main:has(> .play-desk) > .footer {
-  max-width: 1120px;
-  margin-inline: auto;
-}
+/* the play desk sits in its own offset column on ultrawide screens; keep the footer on it */
 @media (min-width: 2000px) {
   .frame-main:has(> .play-desk) > .footer {
     max-width: 1940px;
@@ -2711,10 +2696,17 @@ details.fold[open] > summary::before {
   .seg button,
   .linkbtn,
   .btn,
-  .iconbtn {
+  .iconbtn,
+  .tray button,
+  select,
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden']) {
     min-height: 44px;
   }
   .iconbtn {
+    min-width: 44px;
+  }
+  .searchtrigger {
+    height: 44px;
     min-width: 44px;
   }
   .ledger a {
@@ -2729,6 +2721,12 @@ details.fold[open] > summary::before {
     min-height: 44px;
     display: inline-flex;
     align-items: center;
+  }
+}
+/* icon-only search trigger (label hidden below 1100px): keep the glass centred in its 44px box */
+@media (pointer: coarse) and (max-width: 1099px) {
+  .searchtrigger {
+    justify-content: center;
   }
 }
 

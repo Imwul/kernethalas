@@ -34,6 +34,9 @@
 .archive-layout { display: grid; gap: clamp(24px, 3.5vw, 44px); padding-inline: var(--archive-inset); }
 .archive-index { display: grid; gap: 26px; align-content: start; }
 .archive-index .section-head h2 { font-size: 20px; }
+.archive-main { display: grid; gap: 34px; align-content: start; min-width: 0; }
+.archive-main .section-head h2 { font-size: 20px; }
+.archive-main .ledger a { min-height: 44px; }
 .archive-index .ledger a { min-height: 44px; }
 @media (min-width: 900px) {
   .archive-layout { grid-template-columns: minmax(0, 1.8fr) minmax(240px, 1fr); }
@@ -162,10 +165,18 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 .search-input { padding: 6px 12px; border-bottom: 1px solid var(--rule-soft); }
 .search-input input { font-size: 18px; }
 .search-input input:focus-visible { outline-offset: -2px; }
+/* text sits inside its focus box rather than on its edge */
+.search-input input { padding-inline: 8px; }
+/* the dialog has its own close button; hide the browser's blue clear cross next to it */
+.search-input input::-webkit-search-cancel-button { appearance: none; }
 .search-input .iconbtn, .reference-panel .iconbtn { width: 44px; height: 44px; }
 .search-filters { padding-inline: 12px; border-bottom: 1px solid var(--rule-soft); }
 .search-results { overflow: auto; overscroll-behavior: contain; min-height: 0; }
 .search-empty { padding: 16px; }
+.search-dice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); padding: 10px 14px; border-bottom: 1px solid var(--rule-soft); background: var(--paper); }
+.search-dice .btn { min-height: 44px; }
+.search-dice output { display: inline-flex; align-items: baseline; gap: var(--s2); font: 14px/1.4 var(--f-mono); color: var(--ink-2); }
+.search-dice output b { font: 600 24px/1 var(--f-mono); color: var(--ink); }
 .search-empty p { margin: 0 0 8px; }
 .search-empty button { min-height: 44px; }
 .search-group { margin: 0; padding: 10px 14px 2px; color: var(--ink-2); font: 13px var(--f-ui); }
@@ -316,7 +327,7 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
   .panel-visible .archive-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
-.reference-record { display: block; max-width: 1220px; margin-inline: auto; container-type: inline-size; }
+.reference-record { display: block; max-width: 1240px; margin-inline: auto; container-type: inline-size; }
 .reference-folio { display: grid; gap: var(--s5); }
 .reference-folio .folio-head { margin-bottom: 0; box-shadow: none; }
 .reference-folio .folio-head-compact { padding-bottom: 10px; }
@@ -339,7 +350,9 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 .reference-related-jump, .reference-source-link { color: var(--copper-ink); font: 14px var(--f-ui); }
 .reference-related-jump { min-height: 44px; margin-top: 4px; }
 .reference-source-link { display: block; width: fit-content; margin-top: 5px; }
-.reference-related-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
+/* procedure and table links read like the relation rows below them: one per line, same size */
+.reference-related-links { display: grid; justify-items: start; gap: 4px; margin-bottom: 10px; }
+.reference-related-links .xref { font-family: var(--f-ko); font-size: 15.5px; }
 .reference-source { border-top: 1px solid var(--rule-soft); padding-top: 12px; }
 .reference-source p { margin: 0; }
 .reference-source .notice { margin-top: 8px; }

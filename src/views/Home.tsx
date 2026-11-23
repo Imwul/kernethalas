@@ -38,7 +38,15 @@ export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
       </section>
 
       <div className="archive-layout">
-        <SituationFinder onSearch={onSearch} />
+        <div className="archive-main">
+          <SituationFinder onSearch={onSearch} />
+            {recent.length > 0 && (
+              <section aria-labelledby="recent">
+                <div className="section-head"><h2 id="recent">최근 열람</h2></div>
+                <ul className="ledger">{recent.slice(0, 6).map((id) => <LedgerItem key={id} id={id} />)}</ul>
+              </section>
+            )}
+        </div>
         <aside className="archive-index" aria-label="자주 보는 자료">
           <section aria-labelledby="pins">
             <div className="section-head">
@@ -67,12 +75,6 @@ export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
               })}
             </ul>
           </section>
-          {recent.length > 0 && (
-            <section aria-labelledby="recent">
-              <div className="section-head"><h2 id="recent">최근 열람</h2></div>
-              <ul className="ledger">{recent.slice(0, 6).map((id) => <LedgerItem key={id} id={id} />)}</ul>
-            </section>
-          )}
         </aside>
       </div>
     </div>

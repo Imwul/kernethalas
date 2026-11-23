@@ -190,7 +190,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
         <label><input type="checkbox" checked={effectiveDarkness} disabled={domainDarkness} onChange={(event) => setField('darkness', event.target.checked)} /> Growing Darkness 17–18</label>
       </div>
       {sleep && <p>취침 중에는 방어벽만 설치할 수 있습니다.</p>}
-      <details className="camp-activities" open={activitiesOpen} onToggle={(event) => setActivitiesOpen(event.currentTarget.open)}>
+      <details className="fold camp-activities" open={activitiesOpen} onToggle={(event) => setActivitiesOpen(event.currentTarget.open)}>
         <summary>요리 · 제작 · 그 밖의 야영 활동</summary>
         {attunementBlocked && <p>짙어지는 어둠 19–20 · 야영 중 아이템 조율 불가</p>}
         <fieldset className="camp-grid" disabled={sleep}>
@@ -331,7 +331,7 @@ function CampBenefits({
         <div><dt>Sanity</dt><dd>{sanityRecovery}</dd></div>
         <div><dt>Exhaustion</dt><dd>{exhaustion}</dd></div>
       </dl>
-      <details className="camp-activities" open={open} onToggle={(event) => onOpen(event.currentTarget.open)}>
+      <details className="fold camp-activities" open={open} onToggle={(event) => onOpen(event.currentTarget.open)}>
         <summary>회복량 직접 계산</summary>
         <div className="camp-grid">
           <CampNumberField label="잃은 Toughness" value={lostToughness} onChange={setLostToughness} invalid={lost === null} />

@@ -115,7 +115,7 @@ function creatureEntry(c: CreatureRecord): Entry {
     ko: c.name,
     aliases: [c.name, ...(CREATURE_NAME_ALIASES[c.id] ?? []), ...c.types, ...c.types.map((t) => TYPE_KO[t] ?? t), group, ...c.traits],
     tags: [group, ...c.types],
-    summary: `${c.types.map((t) => `${t}(${TYPE_KO[t] ?? t})`).join(' · ')} — ${group}. 수치는 레벨 적응 적용 전 기본값.`,
+    summary: `${c.types.map((t) => TYPE_KO[t] ?? t).join(' · ')} — ${group}. 수치는 레벨 적응 적용 전 기본값.`,
     stats: {
       Number: c.number,
       Mind: c.mind,

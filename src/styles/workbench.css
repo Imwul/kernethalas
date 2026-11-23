@@ -97,3 +97,40 @@
 .bench-tool-outline > .steps {
   margin: 0 var(--s3) var(--s3);
 }
+
+/* Ultrawide: pinned and recent lists share the full width instead of a three-column home grid. */
+@media (min-width: 2000px) {
+  .bench .home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* empty ultrawide dock: pinned and recent items as one-tap panes */
+.dock-suggest { display: grid; gap: var(--s2); }
+.dock-suggest h3 { margin: 0; font: 600 14px/1.4 var(--f-ui); color: var(--ink-2); }
+.dock-suggest ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: 0 var(--s4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dock-suggest button {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--s1);
+  border: 0;
+  border-bottom: 1px dotted var(--rule);
+  background: none;
+  color: var(--ink);
+  font: 16px/1.35 var(--f-ko);
+  text-align: start;
+  cursor: pointer;
+}
+.dock-suggest button > :nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dock-suggest button > :last-child { color: var(--copper-ink); font: 16px var(--f-mono); }
+.dock-suggest button:hover { background: var(--copper-wash); }
+.dock-suggest-kind { flex: none; width: 2.5em; color: var(--faded); font: 12px var(--f-ui); }
+.dock:has(> .dock-suggest) { grid-template-rows: none; align-content: start; }

@@ -377,6 +377,29 @@ export function Workbench() {
 }
 
 /** Ultrawide dock: open panes live beside whatever page you are reading. */
+/** Empty dock: offer the reader's pinned and recent items as one-tap panes instead of a blank box. */
+function DockSuggestions() {
+  const { pins, recent } = useNav();
+  const ids = [...new Set([...pins, ...recent])].filter((id) => kindOf(id)).slice(0, 8);
+  if (!ids.length) return null;
+  return (
+    <section className="dock-suggest" aria-labelledby="dock-suggest-h">
+      <h3 id="dock-suggest-h">바로 펼치기</h3>
+      <ul>
+        {ids.map((id) => (
+          <li key={id}>
+            <button type="button" onClick={() => nav.open(id)}>
+              <span className="dock-suggest-kind">{pins.includes(id) ? '고정' : '최근'}</span>
+              <span>{titleOf(id).ko}</span>
+              <span aria-hidden="true">+</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function Dock() {
   const { open } = useNav();
   return (
@@ -391,9 +414,12 @@ export function Dock() {
         <BenchPresets />
       </div>
       {open.length === 0 ? (
-        <div className="empty">
-          넓은 화면에서는 펼친 항목이 이곳에 계속 머뭅니다. 아무 페이지에서나 <b>작업대에 펼치기</b>를 눌러 보세요.
-        </div>
+        <>
+          <div className="empty">
+            넓은 화면에서는 펼친 항목이 이곳에 계속 머뭅니다. 아무 페이지에서나 <b>작업대에 펼치기</b>를 눌러 보세요.
+          </div>
+          <DockSuggestions />
+        </>
       ) : (
         <div className="dock-panes">
           {open.map((id) => (

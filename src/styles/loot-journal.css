@@ -69,13 +69,6 @@
 .loot-journal .xref { min-height: 44px; align-items: center; }
 .loot-appearance { border-top: 1px solid var(--rule-soft); }
 
-.loot-appearance summary {
-  padding-block: var(--s2);
-  cursor: pointer;
-  color: var(--copper-ink);
-  font: 14px/1.5 var(--f-ui);
-}
-
 .loot-journal-line {
   display: grid;
   gap: var(--s2);

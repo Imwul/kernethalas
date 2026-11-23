@@ -244,6 +244,8 @@
   min-width: 0;
   container-type: inline-size;
 }
+/* two-column tables (range + result) stop at a reading measure instead of stretching across the page */
+.oracle-table-sheet .ttable:not(.cols-many) { max-inline-size: 48rem; }
 
 @container (max-width: 560px) {
   .oracle-table-sheet .ttable.cols-many {

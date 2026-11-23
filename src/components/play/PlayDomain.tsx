@@ -82,7 +82,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate,
             <button className="btn ghost" type="button" onClick={() => setDestination(null)}>취소</button>
           </div>
         )}
-        {timeline && onTimelineChange && <PlayTimeline domainId={domain.id} timeline={timeline} onChange={onTimelineChange} />}
+        {timeline && onTimelineChange && <PlayTimeline domainId={domain.id} domainName={domainName(domain)} timeline={timeline} onChange={onTimelineChange} />}
         <section className="play-domain-options" aria-label="도메인 진행 설정">
           <h3>탐험 진행</h3>
           <div className="play-domain-fields">

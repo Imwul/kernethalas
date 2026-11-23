@@ -84,7 +84,7 @@ export function focusPlayRoll(stage: Stage, field?: string, onResult?: (focused:
 
 export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: () => void }) {
   const draft = usePlayDraft()!;
-  const [target, setTarget] = useState('');
+  const [target, setTarget] = useState<{ label: string; die?: string } | null>(null);
   const barRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const bar = barRef.current;
@@ -118,7 +118,7 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
         const action = nextAction(section);
         const label = action?.dataset.playRollLabel ?? action?.textContent?.trim();
         const die = action?.dataset.playRollDie;
-        setTarget(label ? [label, die].filter(Boolean).join(' · ') : '');
+        setTarget(label ? { label, die: die || undefined } : null);
       });
     };
     const observer = new MutationObserver(update);
@@ -140,15 +140,35 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
     else focusPlayRoll(stage);
   };
 
+  // Hardware keyboards (iPad, laptop): N jumps to the next action, U undoes the last roll.
+  const shortcuts = useRef({ jump, undo: draft.undoRoll, canUndo: draft.canUndo });
+  shortcuts.current = { jump, undo: draft.undoRoll, canUndo: draft.canUndo };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement;
+      if (target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog[open]')) return;
+      const key = event.key.toLowerCase();
+      if (key === 'n') { event.preventDefault(); shortcuts.current.jump(); }
+      else if (key === 'u' && shortcuts.current.canUndo) { event.preventDefault(); shortcuts.current.undo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <section className="play-action-bar" aria-label="다음 행동 바로가기" ref={barRef}>
       <button className="btn ghost play-jump-roll" aria-label={target ? '다음 행동' : '현재 단계로 이동'}
+        aria-keyshortcuts="N" title="단축키 N"
         aria-describedby="play-jump-roll-target" type="button" onClick={jump}>
         <span>{target ? '다음 행동' : '현재 단계'}</span>
-        <strong id="play-jump-roll-target">{target || '단계 맨 위로'}</strong>
+        <strong id="play-jump-roll-target">
+          {target ? target.label : '단계 맨 위로'}
+          {target?.die && <> <span className="play-jump-die"><span className="sr-only">· </span>{target.die}</span></>}
+        </strong>
       </button>
       <div className="play-action-bar-tools">
-        <button className="btn ghost" type="button" aria-label="방금 굴림 되돌리기"
+        <button className="btn ghost" type="button" aria-label="직전 굴림 되돌리기" aria-keyshortcuts="U" title="단축키 U"
           disabled={!draft.canUndo} onClick={draft.undoRoll}>되돌리기</button>
         <button className="btn ghost" type="button" aria-label="이번 장소 굴림 이력으로 이동" onClick={onHistory}>굴림 이력</button>
       </div>

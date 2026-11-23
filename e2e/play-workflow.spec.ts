@@ -31,11 +31,11 @@ test('mobile action bar focuses the next physical roll and the 00 shortcut persi
   await expect(shape.getByRole('img')).toHaveCount(0);
   await shape.getByRole('button', { name: '확인', exact: true }).click();
   await expect(shape.getByRole('img', { name: /100번 방 모양/ })).toBeVisible();
-  await expect(bar.getByRole('button', { name: '방금 굴림 되돌리기' })).toBeEnabled();
+  await expect(bar.getByRole('button', { name: '직전 굴림 되돌리기' })).toBeEnabled();
   await page.reload();
   await expect(preferred).toHaveAttribute('aria-pressed', 'true');
   await expect(shape.getByRole('img', { name: /100번 방 모양/ })).toBeVisible();
-  await bar.getByRole('button', { name: '방금 굴림 되돌리기' }).click();
+  await bar.getByRole('button', { name: '직전 굴림 되돌리기' }).click();
   await expect(shape.getByRole('img')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });

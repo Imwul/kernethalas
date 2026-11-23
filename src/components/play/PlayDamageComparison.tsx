@@ -62,7 +62,7 @@ export function PlayDamageComparison({ targets }: { targets: readonly Comparison
                     <span className="play-damage-response" data-reaction={appearance}>{damageReactionText(reaction)}</span>
                     {condition && defenses.immuneConditions.includes(condition) &&
                       <span className="play-damage-immunity">{titleOf(condition.toLowerCase()).ko} 상태 면역</span>}
-                    {effects.length > 0 && <details className="play-damage-actions">
+                    {effects.length > 0 && <details className="fold play-damage-actions">
                       <summary>임시 효과{active.length > 0 && ` ${active.length}개 적용 중`}</summary>
                       {effects.map(({ name, description }) => (
                         <label className="play-combat-tool-check" key={name}>

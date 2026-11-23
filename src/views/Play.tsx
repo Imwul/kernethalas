@@ -16,6 +16,7 @@ import { findPaperCorrections, paperReceiptKey, PlayPaperCorrections, type Paper
 import { PlayPendingRolls } from '../components/play/PlayPendingRolls';
 import { PlayPinnedTool } from '../components/play/PlayPinnedTool';
 import { PlayWrapUp } from '../components/play/PlayWrapUp';
+import { useKeepAwakePreference, useScreenWakeLock, wakeLockSupported } from '../lib/wake-lock';
 import { focusPlayRoll, PlayActionBar, PlayRollHistory, usePhysicalFirst, usePlayPreference } from '../components/play/PlayWorkflow';
 import { BESTIARY_CREATURE_PARAM } from '../lib/bestiary-encounter';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
@@ -120,6 +121,8 @@ export function Play() {
 
 function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFocusMode: () => void }) {
   const draft = usePlayDraft()!;
+  const [keepAwake, toggleKeepAwake] = useKeepAwakePreference();
+  const screenAwake = useScreenWakeLock(keepAwake);
   const campaignId = usePlayCampaignId();
   const { search } = useLocation();
   const requestedCreature = search.get(BESTIARY_CREATURE_PARAM);
@@ -509,8 +512,10 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           <div className="play-header-toggles" role="group" aria-label="보기 설정">
             <button className="play-toggle" type="button" aria-pressed={physicalFirst} onClick={togglePhysicalFirst}>실물 입력 우선</button>
             <button className="play-toggle" type="button" aria-pressed={focusMode} onClick={toggleFocusMode}>집중 보기</button>
+            {wakeLockSupported() && <button className="play-toggle" type="button" aria-pressed={keepAwake}
+              title={keepAwake && !screenAwake ? '브라우저가 화면 켜 두기를 허용하지 않았습니다.' : undefined}
+              onClick={toggleKeepAwake}>화면 켜 두기</button>}
           </div>
-          <button className="btn ghost" type="button" disabled={!draft.canUndo} onClick={draft.undoRoll}>직전 굴림 되돌리기</button>
           <button className="btn ghost" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
             onClick={() => setConfirmReset((open) => !open)}>새 장소 시작</button>
         </div>
@@ -522,26 +527,28 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           <button className="btn ghost" type="button" onClick={() => setConfirmReset(false)}>취소</button>
         </div>
       )}
-      <PlayCheckpoints data={{ slots: draft.slots, gear: gear.ledger, encounters: customSets, history: draft.history }}
-        place={placeName.trim() || paperId || `장소 ${roomNumber}`} stage={stage.label} onRestore={restoreCheckpoint} />
-      <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
-        onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
-        timeline={timeline} onTimelineChange={setTimeline} />
-      <PlayOngoingEffects />
-      <PlayPendingRolls stage={active} roomId={roomLedgerId} wrapBattleId={wrapId}
-        place={`${domain.name.trim() || `도메인 ${domain.id}`} · ${placeName.trim() || paperId || `장소 ${roomNumber}`}`}
-        rolls={pendingRolls} onChange={setPendingRolls} onJump={(roll, after) => {
-          if (roll.wrapBattleId) {
-            const outcome = battles[roll.wrapBattleId]?.outcome;
-            if (!outcome || outcome === 'fled') { after(false); return; }
-            setWrapId(roll.wrapBattleId);
-          }
-          goToRecordedField(roll, after);
-        }} />
-      <details className="fold play-gear-fold" ref={inventory}>
-        <summary>장비 장부{gear.ledger.items.length > 0 ? ` · ${gear.ledger.items.length}종` : ''}</summary>
-        <PlayInventory state={gear} changes={gearChanges} roomId={roomLedgerId} />
-      </details>
+      <div className="play-ledgers">
+        <PlayCheckpoints data={{ slots: draft.slots, gear: gear.ledger, encounters: customSets, history: draft.history }}
+          place={placeName.trim() || paperId || `장소 ${roomNumber}`} stage={stage.label} onRestore={restoreCheckpoint} />
+        <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
+          onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
+          timeline={timeline} onTimelineChange={setTimeline} />
+        <PlayOngoingEffects />
+        <PlayPendingRolls stage={active} roomId={roomLedgerId} wrapBattleId={wrapId}
+          place={`${domain.name.trim() || `도메인 ${domain.id}`} · ${placeName.trim() || paperId || `장소 ${roomNumber}`}`}
+          rolls={pendingRolls} onChange={setPendingRolls} onJump={(roll, after) => {
+            if (roll.wrapBattleId) {
+              const outcome = battles[roll.wrapBattleId]?.outcome;
+              if (!outcome || outcome === 'fled') { after(false); return; }
+              setWrapId(roll.wrapBattleId);
+            }
+            goToRecordedField(roll, after);
+          }} />
+        <details className="fold play-gear-fold" ref={inventory}>
+          <summary>장비 장부{gear.ledger.items.length > 0 ? ` · ${gear.ledger.items.length}종` : ''}</summary>
+          <PlayInventory state={gear} changes={gearChanges} roomId={roomLedgerId} />
+        </details>
+      </div>
 
       <div className="play-layout">
         <nav className="play-nav" aria-label="플레이 단계">

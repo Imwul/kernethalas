@@ -21,6 +21,10 @@
 .home-launch-tools { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .home-launch-tools .bigsearch { flex: 1 1 206px; min-width: 0; }
 .home-play-launch { min-height: 54px; }
+/* phones: the play button and the search field below it share one edge */
+@media (max-width: 480px) {
+  .home-launch-tools > :is(.home-play-launch, .home-play-resume) { flex: 1 1 100%; justify-content: center; }
+}
 
 @media (max-width: 420px) {
   .masthead-inner { padding-inline: var(--s2); }
@@ -39,8 +43,6 @@
 .play-desk {
   --play-sticky-top: calc(var(--header-h) + 1px);
   --play-stage-top: calc(var(--play-sticky-top) + 46px);
-  max-width: 1120px;
-  margin-inline: auto;
   container: play-desk / inline-size;
 }
 
@@ -165,9 +167,25 @@ details.play-domain { margin-block: 0 var(--s3); }
 .play-facts dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .play-refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); column-gap: var(--s2); }
 .play-refs .xref { min-height: 44px; align-items: center; font: 15px/1.4 var(--f-ui); }
-/* The desk's folds read as one ledger: no gaps between consecutive rows. */
-.play-desk > details.fold { margin-block: 0; }
-.play-desk > details.fold:has(+ .play-layout) { margin-bottom: var(--s4); border-bottom: 1px solid var(--rule); }
+/* The desk's ledgers (save, domain, ongoing, pending, gear) sit in a compact grid of summaries
+   so the stage starts higher; an opened ledger takes the full row below the closed ones. */
+.play-ledgers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row dense;
+  column-gap: var(--s5);
+  margin-bottom: var(--s4);
+  border-bottom: 1px solid var(--rule);
+}
+.play-ledgers > details.fold { margin: 0; min-inline-size: 0; }
+@container play-desk (width >= 720px) {
+  .play-ledgers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .play-ledgers > details.fold[open] { grid-column: 1 / -1; }
+  .play-ledgers > details.fold:last-child:not([open]) { grid-column: span 2; }
+}
+@container play-desk (width >= 1040px) {
+  .play-ledgers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .play-journal {
   display: grid;
   gap: var(--s3);

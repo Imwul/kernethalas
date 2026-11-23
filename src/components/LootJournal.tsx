@@ -291,7 +291,7 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
         </>
       )}
       {baseReady && (
-        <details className="loot-appearance">
+        <details className="fold loot-appearance">
           <summary>외형 메모 (선택)</summary>
           <XRef id="t-peculiarity">특이점 표 열기</XRef>
           <label className="field"><span>외형 한 줄</span>
