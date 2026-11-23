@@ -74,13 +74,14 @@ export function calculateDirectDamage(input: DirectDamage) {
   const armorIgnore = ignoresArmor(type) ? armor : Math.min(armor, extraArmorIgnore + (type === 'Bludgeoning' ? 1 : 0));
   const absorbed = Math.min(beforeArmor, armor - armorIgnore);
   const afterArmor = beforeArmor - absorbed;
-  const slashing = type === 'Slashing' && afterArmor <= 3 ? 1 : 0;
-  const afterType = afterArmor + slashing;
   const reacted = reactions.immune ? 0
-    : reactions.vulnerable === reactions.resistant ? afterType
-      : reactions.vulnerable ? 2 * afterType : Math.ceil(afterType / 2);
-  const amount = Math.max(0, reacted - reduction);
+    : reactions.vulnerable === reactions.resistant ? afterArmor
+      : reactions.vulnerable ? 2 * afterArmor : Math.ceil(afterArmor / 2);
+  const reduced = Math.max(0, reacted - reduction);
+  // Rulings q-damage-order: the Slashing bonus comes last, after reactions and damage reduction.
+  const slashing = type === 'Slashing' && !reactions.immune && reduced <= 3 ? 1 : 0;
+  const amount = reduced + slashing;
 
-  return { base, multiplier, piercing, beforeArmor, armorIgnore, absorbed, afterArmor, slashing, afterType, reacted, amount,
+  return { base, multiplier, piercing, beforeArmor, armorIgnore, absorbed, afterArmor, reacted, reduced, slashing, amount,
     restored: reactions.restored && !reactions.immune };
 }

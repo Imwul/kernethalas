@@ -1,17 +1,27 @@
 import { useId, useState, type ReactNode } from 'react';
-import { parseDice, rollDie, type RollResult } from '../lib/dice';
+import { parseDice, pooledDie, rollDie, type RollResult } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/loot-journal.css';
 
-export function PhysicalDiceRoll({ label, dice, value, onValue, resultText }: {
+/** Damage Pool roll: one die counts. `choose` lets the player pick it; otherwise the highest die is used. */
+export interface DamagePoolOptions {
+  choose: boolean;
+  /** Damage type of each die, in roll order. */
+  labels?: readonly string[];
+  /** Damage this die would deal once the target's defenses apply. */
+  preview?: (amount: number, index: number) => ReactNode;
+}
+
+export function PhysicalDiceRoll({ label, dice, value, onValue, resultText, pool }: {
   label: string;
   dice: string;
   value?: RollResult;
   onValue: (value: RollResult) => void;
   resultText?: (value: RollResult) => ReactNode;
+  pool?: DamagePoolOptions;
 }) {
   const id = useId();
   const [typed, setTyped] = useState('');
@@ -26,10 +36,15 @@ export function PhysicalDiceRoll({ label, dice, value, onValue, resultText }: {
   const mod = parsed.reduce((total, term) => total + term.mod, 0);
   const sameSize = sides.every((side) => side === sides[0]);
   const applied = value?.expr === dice ? value : undefined;
+  const picked = applied && pool ? pooledDie(applied) : null;
+  const signedMod = mod > 0 ? ` +${mod}` : mod < 0 ? ` −${-mod}` : '';
 
   const apply = (faces: number[], source: PlayRollDetails['source']) => {
-    commit(() => onValue({ expr: dice, dice: faces, mod, total: faces.reduce((total, face) => total + face, mod) }), {
-      label, dice, value: faces.map((face, index) => sides[index] === 100 && face === 100 ? '00' : String(face)).join(' + '),
+    const picked = pool ? pooledDie({ dice: faces, mod }) : null;
+    commit(() => onValue(picked
+      ? { expr: dice, dice: faces, mod, total: picked.amount, pick: picked.index }
+      : { expr: dice, dice: faces, mod, total: faces.reduce((total, face) => total + face, mod) }), {
+      label, dice, value: faces.map((face, index) => sides[index] === 100 && face === 100 ? '00' : String(face)).join(pool ? ' / ' : ' + '),
       source, field: field['data-play-roll-field'],
     });
     setTyped('');
@@ -61,9 +76,22 @@ export function PhysicalDiceRoll({ label, dice, value, onValue, resultText }: {
           ? `1–${sides[0]}${sides[0] === 100 ? ' 또는 00' : ''} 결과를 ${sides.length}개 입력하세요.`
           : '표시된 주사위 순서대로 결과를 공백으로 구분해 입력하세요.'}</p>}
       </form>
+      {applied && pool?.choose && applied.dice.length > 1 && picked && <fieldset className="damage-pool-pick">
+        <legend>사용할 주사위 하나</legend>
+        {applied.dice.map((face, index) => {
+          const amount = face + applied.mod;
+          return <label className="damage-pool-option" key={index}>
+            <input type="radio" name={`${id}-pick`} checked={picked.index === index}
+              onChange={() => onValue({ ...applied, pick: index, total: amount })} />
+            <span className="damage-pool-face">{pool.labels?.[index] && `${pool.labels[index]} `}<b>{face}</b>{signedMod}</span>
+            {pool.preview && <span className="damage-pool-preview">{pool.preview(amount, index)}</span>}
+            {index === picked.highest && <span className="damage-pool-tag">가장 높음</span>}
+          </label>;
+        })}
+      </fieldset>}
       {applied && <div className="loot-roll-result" role="status">
-        <span className="readout">{applied.total}</span>
-        {resultText && <span>{resultText(applied)}</span>}
+        <span className="readout">{picked ? picked.amount : applied.total}</span>
+        {resultText && <span>{resultText(picked ? { ...applied, total: picked.amount, pick: picked.index } : applied)}</span>}
       </div>}
     </fieldset>
   );

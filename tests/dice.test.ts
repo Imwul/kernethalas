@@ -78,3 +78,20 @@ describe('opposed & attack (Core p.70, 75)', () => {
     expect(r.attackerFumble).toBe(true);
   });
 });
+
+describe('Damage Pool', () => {
+  it('counts one die, defaulting to the highest, and applies the fixed modifier to it', async () => {
+    const { pooledDie } = await import('../src/lib/dice');
+    expect(pooledDie({ dice: [4, 6], mod: 0 })).toMatchObject({ index: 1, amount: 6, highest: 1 });
+    expect(pooledDie({ dice: [4, 3, 5], mod: 1 })).toMatchObject({ amount: 6 });
+    expect(pooledDie({ dice: [4, 6], mod: 0, pick: 0 })).toMatchObject({ index: 0, amount: 4, highest: 1 });
+    expect(pooledDie({ dice: [4, 6], mod: 0, pick: 5 })).toMatchObject({ index: 1, amount: 6 });
+  });
+
+  it('pools a creature action’s dice and keeps each die’s damage type', async () => {
+    const { splitActionDamage } = await import('../src/lib/damage-pool');
+    expect(splitActionDamage([['Fire', 'D8'], ['Infernal', 'D4']]).pool).toEqual({ dice: 'D8+D4', types: ['Fire', 'Infernal'], mixed: true });
+    expect(splitActionDamage([['Bludgeoning', '2D8']]).pool).toEqual({ dice: '2D8', types: ['Bludgeoning', 'Bludgeoning'], mixed: false });
+    expect(splitActionDamage([['Fire', 2]])).toEqual({ fixed: [['Fire', 2]], pool: null });
+  });
+});

@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import type { ActionDamage } from '../content/creature-action-rules';
 import type { RollResult } from '../lib/dice';
+import { splitActionDamage } from '../lib/damage-pool';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { PhysicalDiceRoll } from './PhysicalDiceRoll';
 
@@ -29,8 +30,8 @@ export function CreatureAreaTargets({ damage, renderTarget }: {
   const value = draft ?? names.join('\n');
   const parsed = parseTargets(value);
   const altered = parsed && parsed.join('\n') !== names.join('\n');
-  const damageRolls = damage.flatMap(([type, amount], index) => typeof amount === 'string' ? [{ type, dice: amount, index }] : []);
-  const sharedMode = mode === 'shared' && damageRolls.length > 0;
+  const { pool } = splitActionDamage(damage);
+  const sharedMode = mode === 'shared' && !!pool;
 
   return (
     <>
@@ -57,7 +58,7 @@ export function CreatureAreaTargets({ damage, renderTarget }: {
           </div>
         </form>
         {!!names.length && <>
-          {damageRolls.length > 0 && <label className="field creature-area-damage-mode"><span>피해 주사위</span>
+          {pool && <label className="field creature-area-damage-mode"><span>피해 주사위</span>
             <select value={mode} onChange={(event) => setMode(event.target.value === 'shared' ? 'shared' : 'individual')}>
               <option value="individual">대상마다 굴림</option>
               <option value="shared">같은 굴림 결과 사용</option>
@@ -75,9 +76,8 @@ export function CreatureAreaTargets({ damage, renderTarget }: {
           </div>
           {sharedMode && <section className="creature-area-shared" aria-label="공유 피해 굴림">
             <h4>공유 피해 굴림</h4>
-            {damageRolls.map(({ type, dice, index }) => <PhysicalDiceRoll key={index}
-              label={`공유 ${type} 피해`} dice={dice} value={shared[index]}
-              onValue={(roll) => setShared((old) => ({ ...old, [index]: roll }))} />)}
+            {pool && <PhysicalDiceRoll label={`공유 ${[...new Set(pool.types)].join(' + ')} 피해`} dice={pool.dice} value={shared[0]}
+              onValue={(roll) => setShared((old) => ({ ...old, 0: roll }))} pool={{ choose: pool.mixed, labels: pool.types }} />}
           </section>}
         </>}
       </div>

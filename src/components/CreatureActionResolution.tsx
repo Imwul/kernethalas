@@ -1,7 +1,9 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ActionDamage, CreatureActionRule } from '../content/creature-action-rules';
 import type { CreatureAction } from '../content/entries/creatures';
-import type { RollResult } from '../lib/dice';
+import { pooledDie, type RollResult } from '../lib/dice';
+import type { DamageType } from '../lib/damage';
+import { splitActionDamage, type ActionDamagePool } from '../lib/damage-pool';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { CreatureAreaTargets, type SharedActionDamage } from './CreatureAreaTargets';
 import { CreatureSummonRoll, type CombatSummonControls } from './CreatureSummonRoll';
@@ -122,34 +124,49 @@ function ActionOutcomeRolls({ damage, duration, halfDamage, target, shared }: {
   shared?: SharedActionDamage;
 }) {
   const [durationRoll, setDurationRoll] = usePlayDraftState<RollResult | undefined>('duration', undefined);
+  const { fixed, pool } = splitActionDamage(damage);
   return (
     <>
-      {damage.map((effect, index) => (
-        <PlayDraftScope key={index} name={`damage-${index}`}>
-          <ActionDamageRoll effect={effect} halfDamage={halfDamage} target={target} shared={shared ? shared[index] ?? null : undefined} />
-        </PlayDraftScope>
-      ))}
+      {fixed.map(([type, amount], index) => <div className="creature-action-damage" key={index}>
+        <p>{damageText(type, amount, halfDamage)}</p>
+        <DamageTypeGuide type={type} />
+      </div>)}
+      {pool && <PlayDraftScope name="damage-pool">
+        <ActionDamageRoll pool={pool} halfDamage={halfDamage} target={target} shared={shared ? shared[0] ?? null : undefined} />
+      </PlayDraftScope>}
       {duration && <PhysicalDiceRoll label={target ? `지속 라운드 · ${target}` : '지속 라운드'} dice={duration} value={durationRoll}
         onValue={setDurationRoll} resultText={({ total }) => `${total}라운드`} />}
     </>
   );
 }
 
-function ActionDamageRoll({ effect: [type, amount], halfDamage, target, shared }: {
-  effect: ActionDamage;
+const damageText = (type: DamageType, amount: number, halfDamage: boolean) =>
+  `${type} 피해 ${halfDamage ? `${Math.ceil(amount / 2)} (절반 · 올림)` : amount}`;
+
+/** Core p.81: a creature uses one die from its Damage Pool. With mixed damage types the player picks the die. */
+function ActionDamageRoll({ pool, halfDamage, target, shared }: {
+  pool: ActionDamagePool;
   halfDamage: boolean;
   target?: string;
   shared?: RollResult | null;
 }) {
   const [rolled, setRolled] = usePlayDraftState<RollResult | undefined>('roll', undefined);
-  const text = (total: number) => `${type} 피해 ${halfDamage ? `${Math.ceil(total / 2)} (절반 · 올림)` : total}`;
+  const typeLabel = [...new Set(pool.types)].join(' + ');
+  const outcome = (roll: RollResult) => {
+    const { index, amount } = pooledDie(roll);
+    const note = pool.types.length > 1 && !pool.mixed ? ' · 가장 높은 눈' : '';
+    return damageText(pool.types[index], amount, halfDamage) + note;
+  };
   return (
     <div className="creature-action-damage">
-      {typeof amount === 'number' ? <p>{text(amount)}</p> : shared === undefined
-        ? <PhysicalDiceRoll label={target ? `${type} 피해 · ${target}` : `${type} 피해`} dice={amount}
-            value={rolled} onValue={setRolled} resultText={({ total }) => text(total)} />
-        : <p>{shared?.expr === amount ? text(shared.total) : `공유 ${type} 피해 굴림 대기`}</p>}
-      <DamageTypeGuide type={type} />
+      {shared === undefined
+        ? <PhysicalDiceRoll label={target ? `${typeLabel} 피해 · ${target}` : `${typeLabel} 피해`} dice={pool.dice}
+            value={rolled} onValue={setRolled} resultText={outcome} pool={{
+              choose: pool.mixed, labels: pool.types,
+              preview: halfDamage ? (amount) => `→ 절반 ${Math.ceil(amount / 2)}` : undefined,
+            }} />
+        : <p>{shared?.expr === pool.dice ? outcome(shared) : `공유 ${typeLabel} 피해 굴림 대기`}</p>}
+      {[...new Set(pool.types)].map((type) => <DamageTypeGuide key={type} type={type} />)}
     </div>
   );
 }

@@ -24,7 +24,7 @@
 .play-combat > .play-mastery-fold { margin-block: 0; }
 .play-mastery-fold > summary { min-block-size: 44px; }
 .play-mastery-card .field { min-inline-size: 0; }
-.play-mastery-card :is(input:not([type='checkbox']), select, textarea) { inline-size: 100%; min-block-size: 44px; }
+.play-mastery-card :is(input:not([type='checkbox'], [type='radio']), select, textarea) { inline-size: 100%; min-block-size: 44px; }
 .play-mastery-card .btn { min-block-size: 44px; }
 .play-mastery-card [data-play-dice] { font-variant-numeric: tabular-nums; }
 

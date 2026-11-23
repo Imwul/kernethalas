@@ -318,7 +318,7 @@ export const explorationEntries: Entry[] = [
       '잠김 여부(문·용기만): D20, 문 12+ / 용기 10+.',
     ],
     outcomes: [
-      { label: '해제(Disarm)', text: 'Thieves’ Toolkit 필요, Thievery(Random Difficulty). 실패 → 발동.' },
+      { label: '해제(Disarm)', text: 'Thieves’ Toolkit 필요, Thievery +5(Toolkit)·Random Difficulty. 실패 → 발동.' },
       { label: '우회(Bypass)', text: '환경 함정에만 사용한다. 지정된 회피 Skill에 +20. 성공하면 어느 출구로든 이동할 수 있고, 문은 일반 절차로 조사하고 열 수 있다. 뒤지기나 다른 물체를 건드리는 행동은 할 수 없다. 같은 함정을 다시 우회할 때 난이도는 Effortless(+20)다.' },
       { label: '고의 발동', text: '회피 판정 +20. 성공하면 피해 없이 제거.' },
       { label: '자물쇠 따기', text: 'Lockpick 필요, Thievery. 실패 시 Lockpick 파손, 재시도 시 난이도 한 단계 쉬워짐.' },

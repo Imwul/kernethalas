@@ -216,7 +216,7 @@ function DamageBreakdown({ result, armor, critical, weak, type, reactions, reduc
   reduction: number;
   pc: boolean;
 }) {
-  const { base, multiplier, piercing, beforeArmor, armorIgnore, absorbed, afterArmor, slashing, afterType, reacted, amount, restored } = result;
+  const { base, multiplier, piercing, beforeArmor, armorIgnore, absorbed, afterArmor, slashing, reacted, reduced, amount, restored } = result;
   const modifierLabel = critical > 1 && weak ? '치명타·약점' : weak ? '약점' : '치명타';
   const reactionLabel = reactions.immune ? '면역' : reactions.vulnerable && reactions.resistant ? '취약·저항 상쇄'
     : reactions.vulnerable ? '취약 ×2' : reactions.resistant ? '저항 ½ · 올림' : '';
@@ -229,11 +229,11 @@ function DamageBreakdown({ result, armor, critical, weak, type, reactions, reduc
         {(armor > 0 || ignoresArmor(type)) && (
           <div><dt>{ignoresArmor(type) ? 'Armor 무시' : `Armor −${absorbed}`}{!ignoresArmor(type) && armorIgnore > 0 && ` (${armorIgnore} 무시)`}</dt><dd>{afterArmor}</dd></div>
         )}
-        {slashing > 0 && <div><dt>Slashing +{slashing}</dt><dd>{afterType}</dd></div>}
         {reactionLabel && <div><dt>{reactionLabel}</dt><dd>{reacted}</dd></div>}
-        {reduction > 0 && <div><dt>유형별 피해 감소 −{reduction}</dt><dd>{amount}</dd></div>}
+        {reduction > 0 && <div><dt>유형별 피해 감소 −{reduction}</dt><dd>{reduced}</dd></div>}
+        {slashing > 0 && <div><dt>Slashing 3 이하 +{slashing}</dt><dd>{amount}</dd></div>}
       </dl>
-      <p role="status">{restored ? (pc ? 'Health 회복' : 'Wounds 회복') : '최종 피해'} <strong>{amount}</strong> <span>{type}</span></p>
+      <p role="status">{restored ? (pc ? 'Wounds 회복' : 'Health 회복') : '최종 피해'} <strong>{amount}</strong> <span>{type}</span></p>
       {type === 'Acid' && amount > 0 && !restored && (
         <p className="damage-note">Acid 피해를 입은 부위는 캠프 수리 전까지 Armor −1.</p>
       )}

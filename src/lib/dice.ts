@@ -35,6 +35,16 @@ export interface RollResult {
   dice: number[];
   mod: number;
   total: number;
+  /** Damage Pool only: index of the die that counts. */
+  pick?: number;
+}
+
+/** Damage Pool (core p.81): one die counts and fixed modifiers apply to it. Defaults to the highest die. */
+export function pooledDie(roll: Pick<RollResult, 'dice' | 'mod' | 'pick'>) {
+  const highest = roll.dice.indexOf(Math.max(...roll.dice));
+  const index = roll.pick !== undefined && Number.isInteger(roll.pick) && roll.pick >= 0 && roll.pick < roll.dice.length
+    ? roll.pick : highest;
+  return { index, face: roll.dice[index], amount: roll.dice[index] + roll.mod, highest };
 }
 
 export function roll(expr: string, rng: Rng = cryptoRng): RollResult | null {

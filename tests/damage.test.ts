@@ -22,6 +22,14 @@ describe('direct damage', () => {
     expect(calculateDirectDamage({ ...hit, type: 'Acid' })).toMatchObject({ armorIgnore: 0, amount: 3 });
   });
 
+  it('adds the Slashing bonus last, after reactions and damage reduction', () => {
+    const slash = { ...hit, type: 'Slashing' as const, roll: 2, modifier: 0, armor: 0 };
+    expect(calculateDirectDamage({ ...slash, reactions: { ...normal, vulnerable: true } })).toMatchObject({ reacted: 4, slashing: 0, amount: 4 });
+    expect(calculateDirectDamage({ ...slash, roll: 4, reactions: { ...normal, resistant: true } })).toMatchObject({ reacted: 2, slashing: 1, amount: 3 });
+    expect(calculateDirectDamage({ ...slash, roll: 5, reduction: 2 })).toMatchObject({ reduced: 3, slashing: 1, amount: 4 });
+    expect(calculateDirectDamage({ ...slash, reactions: { ...normal, immune: true } })).toMatchObject({ slashing: 0, amount: 0 });
+  });
+
   it('bypasses Armor for Holy, rounds resistance up, and returns healing for restoration', () => {
     expect(calculateDirectDamage({ ...hit, type: 'Holy', reactions: { ...normal, vulnerable: true } }).amount).toBe(10);
     expect(calculateDirectDamage({ ...hit, type: 'Necrotic', reactions: { ...normal, resistant: true, restored: true } }))

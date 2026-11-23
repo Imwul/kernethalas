@@ -39,6 +39,8 @@ const spoils = (id = 'spoils'): FollowStep => ({ kind: 'spoils', id });
 const darkness = () => table('t-growing-darkness');
 const madness = () => table('t-madness');
 
+const DEATH_VISION = '다음에 Health가 0이 될 때 그 피해 무시 (1회)';
+
 function when(id: string, value: Answer, steps: FollowStep[]) {
   return steps.map((step): FollowStep => ({ ...step, when: (answers) => answers[id] === value && (!step.when || step.when(answers)) }));
 }
@@ -85,7 +87,8 @@ const EVENT_STEPS: Record<number, FollowStep[]> = {
   52: test('Resolve', [xp(10)], [damage('3D4', 'Slashing')]),
   53: optional('시신 내려 주기', [paper('exhaustion', 'Exhaustion +2'), sanity('D4', '+')], [darkness()]),
   54: test('Reason', [xp(10)], [paper('sanity', 'Sanity −1')]),
-  56: test('Resolve', [], [sanity('D6')]),
+  // Core event 56: the benefit is not tied to the Resolve result.
+  56: test('Resolve', [paper('death-vision', DEATH_VISION)], [sanity('D6'), paper('death-vision-failed', DEATH_VISION)]),
   57: test('Endurance', [paper('damage-pool', '다음 근접 공격 피해 풀 +D8 Cold')]),
   58: [choice('response', '석상에서 할 일', [['judge', '심판받는다'], ['break', '부순다']]),
     ...when('response', 'judge', test('Resolve', [spoils('first'), spoils('second')])),

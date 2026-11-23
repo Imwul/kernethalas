@@ -4,7 +4,7 @@ import type { CreatureRecord } from '../../content/entries/creatures';
 import { masteryCatalog } from '../../content/entries/masteries';
 import { calculateCreatureAdaptation, readCreatureLevel } from '../../lib/creature-adaptation';
 import { calculateDirectDamage, ignoresArmor, listedDamageReactions, type DamageReactions } from '../../lib/damage';
-import { resolveAttack, type CheckResult, type RollResult } from '../../lib/dice';
+import { pooledDie, resolveAttack, type CheckResult, type RollResult } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { abilityRoll, describeMasteryAbility, readMasteryInteger, type MasteryAbility } from '../../lib/mastery-play';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
@@ -83,6 +83,22 @@ function targetGate(ability: MasteryAbility, target: MasteryTarget, draft: Targe
   return { applies: true, text: '' };
 }
 
+/** Damage one chosen die deals to this target after Armor and its damage reactions. */
+function abilityDamage(ability: MasteryAbility, target: MasteryTarget, draft: TargetDraft,
+  effect: NonNullable<MasteryAbility['roll']>, hit: Hit, amount: number) {
+  if (!effect.type) return null;
+  const reactions = targetReactions(target, ability, effect, draft)!;
+  const armor = ignoresArmor(effect.type) ? 0 : readMasteryInteger(draft.armor ?? '');
+  const reduction = readMasteryInteger(draft.reduction || '0');
+  const modifier = encounterInteger(draft.modifier || '0');
+  if (armor === null || reduction === null || modifier === null) return null;
+  const result = calculateDirectDamage({
+    roll: amount, modifier, type: effect.type, critical: hit.critical ? 2 : 1, weak: false,
+    armor, extraArmorIgnore: 0, reduction, reactions,
+  });
+  return Number.isSafeInteger(result.beforeArmor) && Number.isSafeInteger(result.reacted) ? result : null;
+}
+
 function targetEffect(ability: MasteryAbility, target: MasteryTarget, draft: TargetDraft, spent: number | null) {
   const hit = targetGate(ability, target, draft);
   if (!hit) return null;
@@ -91,7 +107,7 @@ function targetEffect(ability: MasteryAbility, target: MasteryTarget, draft: Tar
   const effect = abilityRoll(ability, spent);
   const rollRequired = !!effect && (ability.name !== 'Reaper' || !!draft.confirmed);
   if (rollRequired && draft.roll?.expr !== effect.dice) return null;
-  const amount = rollRequired ? draft.roll?.total : undefined;
+  const amount = !rollRequired || !draft.roll ? undefined : effect.mode === 'damage' ? pooledDie(draft.roll).amount : draft.roll.total;
   const conditionImmune = ability.condition && target.creature
     && creatureDefenses(target.creature).immuneConditions.includes(ability.condition);
   let annotation = conditionImmune ? `${ability.condition} 상태 면역`
@@ -100,16 +116,8 @@ function targetEffect(ability: MasteryAbility, target: MasteryTarget, draft: Tar
   let rolled = '';
   if (amount !== undefined && effect) {
     if (effect.mode === 'damage' && effect.type) {
-      const reactions = targetReactions(target, ability, effect, draft)!;
-      const armor = ignoresArmor(effect.type) ? 0 : readMasteryInteger(draft.armor ?? '');
-      const reduction = readMasteryInteger(draft.reduction || '0');
-      const modifier = encounterInteger(draft.modifier || '0');
-      if (armor === null || reduction === null || modifier === null) return null;
-      const result = calculateDirectDamage({
-        roll: amount, modifier, type: effect.type, critical: hit.critical ? 2 : 1, weak: false,
-        armor, extraArmorIgnore: 0, reduction, reactions,
-      });
-      if (!Number.isSafeInteger(result.beforeArmor) || !Number.isSafeInteger(result.reacted)) return null;
+      const result = abilityDamage(ability, target, draft, effect, hit, amount);
+      if (!result) return null;
       damage = result.restored ? 0 : result.amount;
       rolled = `${effect.type} ${result.restored ? '회복' : '피해'} ${result.amount}`;
       if (ability.id.startsWith('m-frostweaver:') && damage > 0) annotation = 'Freezing (Relentless Winter)';
@@ -187,7 +195,11 @@ function TargetControls({ ability, target, draft, level, spent, onChange }: {
         </label>}
         {effect && outcome?.applies && (ability.name !== 'Reaper' || draft.confirmed) && <>
           <PhysicalDiceRoll label={effect.label} dice={effect.dice} value={draft.roll} onValue={(roll) => onChange({ roll })}
-            resultText={effect.mode === 'pool' ? ({ dice }) => `${effect.type} ${dice.join(' / ')} 중 필요한 눈을 선택` : undefined} />
+            resultText={effect.mode === 'pool' ? ({ dice }) => `${effect.type} ${dice.join(' / ')} 중 필요한 눈을 선택` : undefined}
+            pool={effect.mode === 'damage' ? { choose: true, preview: (amount) => {
+              const result = outcome?.applies ? abilityDamage(ability, target, draft, effect, outcome, amount) : null;
+              return result && `→ ${result.restored ? '대상 회복' : '피해'} ${result.amount}`;
+            } } : undefined} />
           {reactionText && effect.type && <>
             <DamageTypeGuide type={effect.type} reactions={reactions}
               immuneConditions={target.creature ? creatureDefenses(target.creature).immuneConditions : undefined} />

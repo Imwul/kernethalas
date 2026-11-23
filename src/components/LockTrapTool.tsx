@@ -11,6 +11,9 @@ import { TensionTool, type TensionResult } from './TensionTool';
 import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/lock-trap.css';
 
+/** Core p.212: Thieves’ Toolkit, required to disarm traps, gives +5 to Thievery. */
+const TOOLKIT_BONUS = 5;
+
 const TARGETS = { door: '문', container: '용기', environment: '환경 함정' } as const;
 type Outcome = 'success' | 'failure';
 type TrapMethod = '' | 'disarm' | 'bypass' | 'trigger';
@@ -270,11 +273,11 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
           {(method === 'disarm' || method === 'bypass') && (
             <>
               {method === 'disarm'
-                ? <p className="lock-trap-links">Thieves’ Toolkit을 사용해 Thievery 판정 <XRef id="t-difficulty">해제 난이도 D8</XRef></p>
+                ? <p className="lock-trap-links">Thieves’ Toolkit을 사용해 Thievery +5로 판정 <XRef id="t-difficulty">해제 난이도 D8</XRef></p>
                 : <p>{row.cols?.avoid} +20으로 우회 판정</p>}
               <RollCheck key={attempt} slot={String(attempt)} label={method === 'disarm' ? '해제' : '우회'}
                 skill={method === 'disarm' ? 'Thievery' : row.cols?.avoid ?? 'Skill'} randomDifficulty={method === 'disarm'}
-                modifier={method === 'bypass' ? 20 : 0} readOnly={result !== null} onResult={applyResponse} />
+                modifier={method === 'bypass' ? 20 : TOOLKIT_BONUS} readOnly={result !== null} onResult={applyResponse} />
             </>
           )}
           {result === 'success' && method === 'disarm' && <p className="lock-trap-note" role="status">함정 해제 · XP +10</p>}
@@ -369,7 +372,7 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
       )}
       {method === 'pick' && (
         <>
-          {!opened && <p>Lockpick을 사용해 Thievery +{lockpickDifficulty(pickFailures)}로 판정합니다.</p>}
+          {!opened && <p>Lockpick을 사용해 Thievery +{lockpickDifficulty(pickFailures)}로 판정합니다. Thieves’ Toolkit의 +{TOOLKIT_BONUS}가 자물쇠 따기에도 붙는지는 원문에 명시되어 있지 않습니다.</p>}
           {pickFailures > 0 && <p className="lock-trap-note" role="status">Lockpick 파손 {pickFailures}개 · 재시도 난이도 한 단계 완화(최대 +30)</p>}
           <RollCheck label="자물쇠 따기" skill="Thievery" modifier={lockpickDifficulty(pickFailures)} readOnly={opened} onResult={applyPick} />
         </>

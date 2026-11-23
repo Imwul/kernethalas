@@ -98,7 +98,10 @@ test('compound spell dice and Sustained activation keep separate paper Aether ch
   await resistance.fill('78');
   await resistance.press('Enter');
   await physicalRoll(target, 'Infernal 피해 D6+D4', '5 3');
-  await expect(target).toContainText('Infernal 피해 8');
+  // Damage Pool: one die counts, the highest by default, and the player may pick another.
+  await expect(target).toContainText('Infernal 피해 5');
+  await target.getByRole('radio', { name: /^3/ }).check();
+  await expect(target).toContainText('Infernal 피해 3');
   await mastery.getByRole('button', { name: '능력 사용 기록' }).click();
 
   await abilities.selectOption({ label: 'Hellish Weapon' });

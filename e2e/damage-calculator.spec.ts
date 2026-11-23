@@ -37,7 +37,7 @@ test('a mobile monster hit carries the critical, weak spot, armor and damage rea
   await expect(damage.getByRole('status')).toHaveText('최종 피해 20 Holy');
   await expect(damage.getByText('Armor 무시', { exact: true })).toBeVisible();
   await damage.getByRole('combobox', { name: '피해 유형' }).selectOption('Necrotic');
-  await expect(damage.getByRole('status')).toHaveText('Wounds 회복 10 Necrotic');
+  await expect(damage.getByRole('status')).toHaveText('Health 회복 10 Necrotic');
 });
 
 test('physical resistance rounds up and can be adjusted for a magical attack', async ({ page }) => {
