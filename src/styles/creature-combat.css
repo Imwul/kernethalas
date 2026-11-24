@@ -186,7 +186,7 @@
 .creature-guide-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s2); }
 .creature-guide-controls .field { width: min(100%, 14rem); min-width: 0; }
 .creature-guide-controls select,
-.creature-combat :is(.creature-damage-guide, .creature-action-resolution) > summary,
+.creature-combat .creature-action-resolution > summary,
 .creature-action-damage .loot-roll-form :is(input, button) { min-height: 44px; }
 .creature-action-damage { display: grid; min-width: 0; gap: var(--s1); }
 .creature-action-damage .loot-roll-form .field { min-width: 0; }
@@ -237,8 +237,8 @@
 .creature-spoils { margin-top: var(--s2); }
 .creature-spoils-links { display: flex; flex-wrap: wrap; gap: 0 var(--s4); }
 .creature-spoils-links .xref { min-height: 44px; padding-block: 10px; }
-.creature-other-stats .creature-combat-meta { padding: 0 var(--s3) var(--s3); }
-.creature-adaptation-source { padding: 0 var(--s3) var(--s3); }
+.creature-other-stats .creature-combat-meta { padding: 0; }
+.creature-adaptation-source { padding: 0; }
 .creature-adaptation-source h3 { margin: 0; font: 700 14px/1.5 var(--f-ui); }
 .creature-adaptation-source ul { margin-block: var(--s1) 0; padding-inline-start: var(--s4); }
 

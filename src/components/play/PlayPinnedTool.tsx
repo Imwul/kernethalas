@@ -26,9 +26,7 @@ export function PlayPinnedTool() {
   };
 
   return (
-    <details className="fold play-pinned-tool" data-selected={selected || undefined}>
-      <summary>고정 도구{selected && <span>{titleOf(selected).ko}</span>}</summary>
-      <div className="play-pinned-body">
+    <div className="play-pinned-tool play-pinned-body" data-selected={selected || undefined}>
         <label className="field"><span>플레이에 고정할 도구</span>
           <select value={selected} onChange={(event) => choose(event.currentTarget.value)}>
             <option value="">도구 선택</option>
@@ -39,7 +37,6 @@ export function PlayPinnedTool() {
           <XRef id={selected}>참조 패널에서 보기</XRef>
           <PlayReferenceTool><PaneBody key={selected} id={selected} /></PlayReferenceTool>
         </div>}
-      </div>
-    </details>
+    </div>
   );
 }

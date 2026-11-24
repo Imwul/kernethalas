@@ -86,3 +86,6 @@
     font: 13px/1.4 var(--f-ui);
   }
 }
+
+/* 원문 함께 보기 off: the local overlay's English wording is hidden everywhere it is shown. */
+:root[data-reading-originals='hidden'] :is(.ttable td .src, .reference-original, .o-original, .mastery-original, .oracle-result-original) { display: none; }

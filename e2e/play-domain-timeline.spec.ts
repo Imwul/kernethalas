@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openDrawer, openPane } from './helpers/play-desk';
 
 const WIDTH = Number(process.env.KN_TIMELINE_WIDTH ?? 320);
 
@@ -43,7 +44,7 @@ test('domain timeline archives the journal and copies only unchecked portions', 
   await journal.getByRole('button', { name: '다음 장소', exact: true }).click();
   await page.reload();
 
-  await page.locator('.play-domain > summary').click();
+  await openDrawer(page, '도메인');
   await page.getByText('탐험 연대기', { exact: true }).click();
   const timeline = page.getByRole('region', { name: '도메인 탐험 연대기' });
   await timeline.getByText('닫힌 납골당', { exact: true }).click();
@@ -65,12 +66,12 @@ test('domain timeline archives the journal and copies only unchecked portions', 
   const domain = page.getByRole('region', { name: '도메인 효과' });
   await domain.getByRole('button', { name: '새 도메인', exact: true }).click();
   await domain.getByRole('button', { name: 'D8로 새 도메인 시작', exact: true }).click();
-  await page.locator('.play-domain > summary').click();
+  await openDrawer(page, '도메인');
   await page.getByText('탐험 연대기', { exact: true }).click();
   await expect(timeline).toContainText('다음 장소로 이동하면 여기에 기록이 남습니다.');
   await domain.getByRole('combobox', { name: '도메인 전환' }).selectOption('1');
   await domain.getByRole('button', { name: '선택한 도메인으로 이동', exact: true }).click();
-  await page.locator('.play-domain > summary').click();
+  await openDrawer(page, '도메인');
   await page.getByText('탐험 연대기', { exact: true }).click();
   await timeline.getByText('닫힌 납골당', { exact: true }).click();
   await expect(journalCheck).toBeChecked();
@@ -83,7 +84,7 @@ test('return places show tags and saved exit marks before a safe direct revisit'
   const explore = page.getByRole('region', { name: '장소 탐험' });
   const map = explore.getByRole('region', { name: '종이 지도 장소 색인' });
   const save = async (id: string, tag: string, note: string) => {
-    await explore.getByText('종이 지도 메모', { exact: true }).click();
+    await openPane(explore, '종이 지도 메모');
     await map.getByRole('textbox', { name: '종이 지도 번호', exact: true }).fill(id);
     await map.getByRole('textbox', { name: '장소 메모', exact: true }).fill(note);
     await map.getByRole('checkbox', { name: tag, exact: true }).check();
@@ -103,7 +104,7 @@ test('return places show tags and saved exit marks before a safe direct revisit'
   await save('C-02', '미개봉 용기', '남겨 둔 항아리');
   await nextLocation(page);
   await page.reload();
-  await explore.getByText('돌아갈 곳', { exact: true }).click();
+  await openPane(explore, '돌아갈 곳');
   const returns = explore.getByRole('region', { name: '돌아갈 곳 목록' });
   const first = returns.getByRole('button', { name: 'B-07 재방문', exact: true });
   const second = returns.getByRole('button', { name: 'C-02 재방문', exact: true });
@@ -120,9 +121,10 @@ test('return places show tags and saved exit marks before a safe direct revisit'
   await expect(returns.getByRole('status')).toContainText('B-07 재방문을 선택했습니다.');
   await expect(explore.getByRole('button', { name: '통로', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(explore.getByRole('button', { name: '재방문', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await explore.getByText('종이 지도 메모', { exact: true }).click();
+  await openPane(explore, '종이 지도 메모');
   await expect(map.getByRole('textbox', { name: '장소 메모', exact: true })).toHaveValue('철문 옆 메모');
   await map.getByRole('button', { name: '장소 메모 저장', exact: true }).click();
+  await openPane(explore, '돌아갈 곳');
   await expect(returns).toContainText('입구 1번 · 2번 잠김');
   await enter(explore.getByRole('region', { name: '긴장 주사위', exact: true }), '긴장 주사위 굴린 값', '3');
   await expect(first).toBeDisabled();

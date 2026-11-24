@@ -9,6 +9,7 @@ import { ARMOR_DICE, GEAR_WEIGHTS, isGearLedger, type GearLedger } from './play-
 import { readPlayRollHistory, safePlaySlot, type PlayRollEntry } from './play-roll-history';
 import { isPlayPendingRolls, PLAY_PENDING_ROLLS_SLOT } from './play-pending-rolls';
 import { isSkillModifierList, isSkillPresetRecord, SKILL_PRESETS_SLOT } from './play-skill';
+import { isPlayCharacter, PLAY_CHARACTER_SLOT } from './play-character';
 import { isPlayTimeline, PLAY_TIMELINE_SLOT } from './play-timeline';
 import { isGrowthSkill } from './skill-growth';
 
@@ -128,7 +129,7 @@ const ROOT_FIELDS: Record<string, Validator> = {
     && new Set(value.map(({ domainId, paperId }) => `${domainId}/${paperMapKey(paperId)}`)).size === value.length,
   [PLAY_TIMELINE_SLOT]: isPlayTimeline,
   [PLAY_EFFECTS_SLOT]: isPlayOngoing, [PLAY_EFFECT_CHANGES_SLOT]: list(paperChange),
-  [PLAY_PENDING_ROLLS_SLOT]: isPlayPendingRolls, [SKILL_PRESETS_SLOT]: isSkillPresetRecord,
+  [PLAY_PENDING_ROLLS_SLOT]: isPlayPendingRolls, [SKILL_PRESETS_SLOT]: isSkillPresetRecord, [PLAY_CHARACTER_SLOT]: isPlayCharacter,
   confirmedBreather: isText, confirmedCamp: isText,
 };
 

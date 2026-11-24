@@ -9,6 +9,7 @@ import { gearCount, type GearEffect } from '../lib/play-inventory';
 import { CopyButton, XRef } from './bits';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
+import { TogglePanel } from './TogglePanel';
 import '../styles/loot-journal.css';
 
 type JournalRollProps = {
@@ -291,13 +292,12 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
         </>
       )}
       {baseReady && (
-        <details className="fold loot-appearance">
-          <summary>외형 메모 (선택)</summary>
+        <TogglePanel className="loot-appearance" label="외형 메모 (선택)" badge={draft.peculiarity.trim() ? '1' : undefined}>
           <XRef id="t-peculiarity">특이점 표 열기</XRef>
           <label className="field"><span>외형 한 줄</span>
             <input value={draft.peculiarity} onChange={(event) => setDraft({ ...draft, peculiarity: event.target.value })} />
           </label>
-        </details>
+        </TogglePanel>
       )}
       {text && <JournalLine text={text} />}
     </section>

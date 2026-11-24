@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 
 async function physicalRoll(container: Locator, name: string, value: string) {
   const input = container.getByRole('group', { name, exact: true }).getByRole('textbox', { name: '직접 굴린 값' });
@@ -14,7 +15,7 @@ test('a physical Magic Resistance failure opens the damage roll and confirmed Ma
   await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Fangvine');
   await combat.getByRole('button', { name: 'Fangvine', exact: true }).click();
-  await combat.getByText('Mastery 능력과 마법 전투', { exact: true }).click();
+  await openPane(combat, 'Mastery·마법');
 
   const mastery = combat.getByRole('region', { name: 'PC Mastery 능력' });
   await mastery.getByRole('combobox', { name: '종이 시트의 Mastery' }).selectOption('m-flamecaster');
@@ -51,7 +52,7 @@ test('XP threshold, sequential unlock and one physical advancement die publish a
   await page.setViewportSize({ width: 3440, height: 1440 });
   await page.goto('/play');
   await page.getByRole('button', { name: '휴식·정리', exact: true }).click();
-  await page.getByText('XP 레벨업·능력 해금', { exact: true }).click();
+  await page.getByRole('group', { name: '정리할 항목' }).getByRole('button', { name: 'XP·레벨업', exact: true }).click();
   const advancement = page.getByRole('region', { name: '레벨업과 능력 해금' });
   const level = advancement.getByRole('textbox', { name: '종이 시트 레벨' });
   const xp = advancement.getByRole('textbox', { name: '보유 XP' });
@@ -85,7 +86,7 @@ test('compound spell dice and Sustained activation keep separate paper Aether ch
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByText('Mastery 능력과 마법 전투', { exact: true }).click();
+  await openPane(combat, 'Mastery·마법');
   const mastery = combat.getByRole('region', { name: 'PC Mastery 능력' });
   await mastery.getByRole('combobox', { name: '종이 시트의 Mastery' }).selectOption('m-abyssal-reaver');
   await mastery.getByRole('combobox', { name: '배운 마지막 Tier' }).selectOption('2');

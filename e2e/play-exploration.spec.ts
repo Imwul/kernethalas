@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
 
 async function enterRoll(section: Locator, value: string) {
@@ -27,13 +28,13 @@ test('physical shape and Tension rolls guide a room event and a later revisit at
   await expect(tension.getByRole('alert')).toHaveText('1에서 4 사이의 정수를 입력하세요.');
   await manual.fill('2');
   await submit.click();
-  await expect(tension.getByRole('status')).toContainText('다음 긴장 주사위 D8');
+  await expect(tension.getByRole('button', { name: /^D4 2 · 짙어지는 어둠 · 다음 D8 다시 보기$/ })).toBeVisible();
   await expect(encounter).toHaveCount(0);
   await enterRoll(darkness, '69');
   await expect(darkness.getByRole('status')).toContainText('방에 들어갈 때마다 광원 1 대신 2 소모');
   await enterRoll(encounter, '9');
   await enterRoll(event, '59');
-  await expect(event.getByRole('status')).toContainText('고요한 샘');
+  await expect(event.getByRole('button', { name: /^D100 59 · 고요한 샘.*다시 보기$/ })).toBeVisible();
   await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' })).toHaveAttribute('aria-current', 'step');
 
   await exploration.getByRole('group', { name: '방문 구분' }).getByRole('button', { name: '재방문', exact: true }).click();
@@ -64,8 +65,8 @@ test('door noise and deep search pass the resolved Tension die into each action'
   await enterRoll(exploration.getByRole('region', { name: '이벤트', exact: true }), '59');
   const actions = exploration.getByRole('region', { name: '선택 탐험 행동' });
 
-  await actions.getByText('문·함정 조사', { exact: true }).click();
-  await enterRoll(actions.getByRole('region', { name: '문이 있는가?', exact: true }), '2');
+  await openPane(actions, '문·함정 조사');
+  await enterRoll(actions.getByRole('group', { name: '문이 있는가? D10', exact: true }), '2');
   const door = actions.getByRole('region', { name: '문 조사' });
   await detectTrap(door);
   await door.getByLabel('함정 여부 D10', { exact: true }).fill('6');
@@ -87,17 +88,17 @@ test('door noise and deep search pass the resolved Tension die into each action'
   await noise.getByRole('textbox', { name: '긴장 주사위 굴린 값' }).press('Enter');
   await expect(door.getByText('개방 성공 · XP +10', { exact: true })).toBeVisible();
   await actions.getByRole('button', { name: '다른 문 조사', exact: true }).click();
-  await enterRoll(actions.getByRole('region', { name: '문이 있는가?', exact: true }), '9');
+  await enterRoll(actions.getByRole('group', { name: '문이 있는가? D10', exact: true }), '9');
 
-  await actions.getByText('방 뒤지기', { exact: true }).click();
+  await openPane(actions, '방 뒤지기');
   const scavenge = actions.getByRole('region', { name: '방 뒤지기 판정' });
-  await scavenge.getByRole('textbox', { name: '보정 Scavenge Skill' }).fill('55');
+  await scavenge.getByRole('textbox', { name: 'Scavenge 수치' }).fill('55');
   await scavenge.getByRole('textbox', { name: 'Scavenge D100' }).fill('31');
-  await scavenge.getByRole('button', { name: '뒤지기 판정 확인' }).click();
+  await scavenge.getByRole('button', { name: '판정', exact: true }).click();
   await enterRoll(scavenge.getByRole('group', { name: '뒤지기 결과 D20' }), '13');
   await enterRoll(scavenge.getByRole('group', { name: 'Cooking Ingredients 수량 D4' }), '2');
 
-  await actions.getByText('깊은 수색', { exact: true }).click();
+  await openPane(actions, '깊은 수색');
   await actions.getByRole('button', { name: '깊은 수색 시작' }).click();
   const deep = actions.getByRole('region', { name: '깊은 수색 긴장 굴림' });
   await expect(deep.getByRole('combobox', { name: '긴장 주사위 크기' })).toHaveValue('4');

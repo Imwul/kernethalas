@@ -5,6 +5,7 @@ import { damageReactionsWithEffects, temporaryDamageEffects } from '../../lib/co
 import { DAMAGE_TYPES, damageReactionText, isPhysicalDamage, listedDamageReactions, type DamageType } from '../../lib/damage';
 import { usePlayDraftState } from '../../lib/play-draft';
 import { XRef } from '../bits';
+import { TogglePanel } from '../TogglePanel';
 import '../../styles/play-combat-tools.css';
 
 type ComparisonTarget = { id: string; label: string; creature: CreatureRecord };
@@ -16,7 +17,6 @@ const RELATED_CONDITION = {
 } as const satisfies Partial<Record<DamageType, string>>;
 
 export function PlayDamageComparison({ targets }: { targets: readonly ComparisonTarget[] }) {
-  const [open, setOpen] = usePlayDraftState('comparison-open', false);
   const [type, setType] = usePlayDraftState<DamageType>('comparison-type', 'Slashing');
   const [magical, setMagical] = usePlayDraftState('comparison-magical', false);
   const [activeEffects, setActiveEffects] = usePlayDraftState<Record<string, string[]>>('comparison-effects', {});
@@ -29,9 +29,7 @@ export function PlayDamageComparison({ targets }: { targets: readonly Comparison
   const condition = type === 'Cold' || type === 'Fire' || type === 'Poison' ? RELATED_CONDITION[type] : undefined;
 
   return (
-    <details className="fold play-combat-tools" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>피해 유형 비교</summary>
-      <section className="play-combat-tool-body" aria-label="조우 피해 유형 비교">
+      <section className="play-combat-tools play-combat-tool-body" aria-label="조우 피해 유형 비교">
         <div className="play-combat-tool-controls">
           <label className="field">
             <span>비교할 피해 유형</span>
@@ -62,8 +60,7 @@ export function PlayDamageComparison({ targets }: { targets: readonly Comparison
                     <span className="play-damage-response" data-reaction={appearance}>{damageReactionText(reaction)}</span>
                     {condition && defenses.immuneConditions.includes(condition) &&
                       <span className="play-damage-immunity">{titleOf(condition.toLowerCase()).ko} 상태 면역</span>}
-                    {effects.length > 0 && <details className="fold play-damage-actions">
-                      <summary>임시 효과{active.length > 0 && ` ${active.length}개 적용 중`}</summary>
+                    {effects.length > 0 && <TogglePanel className="play-damage-actions" label="임시 효과" badge={active.length || undefined}>
                       {effects.map(({ name, description }) => (
                         <label className="play-combat-tool-check" key={name}>
                           <input type="checkbox" checked={active.includes(name)} onChange={(event) => {
@@ -76,7 +73,7 @@ export function PlayDamageComparison({ targets }: { targets: readonly Comparison
                           <span><b lang="en">{name}</b><span>{description.replaceAll('·', ' · ')}</span></span>
                         </label>
                       ))}
-                    </details>}
+                    </TogglePanel>}
                   </td>
                 </tr>
               );
@@ -84,6 +81,5 @@ export function PlayDamageComparison({ targets }: { targets: readonly Comparison
           </tbody>
         </table>
       </section>
-    </details>
   );
 }

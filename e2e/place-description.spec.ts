@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 
 test('room and corridor descriptions use separate rolls and persist in the journal', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -9,8 +10,7 @@ test('room and corridor descriptions use separate rolls and persist in the journ
 
   const openDescription = async (place: '방' | '통로') => {
     await exploration.getByRole('button', { name: place, exact: true }).click();
-    const summary = exploration.getByText(`${place} 환경 묘사`, { exact: true });
-    if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();
+    await openPane(exploration, `${place} 환경 묘사`);
     return exploration.getByRole('region', { name: `${place} 환경 묘사 굴림`, exact: true });
   };
 

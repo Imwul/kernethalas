@@ -1,0 +1,40 @@
+.play-character { display: grid; gap: var(--s3); min-width: 0; font: 14px/1.45 var(--f-ui); }
+.play-character-note { margin: 0; color: var(--ink-2); font-size: 13px; }
+.play-character-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.5rem), 1fr));
+  align-items: end;
+  gap: var(--s2);
+  min-width: 0;
+}
+/* Skills read like the sheet: name on the left, a short number box on the right, two columns when there is room. */
+.play-character-skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.25rem), 1fr));
+  gap: var(--s1) var(--s2);
+  min-width: 0;
+}
+.play-character-skills > .field { grid-template-columns: minmax(0, 1fr) 3rem; align-items: center; gap: var(--s1); }
+.play-character-skills input { height: 36px; padding-inline: 6px; text-align: end; }
+.play-character-skills,
+.play-character-masteries { margin: 0; padding: var(--s2); border: 1px solid var(--rule-soft); }
+.play-character-skills > legend,
+.play-character-masteries > legend { padding-inline: var(--s1); font: 700 14px/1.4 var(--f-ui); }
+.play-character .field { min-width: 0; }
+.play-character .field > span { overflow: hidden; color: var(--ink-2); font: 13px/1.4 var(--f-ui); text-overflow: ellipsis; white-space: nowrap; }
+.play-character :is(input, select) { width: 100%; min-width: 0; }
+.play-character-masteries { display: grid; gap: var(--s2); min-width: 0; }
+.play-character-masteries ul { display: grid; gap: var(--s1); margin: 0; padding: 0; list-style: none; }
+.play-character-masteries li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: var(--s2);
+}
+.play-character-masteries li > span { font-weight: 600; overflow-wrap: anywhere; }
+.play-character-masteries select { height: 40px; }
+.play-character-add { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s2); }
+.play-character-add > .field { flex: 1 1 10rem; }
+@media (pointer: coarse) {
+  .play-character :is(input, select, .btn, .linkbtn) { min-height: 44px; }
+}

@@ -36,7 +36,7 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
   await attack.getByRole('button', { name: 'PC가 공격', exact: true }).click();
-  await attack.getByRole('textbox', { name: '공격자 보정 Skill' }).fill('40');
+  await attack.getByRole('textbox', { name: '공격자 수치' }).fill('40');
   await attack.getByRole('textbox', { name: '공격자 D100' }).fill('77');
   await attack.getByRole('textbox', { name: '방어자 D100' }).fill('31');
   await expect(attack.getByRole('link', { name: 'PC 공격자 펌블' })).toBeVisible();
@@ -46,7 +46,7 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
 
   await attack.getByRole('button', { name: '적이 공격', exact: true }).click();
   await attack.getByRole('textbox', { name: '공격자 D100' }).fill('11');
-  await attack.getByRole('textbox', { name: '방어자 보정 Skill' }).fill('50');
+  await attack.getByRole('textbox', { name: '방어자 수치' }).fill('50');
   await attack.getByRole('textbox', { name: '방어자 D100' }).fill('25');
   await expect(attack.getByRole('combobox', { name: 'PC 방어에 사용한 기술' })).toHaveCount(0);
   await attack.getByRole('textbox', { name: '방어자 D100' }).fill('44');

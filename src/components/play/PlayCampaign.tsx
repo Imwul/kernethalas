@@ -1,10 +1,18 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   activateCampaign, campaignHref, CAMPAIGN_NAME_MAX, DEFAULT_PLAY_CAMPAIGN, PlayCampaignContext, PLAY_CAMPAIGN_PARAM,
   readTabCampaign, recoverLegacyPlayTab, saveCampaignName, usePlayCampaigns,
 } from '../../lib/play-campaigns';
 import { navigate, useLocation } from '../../lib/router';
+import { PlayPopover } from './PlayPanels';
 import '../../styles/play-campaign.css';
+
+const CampaignSelector = createContext<ReactNode>(null);
+
+/** The play desk shows the campaign picker inside its own header. */
+export function useCampaignSelector() {
+  return useContext(CampaignSelector);
+}
 
 export function CampaignPlay({ children }: { children: ReactNode }) {
   const { search } = useLocation();
@@ -26,7 +34,7 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
   const [error, setError] = useState('');
   const [temporary, setTemporary] = useState(false);
   const [selected, setSelected] = useState(active.id);
-  const fold = useRef<HTMLDetailsElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,7 +44,7 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
   }, [active.id]);
 
   const open = (id: string) => {
-    if (fold.current) fold.current.open = false;
+    setPickerOpen(false);
     navigate(campaignHref(id, search));
   };
   const edit = (mode: 'new' | 'rename') => {
@@ -46,10 +54,9 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
     requestAnimationFrame(() => input.current?.focus());
   };
 
-  return (
-    <>
-      <details ref={fold} className="fold campaign-selector">
-        <summary aria-label="플레이 캠페인 선택"><span>캠페인</span><strong>{active.name}</strong></summary>
+  const selector = (
+    <PlayPopover className="campaign-selector" label="플레이 캠페인 선택" open={pickerOpen} onOpenChange={setPickerOpen}
+      trigger={<><span>캠페인</span><strong>{active.name}</strong></>}>
         <section aria-label="플레이 캠페인 관리" className="campaign-selector-body">
           <div className="campaign-selector-row">
             <label className="field"><span>플레이할 캠페인</span>
@@ -83,12 +90,18 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
           </form>}
           {error && <p className="field-err" role="alert">{error}</p>}
         </section>
-      </details>
+    </PlayPopover>
+  );
+
+  return (
+    <>
       {requested && requested !== active.id && requested !== DEFAULT_PLAY_CAMPAIGN && <p className="campaign-storage-status" role="status">
         요청한 캠페인이 이 브라우저에 없어 {active.name} 캠페인을 열었습니다.
       </p>}
       {temporary && <p className="campaign-storage-status" role="status">브라우저에 캠페인 목록을 저장할 수 없어 이 탭에서 보관 중입니다.</p>}
-      <PlayCampaignContext.Provider key={active.id} value={active.id}>{children}</PlayCampaignContext.Provider>
+      <CampaignSelector.Provider value={selector}>
+        <PlayCampaignContext.Provider key={active.id} value={active.id}>{children}</PlayCampaignContext.Provider>
+      </CampaignSelector.Provider>
     </>
   );
 }

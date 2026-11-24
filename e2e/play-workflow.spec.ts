@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openDrawer, openPane, setViewOption } from './helpers/play-desk';
 
 async function inputRoll(scope: Locator, label: string, value: string) {
   const field = scope.getByRole('textbox', { name: label, exact: true });
@@ -11,11 +12,10 @@ test('mobile action bar focuses the next physical roll and the 00 shortcut persi
   await page.goto('/play');
   const shape = page.getByRole('region', { name: '방·통로 모양', exact: true });
   const bar = page.getByRole('region', { name: '다음 행동 바로가기' });
-  const preferred = page.getByRole('button', { name: '실물 입력 우선', exact: true });
   const input = shape.getByRole('textbox', { name: '직접 굴린 값', exact: true });
 
   await expect(shape.getByRole('button', { name: 'D100에 00 입력' })).toBeHidden();
-  await preferred.click();
+  const preferred = await setViewOption(page, '실물 입력 우선', true);
   await expect(shape.getByText('D100 · 1–100 · 00 허용', { exact: true })).toBeVisible();
   const roll = shape.getByRole('button', { name: '굴리기', exact: true });
   const [fieldBounds, rollBounds] = await Promise.all([input.boundingBox(), roll.boundingBox()]);
@@ -33,7 +33,9 @@ test('mobile action bar focuses the next physical roll and the 00 shortcut persi
   await expect(shape.getByRole('img', { name: /100번 방 모양/ })).toBeVisible();
   await expect(bar.getByRole('button', { name: '직전 굴림 되돌리기' })).toBeEnabled();
   await page.reload();
+  await page.getByRole('button', { name: '보기 설정', exact: true }).click();
   await expect(preferred).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
   await expect(shape.getByRole('img', { name: /100번 방 모양/ })).toBeVisible();
   await bar.getByRole('button', { name: '직전 굴림 되돌리기' }).click();
   await expect(shape.getByRole('img')).toHaveCount(0);
@@ -71,7 +73,7 @@ test('rewinding an earlier event previews dependent rolls and preserves an indep
   await inputRoll(roller('조우 판정'), '직접 굴린 값', '9');
   await inputRoll(roller('이벤트'), '직접 굴린 값', '59');
   await inputRoll(explore.getByRole('group', { name: 'Exhaustion 감소 D4', exact: true }), '직접 굴린 값', '2');
-  await explore.getByText('방 환경 묘사', { exact: true }).click();
+  await openPane(explore, '방 환경 묘사');
   await inputRoll(roller('방 환경 묘사 굴림'), '직접 굴린 값', '00');
   await page.getByRole('button', { name: '이번 장소 굴림 이력으로 이동' }).click();
 
@@ -86,7 +88,8 @@ test('rewinding an earlier event previews dependent rolls and preserves an indep
   await expect(roller('이벤트').getByRole('textbox', { name: '직접 굴린 값', exact: true })).toBeFocused();
   await expect(explore.getByRole('group', { name: 'Exhaustion 감소 D4', exact: true })).toHaveCount(0);
   await expect(roller('방 환경 묘사 굴림').getByRole('status')).toContainText('유령 같은 불꽃');
-  await expect(roller('조우 판정').getByRole('status')).toContainText('9');
+  // the finished encounter check stays folded to its one-line result
+  await expect(roller('조우 판정').getByRole('button', { name: /^D20 9 · .*다시 보기$/ })).toBeVisible();
   await inputRoll(roller('이벤트'), '직접 굴린 값', '55');
   await page.getByRole('button', { name: '이번 장소 굴림 이력으로 이동' }).click();
   await expect(history.getByRole('button', { name: '이벤트 D100 55 수정 미리보기', exact: true })).toBeVisible();

@@ -8,8 +8,10 @@ import { calculateCreatureAdaptation, readCreatureLevel } from '../lib/creature-
 import { DAMAGE_TYPES, isPhysicalDamage, listedDamageReactions, type DamageType } from '../lib/damage';
 import { creatureActionTable, creatureHitImpact, creatureHitTable, creatureSpoilsTables } from '../lib/creature-combat';
 import { creatureActionSource } from '../lib/overlay';
+import { usePlayCharacter } from '../lib/play-character';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { OracleBody } from '../views/Oracle';
+import { TogglePanel } from './TogglePanel';
 import { XRef } from './bits';
 import { CheckCalculator } from './CheckCalculator';
 import { CreatureAdaptation } from './CreatureAdaptation';
@@ -23,16 +25,20 @@ import '../styles/creature-combat.css';
 
 const PC_HIT_TABLE = tableById.get('t-hit-humanoid')!;
 
-export function CreatureCombatCard({ creature, entry, targetName, summons, showEncounterStart = true }: {
+export function CreatureCombatCard({ creature, entry, targetName, summons, showEncounterStart = true, showAftermath = true }: {
   creature: CreatureRecord;
   entry: Entry;
   targetName?: string;
   summons?: CombatSummonControls;
   showEncounterStart?: boolean;
+  /** Play mode handles the end of a fight in its wrap-up stage. */
+  showAftermath?: boolean;
 }) {
   const checkPane = useId();
   const actionPane = `${checkPane}-action`;
-  const [levelText, setLevelText] = usePlayDraftState('creature-level', '');
+  const [typedLevel, setLevelText] = usePlayDraftState('creature-level', '');
+  const sheetLevel = usePlayCharacter()?.level ?? '';
+  const levelText = typedLevel || sheetLevel;
   const [mode, setMode] = usePlayDraftState<'action' | 'hit' | 'check' | 'damage'>('creature-mode', 'action');
   const [enemyAttacking, setEnemyAttacking] = usePlayDraftState('creature-attacking', false);
   const [actionValue, setActionValue] = usePlayDraftState<number | null>('creature-action', null);
@@ -82,10 +88,9 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
       <CreatureDefenseSummary defenses={defenses} />
       <CreatureDamageGuide defenses={defenses} />
       <CreatureTraitSummary traits={ruthlessness ? [...defenses.otherTraits, ruthlessness[0]] : defenses.otherTraits} />
-      {showEncounterStart && <details className="fold creature-encounter">
-        <summary>조우 시작</summary>
+      {showEncounterStart && <TogglePanel className="creature-encounter" label="조우 시작">
         <EncounterStart creature={creature} />
-      </details>}
+      </TogglePanel>}
       <div className="creature-roll-tools">
         <div className="seg" role="group" aria-label="전투 도구">
           <button type="button" aria-controls={actionPane} aria-pressed={mode === 'action'} onClick={() => setMode('action')}>행동 {action.dice}</button>
@@ -186,9 +191,8 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
           <XRef id="t-fumble-npc">적 공격자 펌블</XRef>
         </div>
       </section>
-      <CreatureAftermath creature={creature} spoils={spoils} />
-      <details className="fold creature-other-stats">
-        <summary>기타 능력치와 레벨 적응</summary>
+      {showAftermath && <CreatureAftermath creature={creature} spoils={spoils} />}
+      <TogglePanel className="creature-other-stats" label="기타 능력치와 레벨 적응">
         <dl className="creature-combat-meta">
           <div><dt>Mind</dt><dd>{creature.mind}</dd></div>
           <div><dt>Body</dt><dd>{creature.body}</dd></div>
@@ -202,7 +206,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
             </ul>
           </div>
         )}
-      </details>
+      </TogglePanel>
     </section>
   );
 }
@@ -211,8 +215,7 @@ function CreatureDamageGuide({ defenses }: { defenses: ReturnType<typeof creatur
   const [type, setType] = usePlayDraftState<DamageType | ''>('creature-damage-preview', '');
   const [magical, setMagical] = usePlayDraftState('creature-damage-preview-magical', false);
   return (
-    <details className="fold creature-damage-guide">
-      <summary>피해 유형과 대상 반응</summary>
+    <TogglePanel className="creature-damage-guide" label="피해 유형과 대상 반응" badge={type || undefined}>
       <div className="creature-resolution-body">
         <div className="creature-guide-controls">
           <label className="field"><span>공격 전 피해 유형</span>
@@ -229,7 +232,7 @@ function CreatureDamageGuide({ defenses }: { defenses: ReturnType<typeof creatur
         {type && <DamageTypeGuide type={type} reactions={listedDamageReactions(type, magical, defenses)}
           immuneConditions={defenses.immuneConditions} />}
       </div>
-    </details>
+    </TogglePanel>
   );
 }
 

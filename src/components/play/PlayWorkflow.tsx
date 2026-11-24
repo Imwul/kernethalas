@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePlayDraft } from '../../lib/play-draft';
 import { planRollCorrection, type PlayRollEntry } from '../../lib/play-roll-history';
+import { PLAY_DRAWER_EVENT, PLAY_DRAWER_ID } from './PlayDrawer';
 
 const FIELD = 'input[data-play-roll-field]';
 const ACTION = '[data-play-next]';
@@ -10,10 +11,12 @@ export function usePhysicalFirst() {
   return usePlayPreference('kn-play-physical-first');
 }
 
-export function usePlayPreference(key: string) {
+export function usePlayPreference(key: string, defaultOn = false) {
   const [enabled, setEnabled] = useState(() => {
-    try { return localStorage.getItem(key) === '1'; }
-    catch { return false; }
+    try {
+      const stored = localStorage.getItem(key);
+      return stored === null ? defaultOn : stored === '1';
+    } catch { return defaultOn; }
   });
   const toggle = () => {
     setEnabled(!enabled);
@@ -39,12 +42,25 @@ function focusControl(control: HTMLElement) {
   control.scrollIntoView({ block: 'center', inline: 'nearest' });
 }
 
+function findRollField(root: HTMLElement | null, field: string) {
+  return Array.from(root?.querySelectorAll<HTMLElement>(FIELD) ?? [])
+    .find((element) => element.dataset.playRollField === field && !element.matches(':disabled'))
+    ?? root?.querySelector<HTMLElement>(`select[data-play-attack-field="${CSS.escape(field)}"]:not(:disabled)`) ?? undefined;
+}
+
 export function focusPlayRoll(stage: Stage, field?: string, onResult?: (focused: boolean) => void) {
   const reveal = () => {
-    const section = document.getElementById(`play-stage-${stage}`);
-    const input = field && (Array.from(section?.querySelectorAll<HTMLElement>(FIELD) ?? [])
-      .find((element) => element.dataset.playRollField === field && !element.matches(':disabled'))
-      ?? section?.querySelector<HTMLElement>(`select[data-play-attack-field="${CSS.escape(field)}"]:not(:disabled)`));
+    const stageSection = document.getElementById(`play-stage-${stage}`);
+    // Rolls made in the side drawer (domain dice, gear) are recorded under whichever stage was open.
+    const drawer = document.getElementById(PLAY_DRAWER_ID);
+    const stageInput = field ? findRollField(stageSection, field) : undefined;
+    const drawerInput = field && !stageInput ? findRollField(drawer, field) : undefined;
+    const section = drawerInput ? drawer : stageSection;
+    const input = stageInput ?? drawerInput;
+    if (drawerInput) {
+      const pane = drawerInput.closest<HTMLElement>('.play-drawer-pane');
+      if (pane) document.dispatchEvent(new CustomEvent(PLAY_DRAWER_EVENT, { detail: pane.id }));
+    }
     if (!input) {
       section?.querySelector<HTMLElement>('.play-stage-heading')?.focus();
       onResult?.(false);
@@ -54,13 +70,16 @@ export function focusPlayRoll(stage: Stage, field?: string, onResult?: (focused:
     for (let parent = input.parentElement; parent && parent !== section; parent = parent.parentElement) parents.unshift(parent);
     for (const parent of parents) {
       if (parent instanceof HTMLDetailsElement) parent.open = true;
-      if (parent.hidden && parent.id) section?.querySelector<HTMLButtonElement>(`button[aria-controls="${CSS.escape(parent.id)}"]`)?.click();
+      if (parent.hidden && parent.id && !parent.classList.contains('play-drawer-pane')) {
+        section?.querySelector<HTMLButtonElement>(`button[aria-controls="${CSS.escape(parent.id)}"]`)?.click();
+      }
     }
-    requestAnimationFrame(() => {
+    // Two frames: the drawer pane opens through React state before the field can take focus.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       if (canReach(input)) focusControl(input);
-      else section?.querySelector<HTMLElement>('.play-stage-heading')?.focus();
+      else stageSection?.querySelector<HTMLElement>('.play-stage-heading')?.focus();
       onResult?.(document.activeElement === input);
-    });
+    }));
   };
   requestAnimationFrame(() => {
     const target = field?.match(/^combat\/[^/]+\/target-([^/]+)\//)?.[1];
@@ -192,7 +211,7 @@ export function PlayRollHistory({ onCorrection, paperCommitted }: {
   const preview = selection ? planRollCorrection(draft.slots, draft.history, selection) : null;
   return (
     <section id="play-roll-history" className="play-roll-history" aria-labelledby="play-roll-log-title">
-      <h3 id="play-roll-log-title" tabIndex={-1} ref={heading}>이번 장소 굴림 이력</h3>
+      <h3 id="play-roll-log-title" className="sr-only" tabIndex={-1} ref={heading}>이번 장소 굴림 이력</h3>
       {draft.history.length ? (
         <ol className="play-roll-log">
           {[...draft.history].reverse().map((entry) => (

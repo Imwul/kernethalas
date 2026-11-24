@@ -4,7 +4,7 @@ async function openEquipment(page: Page) {
   const panels = page.getByRole('region', { name: '소지칸 검산' });
   if (!(await panels.isVisible())) {
     await page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '휴식·정리' }).click();
-    if (!(await panels.isVisible())) await page.getByText('소지칸·상인 거래', { exact: true }).click();
+    if (!(await panels.isVisible())) await page.getByRole('group', { name: '정리할 항목' }).getByRole('button', { name: '소지칸·상인', exact: true }).click();
   }
   await expect(panels).toBeVisible();
 }

@@ -8,6 +8,10 @@ interface Overlay {
   version: string;
   tables: Record<string, Record<string, string>>;
   creatures: Record<string, Record<string, string>>;
+  /** rule entry id → the book passage it summarises */
+  entries?: Record<string, string>;
+  /** Mastery id → Feature / ability name → its rule text */
+  masteries?: Record<string, Record<string, string>>;
 }
 
 const found = import.meta.glob<Overlay>('../local/source-overlay.json', { eager: true, import: 'default' });
@@ -18,4 +22,10 @@ export function tableRowSource(tableId: string, min: number): string | undefined
 }
 export function creatureActionSource(creatureId: string, action: string): string | undefined {
   return overlay?.creatures[creatureId]?.[action];
+}
+export function entrySource(id: string): string | undefined {
+  return overlay?.entries?.[id];
+}
+export function masterySource(masteryId: string, ability: string): string | undefined {
+  return overlay?.masteries?.[masteryId]?.[ability];
 }

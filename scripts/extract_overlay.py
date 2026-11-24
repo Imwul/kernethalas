@@ -4,6 +4,7 @@ The output contains the book's original wording, so it is git-ignored and must n
 Usage: npm run overlay -- "/path/to/KerNethalas-Corebook.pdf"
 """
 import json, re, sys
+from pathlib import Path
 import fitz  # PyMuPDF
 
 pdf, manifest_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -232,10 +233,256 @@ for c in man['creatures']:
         stop = text.find('TYPE NUMBER', m.end())
         if 0 < stop < nxt:
             nxt = stop
-        acts[name] = text[m.end():nxt].strip()
+        seg = text[m.end():nxt].strip()
+        if i == len(c['actions']) - 1:
+            # the final action runs into the next creature's page; cut at its all-caps title
+            title = re.search(r'\s(?:[A-Z][A-Z’\'-]{2,})(?: [A-Z][A-Z’\'-]{2,})+(?=\s|$)', seg)
+            if title:
+                seg = seg[: title.start()].strip()
+        acts[name] = seg
     creatures[c['id']] = acts
 
-json.dump({'version': 'Gravebound v1.2 (local)', 'tables': tables, 'creatures': creatures}, open(out_path, 'w'), ensure_ascii=False, indent=1)
-print(f"wrote {out_path}: {sum(len(v) for v in tables.values())} table rows ({stats['geom']} by layout, {stats['text']} by text fallback), {sum(len(v) for v in creatures.values())} creature actions")
+# ---------------------------------------------------------------------------
+# Rule entries: the book's prose is split into sections at its headings (all-caps section titles,
+# bold run-in terms, and the small-caps condition/ability names whose glyphs extract as noise).
+# Each entry takes the section that best matches its English title, or the section / bullet
+# paragraph named in ENTRY_HINTS. Tables stop a section: their rows already live in `tables`.
+# ---------------------------------------------------------------------------
+_lines_cache = {}
+
+def rich_lines(n):
+    if n in _lines_cache:
+        return _lines_cache[n]
+    out = []
+    if 1 <= n <= len(doc):
+        for b in doc[n - 1].get_text('dict')['blocks']:
+            for l in b.get('lines', []):
+                spans = [sp for sp in l['spans'] if sp['text'].strip()]
+                if not spans or 'Angelrhapsody' in spans[0]['font']:
+                    continue
+                x0, y0 = l['bbox'][0], l['bbox'][1]
+                out.append({
+                    'page': n, 'col': 0 if x0 < 205 else 1, 'x0': x0, 'y0': y0,
+                    'text': fixf(''.join(sp['text'] for sp in l['spans'])).strip(),
+                    'plain': fixf(''.join(sp['text'] for sp in l['spans'] if 'Bold' not in sp['font'])).strip(),
+                    'font': spans[0]['font'], 'size': round(spans[0]['size'], 1),
+                    'bold': 'Bold' in spans[0]['font'], 'italic': 'Italic' in spans[0]['font'],
+                    'table': 'BaskOldFace' in spans[0]['font'],
+                })
+    out.sort(key=lambda l: (l['col'], round(l['y0']), l['x0']))
+    _lines_cache[n] = out
+    return out
+
+def noisy(t):
+    letters = re.sub(r'[^A-Za-z]', '', t)
+    return '\t' in t or '\n' in t or bool(re.search(r'[\^#!$%]', t)) or (len(t) > 2 and len(letters) < len(t) * 0.5)
+
+def join_lines(parts):
+    out = ''
+    for t in parts:
+        t = t.strip()
+        if not t:
+            continue
+        if out.endswith('-') and t[:1].islower():
+            out = out[:-1] + t
+        else:
+            out = f'{out} {t}' if out else t
+    # the book prints the level as a glyph that most fonts lack
+    return re.sub(r'\s+', ' ', out).replace('⅃', 'L').strip().lstrip('.:;, ')
+
+def new_block(prev, l):
+    return prev is None or prev['page'] != l['page'] or prev['col'] != l['col'] or l['y0'] - prev['y0'] > 13
+
+def all_sections():
+    secs, cur, prev = [], None, None
+    for n in range(1, len(doc) + 1):
+        for l in rich_lines(n):
+            if l['text'] == '•':
+                prev = l
+                continue
+            lv = 0
+            if l['table'] and l['size'] >= 11.5:
+                lv = 2
+            elif l['size'] >= 15:
+                lv = 3
+            elif l['bold'] and l['size'] >= 11.5:
+                lv = 2
+            elif l['bold'] and (new_block(prev, l) or prev['text'] == '•'):
+                lv = 1
+            if lv:
+                # a title wrapped onto a second line continues the same heading
+                wrapped = cur and lv == cur['level'] and lv >= 2 and not cur['body'] and cur['table'] == l['table'] \
+                    and l['page'] == cur['page'] and l['col'] == cur['col'] and 0 <= l['y0'] - cur['y_last'] <= max(16, l['size'] * 1.6)
+                if wrapped:
+                    cur['heading'] += ' ' + l['text']
+                    cur['y_last'] = l['y0']
+                else:
+                    cur = {'level': lv, 'heading': l['text'], 'page': n, 'col': l['col'], 'y_last': l['y0'], 'body': [],
+                           'table': l['table'], 'closed': l['table'], 'first_plain': l['plain'] if l['plain'] != l['text'] else ''}
+                    secs.append(cur)
+            elif cur is not None and not cur['closed']:
+                if l['table']:
+                    cur['closed'] = True  # a table starts: its rows are extracted separately
+                else:
+                    cur['body'].append(l['text'])
+            prev = l
+    return secs
+
+SECTIONS = all_sections()
+
+def section_text(i, follow=0):
+    s = SECTIONS[i]
+    parts = [s['first_plain']] if noisy(s['heading']) else [s['heading']]
+    parts += s['body']
+    j = i + 1
+    while j < len(SECTIONS) and (follow > 0 or (SECTIONS[j]['level'] < s['level'] and s['level'] >= 2)) and not SECTIONS[j]['table']:
+        t = SECTIONS[j]
+        parts += ([t['first_plain']] if noisy(t['heading']) else [t['heading']]) + t['body']
+        follow -= 1
+        j += 1
+    return trim_entry(join_lines(parts))
+
+def trim_entry(text, limit=2000):
+    if len(text) <= limit:
+        return text
+    cut = text.rfind('. ', 0, limit)
+    return text[: cut + 1 if cut > limit // 3 else limit] + ' …'
+
+def bullet_paragraph(page, phrase):
+    """The bullet or paragraph on `page` that contains `phrase`, followed across column and page breaks."""
+    paras, cur, prev = [], None, None
+    for n in (page - 1, page, page + 1):
+        for l in rich_lines(n):
+            if l['table']:
+                prev = l
+                continue
+            if l['text'] == '•':
+                cur = {'page': n, 'parts': []}
+                paras.append(cur)
+                prev = l
+                continue
+            continues = cur is not None and prev is not None and prev['text'] != '•' and not new_block(prev, l)
+            carried = cur is not None and prev is not None and new_block(prev, l) and (prev['page'] != l['page'] or prev['col'] != l['col']) \
+                and not re.search(r'[.!?:]$', cur['parts'][-1] if cur['parts'] else '.')
+            if not (continues or carried or (prev is not None and prev['text'] == '•')):
+                cur = {'page': n, 'parts': []}
+                paras.append(cur)
+            cur['parts'].append(l['plain'] if l['bold'] and noisy(l['text']) else l['text'])
+            prev = l
+    for para in paras:
+        text = join_lines(para['parts'])
+        if phrase.lower() in text.lower() and (para['page'] == page or page - 1 <= para['page'] <= page):
+            return trim_entry(text)
+    return None
+
+def find_section(page, test):
+    return next((i for i, s in enumerate(SECTIONS) if s['page'] == page and test(s)), None)
+
+# Entries whose title is not a heading of its own: (kind, page, phrase[, extra])
+#   section: heading starts with phrase   body: the section whose body contains phrase
+#   para:    the bullet/paragraph containing phrase
+# The anchor phrases are short quotes from the book, so they live in a git-ignored local file
+# (scripts/.overlay-hints.json, written next to the manifest) and never in the public repository.
+_hints_path = Path(__file__).with_name('.overlay-hints.json')
+ENTRY_HINTS = {k: tuple(v) for k, v in json.loads(_hints_path.read_text()).items()} if _hints_path.exists() else {}
+if not ENTRY_HINTS:
+    print(f'note: {_hints_path.name} not found; rule entries fall back to automatic heading matches')
+# Tables, worked examples and out-of-scope chapters get no prose original.
+ENTRY_SKIP = {'weapons', 'common-gear', 'spoils', 'combat-example', 'first-domain-rules', 'character-creation'}
+
+def entry_words(s):
+    return {w for w in re.findall(r'[a-z]+', s.lower()) if w not in STOP and len(w) > 1}
+
+def auto_entry(e):
+    phrases = [e['en']] + e['terms']
+    best = None
+    for k, page in enumerate(e['pages']):
+        rank = (len(e['pages']) - k) / len(e['pages'])
+        for i, sec in enumerate(SECTIONS):
+            if sec['page'] != page or sec['table']:
+                continue
+            head, body = sec['heading'], join_lines(sec['body'])
+            sc = 0.0
+            if not noisy(head):
+                hw = entry_words(head)
+                match = 0.0
+                for ph in phrases:
+                    pw = entry_words(ph)
+                    if pw:
+                        match = max(match, len(pw & hw) / len(pw))
+                    if ph.lower() in head.lower():
+                        match = max(match, 1.2)
+                sc += match
+            elif head[:1].upper() == e['en'][:1].upper():
+                sc += 0.2
+            start = (sec['first_plain'] + ' ' + body)[:160].lower()
+            if any(ph.lower() in start for ph in phrases):
+                sc += 0.6
+            sc += 0.08 * rank
+            if best is None or sc > best[0]:
+                best = (sc, i)
+    return section_text(best[1]) if best and best[0] >= 0.7 else None
+
+entries = {}
+for e in man.get('entries', []):
+    if e['id'] in ENTRY_SKIP:
+        continue
+    hint = ENTRY_HINTS.get(e['id'])
+    text = None
+    if hint:
+        kind, page, phrase, *extra = hint
+        if kind == 'para':
+            text = bullet_paragraph(page, phrase)
+        elif kind == 'section':
+            i = find_section(page, lambda s: s['heading'].upper() == phrase.upper())
+            if i is None:
+                i = find_section(page, lambda s: s['heading'].upper().startswith(phrase.upper()))
+        else:
+            i = find_section(page, lambda s: phrase.lower() in join_lines([s['first_plain']] + s['body']).lower())
+        if kind != 'para':
+            text = section_text(i, extra[0] if extra else 0) if i is not None else None
+    else:
+        text = auto_entry(e)
+    if text:
+        entries[e['id']] = text
+    else:
+        misses.append(f"entry:{e['id']}")
+
+# Masteries: one page each. The Feature is a bold small-caps run-in; each Tier is a bold heading
+# line ("Tier N - Name"), then an italic usage line, then the rule text.
+masteries = {}
+for m in man.get('masteries', []):
+    if not m['page']:
+        continue
+    lines = [l for l in rich_lines(m['page']) if l['size'] < 15 and not (l['italic'] and l['size'] >= 11.5)]
+    blocks, cur = [], None
+    for l in lines:
+        if l['bold']:
+            cur = {'head': l['text'], 'parts': [l['plain']] if l['plain'] else []}
+            blocks.append(cur)
+        elif cur is not None:
+            # the italic usage line ("1 Standard Action. Cost: 4 Aether") is set apart from the rule text
+            if cur['parts'] and cur.get('usage') and not l['italic']:
+                cur['parts'][-1] += ' —'
+                cur['usage'] = False
+            if l['italic'] and not cur['parts']:
+                cur['usage'] = True
+            cur['parts'].append(l['text'])
+    tiers = [b for b in blocks if re.search(r'\b[1-5]\s*-\s', b['head'])]
+    feature = next((b for b in blocks if b not in tiers), None)
+    out = {}
+    if feature:
+        out[m['feature']] = join_lines(feature['parts'])
+    for name, b in zip(m['abilities'], tiers):
+        out[name] = join_lines(b['parts'])
+    if len(tiers) != len(m['abilities']) or not feature:
+        misses.append(f"mastery:{m['id']} ({len(tiers)} tiers)")
+    masteries[m['id']] = out
+
+json.dump({'version': 'Gravebound v1.2 (local)', 'tables': tables, 'creatures': creatures, 'entries': entries, 'masteries': masteries},
+          open(out_path, 'w'), ensure_ascii=False, indent=1)
+print(f"wrote {out_path}: {sum(len(v) for v in tables.values())} table rows ({stats['geom']} by layout, {stats['text']} by text fallback), "
+      f"{sum(len(v) for v in creatures.values())} creature actions, {len(entries)} rule entries, "
+      f"{sum(len(v) for v in masteries.values())} Mastery texts")
 if misses:
     print(f"{len(misses)} unmatched (shown without original text):", ', '.join(misses[:30]), '…' if len(misses) > 30 else '')

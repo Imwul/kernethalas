@@ -5,7 +5,7 @@ import {
   parsePlayCheckpoint, readPlayCheckpoints, storePlayCheckpoints, type PlayCheckpoint,
   type PlayCheckpointData,
 } from '../../lib/play-checkpoints';
-import { backupIsStale, hasRestoreUndo, readLastBackup } from '../../lib/site-backup';
+import { backupIsStale, readLastBackup } from '../../lib/site-backup';
 import { PlaySiteBackup } from './PlaySiteBackup';
 import '../../styles/play-checkpoints.css';
 
@@ -14,6 +14,7 @@ interface Props {
   place: string;
   stage: string;
   onRestore: (data: PlayCheckpointData) => boolean | Promise<boolean>;
+  onNeedsBackup?: (needed: boolean) => void;
 }
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
@@ -37,7 +38,7 @@ function CheckpointLabel({ checkpoint }: { checkpoint: PlayCheckpoint }) {
   );
 }
 
-export function PlayCheckpoints({ data, place, stage, onRestore }: Props) {
+export function PlayCheckpoints({ data, place, stage, onRestore, onNeedsBackup }: Props) {
   const campaignId = usePlayCampaignId();
   const [checkpoints, setCheckpoints] = useState(() => readPlayCheckpoints(campaignId) ?? []);
   const [name, setName] = useState('');
@@ -53,6 +54,7 @@ export function PlayCheckpoints({ data, place, stage, onRestore }: Props) {
   const [backedUp, setBackedUp] = useState(() => !backupIsStale(readLastBackup()));
   // only nag once there is something worth keeping: a recorded roll, a checkpoint or other saved play data
   const needsBackup = !backedUp && ((data.history?.length ?? 0) > 0 || checkpoints.length > 0 || data.gear.items.length > 0);
+  useEffect(() => { onNeedsBackup?.(needsBackup); }, [needsBackup, onNeedsBackup]);
 
   useEffect(() => {
     if (!review) return;
@@ -91,9 +93,8 @@ export function PlayCheckpoints({ data, place, stage, onRestore }: Props) {
   };
 
   return (
-    <details className="fold play-checkpoints" open={hasRestoreUndo() || undefined}>
-      <summary><span>플레이 저장·이어하기</span>{needsBackup && <span className="fold-flag">백업 필요</span>}</summary>
-      <section className="play-checkpoints-body" aria-label="플레이 저장과 복원">
+    <section className="play-checkpoints play-checkpoints-body" aria-label="플레이 저장과 복원">
+        {needsBackup && <p className="play-checkpoint-flag"><span className="fold-flag">백업 필요</span> 저장한 플레이가 아직 전체 백업 파일에 없습니다.</p>}
         <form className="play-checkpoint-form" onSubmit={(event) => {
           event.preventDefault();
           const checkpoint = capture();
@@ -174,7 +175,6 @@ export function PlayCheckpoints({ data, place, stage, onRestore }: Props) {
             ))}
           </ul>
         )}
-      </section>
-    </details>
+    </section>
   );
 }

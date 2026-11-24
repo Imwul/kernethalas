@@ -94,6 +94,10 @@ export function App() {
   useTitle(path);
 
   useEffect(() => { setStack([]); }, [path, bestiaryRequest, campaignRequest]);
+  // Play mode has its own sticky stage bar and fixed action bar; the site tab bar would stack a third bar on phones.
+  useEffect(() => {
+    document.documentElement.dataset.route = path === '/play' ? 'play' : '';
+  }, [path]);
   useEffect(() => { if (currentId) nav.visit(currentId); }, [currentId]);
 
   useEffect(() => {

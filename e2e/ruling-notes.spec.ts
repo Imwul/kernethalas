@@ -1,9 +1,8 @@
 import { expect, test, type Locator } from '@playwright/test';
 
 async function openNote(panel: Locator) {
-  const note = panel.locator('.ruling-note:not(.ruling-notes-index)');
-  await note.locator('summary').click();
-  return note;
+  // The note sits on one line under the header; there is nothing to unfold.
+  return panel.locator('.ruling-note:not(.ruling-notes-index)');
 }
 
 async function addNote(note: Locator, text: string) {

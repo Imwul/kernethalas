@@ -7,6 +7,7 @@ import { DEFAULT_DOMAIN_PROGRESS, domainPlaceLabel, introEncounterCreature, mark
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { capturePaperMapTile, paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
 import { gearCount } from '../../lib/play-inventory';
+import { rowTitle } from '../../lib/oracle';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
 import type { RoomShapeState } from '../RoomShapeDiagram';
@@ -15,6 +16,7 @@ import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
 import { PlayDomainExit, PlayDomainProgress, type DomainDestination } from './PlayDomainProgress';
 import { PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport, type ExplorationActionsHandle } from './PlayExplorationActions';
 import { PlayRoll } from './PlayRoll';
+import { PlayStrip, PlayStripPane } from './PlayPanels';
 import { PlayPaperMap } from './PlayPaperMap';
 import { PlayFinishedStep } from './PlayFocus';
 import { EMPTY_ROOM_SHAPE, PlayTileControls } from './PlayTileControls';
@@ -119,6 +121,8 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
   const [eventFollow, setEventFollow] = useState(EMPTY_FOLLOW_UP);
   const clear = useClearPlayDraftScope();
   const actionsHeading = useId();
+  const descriptionId = useId();
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   const commit = usePlayRoll();
 
   const intro = domainProgress.mode === 'intro';
@@ -167,8 +171,9 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
     ? [mapRecord?.paperId, revisit ? `${placeLabel} 재방문` : placeLabel].filter(Boolean).join(' · ') : null;
   const shapeReport = shapeRow ? [mapRecord?.paperId, shapeRow.ko].filter(Boolean).join(' · ') : null;
   const darknessReport = darknessRow && darknessRoll !== null ? `D100 ${darknessRoll} · ${darknessRow.ko}` : null;
+  // Journal and the room summary carry the event's short title; the card keeps the whole rule text.
   const eventReport = eventRow && eventRoll !== null
-    ? `D100 ${eventRoll} · ${eventRow.label ?? eventRow.ko}` : null;
+    ? `D100 ${eventRoll} · ${rowTitle(eventRow)}` : null;
   const resolvedDarkness = darknessRow ? darknessFollow : EMPTY_FOLLOW_UP;
   const resolvedEvent = eventRow ? eventFollow : EMPTY_FOLLOW_UP;
   const eventLairEffect = eventRoll === 86 && resolvedEvent.items.some(({ id }) => id === 'event-86-lair');
@@ -316,7 +321,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
         <>
           <div className="play-explore-context">
             <p>{revisit ? `정리한 ${placeLabel} 재방문` : `새 ${placeLabel}`}
-              {roomLightCost !== null && <> · <XRef id="lightsource">광원 {roomLightCost} 소모</XRef>{roomLightCost === 1 && <span> (짙어지는 어둠 69–70 적용 중이면 2)</span>}</>}
+              {roomLightCost !== null && <> · <XRef id="lightsource">광원 {roomLightCost} 소모</XRef></>}
             </p>
             {!onDomainProgress && !revisit && (
               <div className="play-explore-links">
@@ -344,7 +349,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
             </label>}
             <section className="play-explore-step" aria-label="긴장 주사위">
               <h3>긴장 주사위</h3>
-              <PlayFinishedStep summary={tension ? `D${tension.sides} ${tension.value} · ${tension.darkness ? '짙어지는 어둠' : `다음 D${tension.nextDie}`}` : null}>
+              <PlayFinishedStep summary={tension ? `D${tension.sides} ${tension.value} · ${tension.darkness ? '짙어지는 어둠 · ' : ''}다음 D${tension.nextDie}` : null}>
                 <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
                   setTension(result);
                   if (enteredLightCost === null && place === 'room') setEnteredLightCost(lightCost);
@@ -405,13 +410,15 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
               {eventCanStartCombat && <button type="button" className="btn ghost" data-play-next="" onClick={startEventCombat}>이벤트에서 전투가 났다면 조우 표로</button>}
             </div>
           )}
-          {!revisit && <details className="fold">
-            <summary>{placeLabel} 환경 묘사</summary>
-            <div className="play-explore-action-body">
+          {!revisit && <div className="play-explore-description">
+            <PlayStrip label="환경 묘사" prefix={descriptionId} value={descriptionOpen ? 'description' : null}
+              onChange={(next) => setDescriptionOpen(next !== null)} items={[{ id: 'description', label: `${placeLabel} 환경 묘사`,
+                badge: descriptionRoll !== null ? `D100 ${descriptionRoll}` : undefined }]} />
+            <PlayStripPane prefix={descriptionId} id="description" open={descriptionOpen}>
               <PlayRoll label={`${placeLabel} 환경 묘사 굴림`} table={PLACE_DESCRIPTIONS[place]}
                 value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))} />
-            </div>
-          </details>}
+            </PlayStripPane>
+          </div>}
           {entryNextTension && <div className="play-explore-step" role="group" aria-labelledby={actionsHeading}>
             <h3 id={actionsHeading}>탐험 후속 행동</h3>
             <PlayExplorationActions actionsRef={actionsRef} room={place === 'room'} initialSides={entryNextTension}

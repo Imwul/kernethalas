@@ -225,14 +225,28 @@
 .play-custom-rows li > strong { overflow-wrap: anywhere; }
 .play-custom-range { color: var(--copper-ink); font: 700 15px / 1.3 var(--f-ui); font-variant-numeric: tabular-nums; }
 
+/* Lineup edits on the left, finishing the fight on the right: both stay above the tools and card. */
+.play-combat-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  min-width: 0;
+}
 .play-combat-complete {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--s2);
-  padding-top: var(--s3);
-  border-top: 1px solid var(--rule-soft);
+  min-width: 0;
 }
-.play-combat-complete .play-combat-note { flex-basis: 100%; }
+.play-combat-complete .play-combat-note { flex-basis: 100%; margin: 0; text-align: end; }
+.play-combat-toolbox { display: grid; gap: var(--s3); min-width: 0; }
+@container (width < 560px) {
+  .play-combat-complete { justify-content: flex-start; }
+  .play-combat-complete .play-combat-note { text-align: start; }
+}
 
 @container (width < 340px) {
   .play-combat-roll { grid-template-columns: minmax(0, 1fr) max-content; }

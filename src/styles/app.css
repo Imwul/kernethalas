@@ -698,6 +698,41 @@ kbd {
   height: 18px;
 }
 
+/* small open/close button that replaces a fold: "+ 기본값·보정" with an optional count */
+.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 5px 12px 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink-2);
+  font: 600 14px/1.3 var(--f-ui);
+  cursor: pointer;
+}
+.toggle-btn::before { content: '+'; content: '+' / ''; flex: none; inline-size: 0.7em; color: var(--copper-ink); font: 400 14px/1 var(--f-mono); }
+.toggle-btn:hover { color: var(--ink); background: var(--bone-2); }
+.toggle-btn[aria-expanded='true'] { border-color: var(--copper-ink); background: var(--copper-wash); color: var(--ink); }
+.toggle-btn[aria-expanded='true']::before { content: '−'; content: '−' / ''; }
+.toggle-btn:disabled { cursor: default; opacity: 0.6; }
+.toggle-count {
+  min-inline-size: 1.5em;
+  padding-inline: 4px;
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
+  color: var(--copper-ink);
+  font: 600 12px/1.45 var(--f-mono);
+  text-align: center;
+}
+.toggle-section { display: grid; justify-items: start; gap: var(--s2); min-width: 0; }
+.toggle-section > .toggle-panel { justify-self: stretch; display: grid; gap: var(--s2); min-width: 0; }
+.toggle-panel[hidden], .toggle-section > .toggle-panel[hidden] { display: none; }
+@media (pointer: coarse) {
+  .toggle-btn { min-height: 44px; }
+}
+
 .pinbtn[aria-pressed='true'] svg {
   fill: var(--oxblood);
   stroke: var(--oxblood);
@@ -988,6 +1023,18 @@ kbd {
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+/* Page actions read as a small tool row, not a block of large buttons. */
+.folio-head .actions .btn {
+  min-height: 36px;
+  padding: 0 10px;
+  gap: 6px;
+  box-shadow: none;
+  font-size: 13.5px;
+}
+.folio-head .actions .btn svg { width: 16px; height: 16px; }
+@media (pointer: coarse) {
+  .folio-head .actions .btn { min-height: 44px; }
 }
 .folio-title {
   font-family: var(--f-ko-display);
@@ -1890,6 +1937,11 @@ details.fold[open] > summary::before {
   font-size: 12.5px;
   color: var(--faded);
 }
+/* Every skill check (general, scavenge, attack, survival) labels its fields the same way. */
+:is(.physical-check-form, .checkcalc-side, .survival-fields) .field > :is(span, label) {
+  color: var(--ink-2);
+  font: 13px/1.4 var(--f-ui);
+}
 .field input,
 .field select {
   height: 40px;
@@ -2780,3 +2832,7 @@ input[aria-invalid='true'] {
 
 /* Keyboard shortcut hints mean nothing on touch screens. */
 @media (pointer: coarse) { .kbd-hint { display: none; } }
+
+/* Play mode: its own bars replace the site tab bar on phones (search stays in the header). */
+:root[data-route='play'] { --tabbar-h: 0px; }
+:root[data-route='play'] .tabbar { display: none; }

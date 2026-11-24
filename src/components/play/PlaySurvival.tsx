@@ -3,6 +3,7 @@ import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { usePlayCharacter } from '../../lib/play-character';
 import { LINGERING_CONDITIONS as CONDITIONS, usePlayOngoingEffects } from '../../lib/play-effects';
 import { gearCount, type PaperChange } from '../../lib/play-inventory';
 import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../../lib/play-skill';
@@ -57,11 +58,11 @@ function CheckInputs({ label, value, result, onChange }: {
   return (
     <>
       <div className="survival-fields">
-        <label className="field"><span>보정 {label}</span>
+        <label className="field"><span>{label} 수치</span>
           <input value={value.target} placeholder="예 45" aria-invalid={invalid || undefined}
             onChange={(event) => onChange({ ...value, target: event.target.value, roll: null })} />
         </label>
-        <label className="field"><span>이점·불이점</span>
+        <label className="field"><span>유불리</span>
           <select value={value.edge} onChange={(event) => onChange({ ...value, edge: event.target.value as Edge, roll: null })}>
             <option value="none">없음</option>
             <option value="advantage">Advantage</option>
@@ -97,7 +98,8 @@ const EMPTY_TREATMENT: TreatmentDraft = { purpose: 'heal', check: EMPTY_CHECK, r
 
 function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord: SaveRecord }) {
   const { current: { conditions }, setCondition } = usePlayOngoingEffects();
-  const [draft, setDraft] = usePlayDraftState<TreatmentDraft>('bandage', EMPTY_TREATMENT);
+  const medicine = usePlayCharacter()?.skill('Medicine') ?? '';
+  const [draft, setDraft] = usePlayDraftState<TreatmentDraft>('bandage', { ...EMPTY_TREATMENT, check: { ...EMPTY_CHECK, target: medicine } });
   const commitRoll = usePlayRoll();
   const { purpose, check, recovery, damage } = draft;
   const result = resolveDraft(check);
@@ -189,7 +191,8 @@ interface RotDraft {
 const EMPTY_ROT: RotDraft = { trigger: 'exposure', stage: 1, check: EMPTY_CHECK, exhaustion: null, health: null };
 
 function RotTool({ onRecord }: { onRecord: SaveRecord }) {
-  const [draft, setDraft] = usePlayDraftState<RotDraft>('rot', EMPTY_ROT);
+  const endurance = usePlayCharacter()?.skill('Endurance') ?? '';
+  const [draft, setDraft] = usePlayDraftState<RotDraft>('rot', { ...EMPTY_ROT, check: { ...EMPTY_CHECK, target: endurance } });
   const commitRoll = usePlayRoll();
   const { trigger, stage, check, exhaustion, health } = draft;
   const start = trigger === 'exposure' ? 0 : stage;

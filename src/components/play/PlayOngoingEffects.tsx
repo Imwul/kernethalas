@@ -12,12 +12,9 @@ export function PlayOngoingEffects() {
   const [raw, setRaw] = useState('');
   const reserved = encounterInteger(raw);
   const valid = name.trim() && (kind !== 'sustain' || reserved !== null && reserved > 0);
-  const activeCount = current.conditions.length + current.abilities.length;
 
   return (
-    <details className="fold play-ongoing">
-      <summary><span>이어지는 상태·능력</span>{activeCount > 0 && <span>{activeCount}개</span>}</summary>
-      <section aria-labelledby={heading} className="play-ongoing-body">
+    <section aria-labelledby={heading} className="play-ongoing play-ongoing-body">
         <h2 id={heading} className="sr-only">현재 남은 상태와 능력</h2>
         <fieldset className="play-ongoing-conditions">
           <legend>남아 있는 상태</legend>
@@ -42,8 +39,8 @@ export function PlayOngoingEffects() {
             </li>
           ))}
         </ul>}
-        <details className="fold play-ongoing-add">
-          <summary>사용·유지 상태 직접 추가</summary>
+        <div className="play-ongoing-add">
+          <h3>사용·유지 상태 직접 추가</h3>
           <form className="play-ongoing-form" onSubmit={(event) => {
             event.preventDefault();
             if (!valid) return;
@@ -66,9 +63,8 @@ export function PlayOngoingEffects() {
             </label>}
             <button className="btn ghost" type="submit" disabled={!valid}>상태 기록</button>
           </form>
-        </details>
+        </div>
         <XRef id="once-per-rest">재사용 규칙</XRef>
-      </section>
-    </details>
+    </section>
   );
 }

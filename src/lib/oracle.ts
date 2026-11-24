@@ -36,3 +36,16 @@ export function quickRollHref(t: OracleTable): string | null {
   const value = rollTable(t);
   return value === null ? null : `/oracle/${t.id}?r=${value}&view=one`;
 }
+
+/** A row's short name for summaries and the journal: its label, or the first sentence of its text. */
+export function rowTitle(row: { label?: string; ko: string }) {
+  if (row.label) return row.label;
+  return (row.ko.split(/(?<=[.!?])\s/)[0] ?? row.ko).replace(/\.$/, '');
+}
+
+/** The rest of a row's text after the sentence `rowTitle` used. */
+export function rowDetail(row: { label?: string; ko: string }) {
+  if (row.label) return row.ko;
+  const [, ...rest] = row.ko.split(/(?<=[.!?])\s/);
+  return rest.join(' ');
+}

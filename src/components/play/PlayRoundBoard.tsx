@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { titleOf } from '../../content';
 import { usePlayDraftState } from '../../lib/play-draft';
 import { XRef } from '../bits';
+import { TogglePanel } from '../TogglePanel';
 import '../../styles/play-combat-tools.css';
 
 const TIMING_LABELS = {
@@ -32,8 +33,13 @@ const PLAYER = { id: 'pc', label: 'PC' };
 const FIRST_ROUND: Position = { round: 1, timing: 'round', actor: null };
 const DEFAULT_REMINDER: ReminderDraft = { actor: 'pc', effect: 'bleeding', timing: 'round', note: '' };
 
+/** The current round, for the combat tool strip. Read inside the encounter's tool scope. */
+export function PlayRoundNumber() {
+  const [position] = usePlayDraftState<Position>('round-position', FIRST_ROUND);
+  return <>{position.round}</>;
+}
+
 export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
-  const [open, setOpen] = usePlayDraftState('round-board-open', false);
   const [position, setPosition] = usePlayDraftState<Position>('round-position', FIRST_ROUND);
   const [actor, setActor] = usePlayDraftState('round-actor', PLAYER.id);
   const [reminders, setReminders] = usePlayDraftState<Reminder[]>('round-reminders', []);
@@ -58,9 +64,7 @@ export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
   }
 
   return (
-    <details className="fold play-combat-tools" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>라운드 정리 · {position.round}라운드</summary>
-      <section className="play-combat-tool-body" aria-label="전투 턴·라운드 체크판">
+      <section className="play-combat-tools play-combat-tool-body" aria-label="전투 턴·라운드 체크판">
         <div className="play-round-status" role="status">
           <strong>{position.round}라운드</strong>
           <span>{position.timing === 'round' ? '라운드 시작'
@@ -116,8 +120,7 @@ export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
           </ul>
         )}
 
-        <details className="fold play-round-add">
-          <summary>확인 항목 추가</summary>
+        <TogglePanel className="play-round-add" label="확인 항목 추가">
           <form className="play-round-form" onSubmit={add}>
             <label className="field"><span>효과 대상</span>
               <select value={draftActor} onChange={(event) => setDraft({ ...draft, actor: event.target.value })}>
@@ -144,8 +147,7 @@ export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
             </label>
             <button type="submit" className="btn ghost" disabled={draft.effect === 'custom' && !draft.note.trim()}>효과 추가</button>
           </form>
-        </details>
+        </TogglePanel>
       </section>
-    </details>
   );
 }

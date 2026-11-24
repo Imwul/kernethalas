@@ -1,36 +1,21 @@
-.campaign-selector.fold, .campaign-storage-status {
-  margin: 0 0 var(--s4);
-}
+.campaign-storage-status { margin: 0 0 var(--s4); }
 /* Line up with the play desk below it on ultrawide screens. */
 @media (min-width: 2000px) {
-  .campaign-selector.fold, .campaign-storage-status {
+  .campaign-storage-status {
     max-inline-size: 1940px;
     margin-inline-start: clamp(0px, calc((100vw - 2360px) / 2), 480px);
     margin-inline-end: 0;
   }
 }
-.campaign-selector.fold {
-  min-inline-size: 0;
-  padding-inline: var(--s3);
-  border: 1px solid var(--rule);
-  border-inline-start: 2px solid var(--copper);
-  background: var(--paper);
-}
-.campaign-selector.fold > summary {
-  gap: var(--s2);
-  min-block-size: 44px;
-  color: var(--ink-2);
-  font: 600 14px/1.45 var(--f-ui);
-  letter-spacing: normal;
-}
-.campaign-selector.fold > summary::before, .campaign-selector.fold > summary > span { flex: none; }
-.campaign-selector.fold > summary strong { min-inline-size: 0; color: var(--ink); overflow-wrap: anywhere; }
+.campaign-selector .play-popover-trigger { border-inline-start: 2px solid var(--copper); }
+.campaign-selector .play-popover-trigger > span { flex: none; }
+.campaign-selector .play-popover-trigger strong { min-inline-size: 0; overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.campaign-selector .play-popover-body { inline-size: min(26rem, calc(100vw - 2 * var(--gutter))); }
 .campaign-selector-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--s3);
   max-inline-size: 42rem;
-  padding-block-end: var(--s3);
 }
 .campaign-selector-row {
   display: grid;

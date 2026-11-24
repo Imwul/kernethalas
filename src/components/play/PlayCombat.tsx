@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { entryById, tableById } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
@@ -18,13 +18,15 @@ import { EncounterLibraryControls, PlayCustomEncounterEditor } from './PlayCusto
 import { PlayDamageComparison } from './PlayDamageComparison';
 import { PlayFlee } from './PlayFlee';
 import { PlayMastery } from './PlayMastery';
-import { PlayRoundBoard } from './PlayRoundBoard';
+import { PlayRoundBoard, PlayRoundNumber } from './PlayRoundBoard';
+import { PlayStrip, PlayStripPane, type StripItem } from './PlayPanels';
 import { PlayTargetAllocation } from './PlayTargetAllocation';
 import '../../styles/play-combat.css';
 
 type EncounterTable = 't-encounter-a' | 't-encounter-b' | 't-overseer';
 type EncounterMethod = 'encounter' | EncounterTable | 'search' | 'custom';
 type CombatTargetStatus = 'defeated' | 'left';
+type CombatTool = 'start' | 'round' | 'allocation' | 'compare' | 'flee' | 'mastery';
 
 interface Target {
   id: string;
@@ -170,6 +172,9 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
   const [lineup, setLineup] = usePlayDraftState('lineup', restoredLineup(seed));
   const [customGap, setCustomGap] = usePlayDraftState<number | null>('custom-gap', null);
   const [addingTarget, setAddingTarget] = useState(false);
+  const [toolPanes, setToolPanes] = usePlayDraftState<Record<string, CombatTool | null>>('tool-panes', {});
+  const [startOrder, setStartOrder] = usePlayDraftState<Record<string, string>>('start-order', {});
+  const toolStrip = useId();
   const methodInput = useRef<HTMLSelectElement>(null);
   const combatHeading = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef<'method' | 'target' | null>(null);
@@ -197,6 +202,41 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
       ? creature : highest, primary),
     traits: [...new Set(targets.flatMap(({ creature }) => creature.traits))],
   };
+
+  // Each encounter opens on its start step (initiative or surprise); later choices are remembered per encounter.
+  const toolKey = selected ? lineup.encounterId ?? 'encounter' : 'lookup';
+  const tool: CombatTool | null = Object.hasOwn(toolPanes, toolKey) ? toolPanes[toolKey] : selected ? 'start' : null;
+  const setTool = (next: CombatTool | null) => setToolPanes((previous) => ({ ...previous, [toolKey]: next }));
+  const order = startOrder[toolKey];
+  // Once the turn order is settled the start step folds away (once per encounter), so the enemy card's turn tools sit right under the lineup.
+  const settleStart = useCallback((summary: string | null, fold: boolean) => {
+    setStartOrder((previous) => {
+      if ((previous[toolKey] ?? null) === summary) return previous;
+      const next = { ...previous };
+      if (summary) next[toolKey] = summary;
+      else delete next[toolKey];
+      return next;
+    });
+    if (summary && fold) setToolPanes((previous) => previous[`${toolKey}:settled`] ? previous
+      : { ...previous, [`${toolKey}:settled`]: 'start', ...((previous[toolKey] ?? 'start') === 'start' ? { [toolKey]: null } : {}) });
+  }, [setStartOrder, setToolPanes, toolKey]);
+  const fighting = !finished && !fled && activeTargets.length > 0;
+  const toolItems: StripItem<CombatTool>[] = selected ? [
+    { id: 'start', label: '조우 시작', badge: order },
+    { id: 'round', label: '라운드', badge: <PlayDraftScope name={`combat-tools-${lineup.encounterId}`}><PlayRoundNumber /></PlayDraftScope> },
+    { id: 'allocation', label: '적 배분' },
+    ...(activeTargets.length > 1 ? [{ id: 'compare' as const, label: '피해 비교' }] : []),
+    { id: 'mastery', label: 'Mastery·마법' },
+    ...(fighting ? [{ id: 'flee' as const, label: '도주' }] : []),
+  ] : [{ id: 'mastery', label: 'Mastery·마법' }];
+  const masteryPane = (
+    <PlayStripPane prefix={toolStrip} id="mastery" open={tool === 'mastery'}>
+      <PlayDraftScope name="mastery">
+        <PlayMastery targets={selected && !selected.status ? [selected, ...activeTargets.filter((target) => target.id !== selected.id)] : activeTargets}
+          onSheetChange={onMasterySheetChange} onJournalChange={onMasteryJournalChange} />
+      </PlayDraftScope>
+    </PlayStripPane>
+  );
 
   useEffect(() => { onCreatureChange(primary); }, [primary, onCreatureChange]);
   useEffect(() => { onTargetsChange?.(names); }, [names, onTargetsChange]);
@@ -275,48 +315,33 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
               <button type="button" className="btn ghost" onClick={clearTargets}>조우 다시 선택</button>
             </header>
             {targets.length === 1 && targetStatus(selected)}
-            <div className="play-combat-target-actions">
-              <button type="button" className="btn ghost" disabled={finished || fled}
-                onClick={() => selectCreature(selected.creature, '같은 생물 추가')}>같은 생물 추가</button>
-              <button type="button" className="btn ghost" aria-expanded={addingTarget} aria-controls={addTargetId}
-                disabled={finished || fled} onClick={() => setAddingTarget(!addingTarget)}>다른 생물 추가</button>
-              {targets.length > 1 && <button type="button" className="btn ghost" disabled={finished || fled} onClick={() => {
-                const remaining = lineup.targets.filter(({ id }) => id !== selected.id);
-                pendingFocus.current = 'target';
-                setLineup({ ...lineup, targets: remaining, activeId: remaining[0]?.id ?? null });
-              }}>선택 대상 빼기</button>}
+            <div className="play-combat-actions-row">
+              <div className="play-combat-target-actions">
+                <button type="button" className="btn ghost" disabled={finished || fled}
+                  onClick={() => selectCreature(selected.creature, '같은 생물 추가')}>같은 생물 추가</button>
+                <button type="button" className="btn ghost" aria-expanded={addingTarget} aria-controls={addTargetId}
+                  disabled={finished || fled} onClick={() => setAddingTarget(!addingTarget)}>다른 생물 추가</button>
+                {targets.length > 1 && <button type="button" className="btn ghost" disabled={finished || fled} onClick={() => {
+                  const remaining = lineup.targets.filter(({ id }) => id !== selected.id);
+                  pendingFocus.current = 'target';
+                  setLineup({ ...lineup, targets: remaining, activeId: remaining[0]?.id ?? null });
+                }}>선택 대상 빼기</button>}
+              </div>
+              {!fled && (!finished || !tracksDefeats) && <div className="play-combat-complete">
+                <button type="button" className="btn primary" disabled={tracksDefeats && activeTargets.length > 0}
+                  onClick={() => onBattleEnd(primary, 'victory', targets.map(({ creature }) => creature), defeatedTargets)}>승리 후 전투 마치기</button>
+                <button type="button" className="btn ghost"
+                  onClick={() => onBattleEnd(primary, 'ended', targets.map(({ creature }) => creature), defeatedTargets)}>전투만 마치기</button>
+                {tracksDefeats && activeTargets.length > 0 &&
+                  <p className="play-combat-note">승리를 확정하려면 교전 중인 적을 처치 또는 이탈로 표시하세요.</p>}
+              </div>}
             </div>
             <div id={addTargetId} hidden={!addingTarget || finished || fled}>
               {addingTarget && !finished && !fled && <PlayCreatureSearch label="추가할 생물 이름" onSelect={(creature) => selectCreature(creature, '이름으로 추가')} />}
             </div>
           </div>
-          <PlayDraftScope key={`encounter-start-${lineup.encounterId}`} name={`encounter-start-${lineup.encounterId}`}>
-            <EncounterStartFold creature={profile} />
-          </PlayDraftScope>
-          <PlayDraftScope key={`allocation-${targetIds}`} name={`allocation-${targetIds}`}>
-            <PlayTargetAllocation targets={targets} />
-          </PlayDraftScope>
-          <PlayDraftScope key={`combat-tools-${lineup.encounterId}`} name={`combat-tools-${lineup.encounterId}`}>
-            <PlayRoundBoard targets={activeTargets} />
-            {activeTargets.length > 1 && <PlayDamageComparison targets={activeTargets} />}
-          </PlayDraftScope>
-          <PlayDraftScope key={`target-${selected.id}`} name={`target-${selected.id}`}>
-            <CreatureCombatCard creature={selected.creature} targetName={selected.label}
-              entry={entryById.get(selected.creature.id)!} summons={summons} showEncounterStart={false} />
-          </PlayDraftScope>
-          {!finished && !fled && activeTargets.length > 0 && <PlayDraftScope key={`flee-${lineup.encounterId}`} name={`flee-${lineup.encounterId}`}>
-            <PlayFlee onFlee={() => onFlee(activeTargets.map(({ creature }) => creature), targets.map(({ creature }) => creature))} />
-          </PlayDraftScope>}
           {fled && <p className="play-condition">후퇴 기록을 남겼습니다. 탐험 화면의 재진입 목록에서 이 적 편성을 다시 열 수 있습니다.</p>}
           {finished && !fled && <p className="play-condition">이 전투의 종료를 확정했습니다. 전투 이후 결과는 휴식·정리에서 확인할 수 있습니다.</p>}
-          {!fled && (!finished || !tracksDefeats) && <div className="play-combat-complete">
-            <button type="button" className="btn primary" disabled={tracksDefeats && activeTargets.length > 0}
-              onClick={() => onBattleEnd(primary, 'victory', targets.map(({ creature }) => creature), defeatedTargets)}>승리 후 전투 마치기</button>
-            <button type="button" className="btn ghost"
-              onClick={() => onBattleEnd(primary, 'ended', targets.map(({ creature }) => creature), defeatedTargets)}>전투만 마치기</button>
-            {tracksDefeats && activeTargets.length > 0 &&
-              <p className="play-combat-note">승리를 확정하려면 교전 중인 적을 처치 또는 이탈로 표시하세요.</p>}
-          </div>}
         </>
       ) : (
         <div className="play-combat-lookup">
@@ -396,24 +421,39 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           )}
         </div>
       )}
-      <details className="fold play-mastery-fold">
-        <summary>Mastery 능력과 마법 전투</summary>
-        <PlayDraftScope name="mastery">
-          <PlayMastery targets={selected && !selected.status ? [selected, ...activeTargets.filter((target) => target.id !== selected.id)] : activeTargets}
-            onSheetChange={onMasterySheetChange} onJournalChange={onMasteryJournalChange} />
-        </PlayDraftScope>
-      </details>
+      <div className="play-combat-toolbox">
+        <PlayStrip label="전투 진행 도구" prefix={toolStrip} value={tool} onChange={setTool} items={toolItems} />
+        {selected && profile && <>
+          <PlayStripPane prefix={toolStrip} id="start" open={tool === 'start'}>
+            <PlayDraftScope key={`encounter-start-${lineup.encounterId}`} name={`encounter-start-${lineup.encounterId}`}>
+              <section className="creature-encounter" aria-label="조우 시작"><EncounterStart creature={profile} onResolved={settleStart} /></section>
+            </PlayDraftScope>
+          </PlayStripPane>
+          <PlayStripPane prefix={toolStrip} id="allocation" open={tool === 'allocation'}>
+            <PlayDraftScope key={`allocation-${targetIds}`} name={`allocation-${targetIds}`}>
+              <PlayTargetAllocation targets={targets} />
+            </PlayDraftScope>
+          </PlayStripPane>
+          <PlayDraftScope key={`combat-tools-${lineup.encounterId}`} name={`combat-tools-${lineup.encounterId}`}>
+            <PlayStripPane prefix={toolStrip} id="round" open={tool === 'round'}>
+              <PlayRoundBoard targets={activeTargets} />
+            </PlayStripPane>
+            {activeTargets.length > 1 && <PlayStripPane prefix={toolStrip} id="compare" open={tool === 'compare'}>
+              <PlayDamageComparison targets={activeTargets} />
+            </PlayStripPane>}
+          </PlayDraftScope>
+        </>}
+        {masteryPane}
+        {fighting && <PlayStripPane prefix={toolStrip} id="flee" open={tool === 'flee'}>
+          <PlayDraftScope key={`flee-${lineup.encounterId}`} name={`flee-${lineup.encounterId}`}>
+            <PlayFlee onFlee={() => onFlee(activeTargets.map(({ creature }) => creature), targets.map(({ creature }) => creature))} />
+          </PlayDraftScope>
+        </PlayStripPane>}
+      </div>
+      {selected && <PlayDraftScope key={`target-${selected.id}`} name={`target-${selected.id}`}>
+        <CreatureCombatCard creature={selected.creature} targetName={selected.label}
+          entry={entryById.get(selected.creature.id)!} summons={summons} showEncounterStart={false} showAftermath={false} />
+      </PlayDraftScope>}
     </section>
-  );
-}
-
-/** Every fight opens with initiative or surprise, so this step starts open; closing it is remembered per encounter. */
-function EncounterStartFold({ creature }: { creature: Parameters<typeof EncounterStart>[0]['creature'] }) {
-  const [open, setOpen] = usePlayDraftState('open', true);
-  return (
-    <details className="fold creature-encounter" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>조우 시작</summary>
-      <EncounterStart creature={creature} />
-    </details>
   );
 }

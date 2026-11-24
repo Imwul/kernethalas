@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { applyDomainCheck, domainCheckKind, type DomainProgress } from '../../lib/domain-progress';
 import { usePlayDraftState } from '../../lib/play-draft';
 import { UsageDieTool } from '../UsageDieTool';
 import { XRef } from '../bits';
+import { PlayStrip, PlayStripPane } from './PlayPanels';
 import '../../styles/play-domain-progress.css';
 
 export type DomainDestination = { id: number; name: string };
@@ -23,6 +24,7 @@ export function PlayDomainProgress({ progress, place, placeId, placeName, revisi
   onExitMark: (marked: boolean) => void;
 }) {
   const [open, setOpen] = usePlayDraftState('domain-progress-open', false);
+  const stripId = useId();
   const kind = domainCheckKind(progress, place, revisit || atLair, placeId);
   const recorded = progress.lastCheck?.placeId === placeId ? progress.lastCheck : undefined;
   const intro = progress.mode === 'intro';
@@ -78,10 +80,9 @@ export function PlayDomainProgress({ progress, place, placeId, placeName, revisi
       {dieTool}
       {arrivalField}
       {atLair && <p className="play-explore-note">이번 위치는 Overseer 은신처입니다. 전투 여부를 선택합니다.</p>}
-      <details className="fold" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary>{kind ? '은신처·출구 직접 표시' : stateLabel}</summary>
-        {details}
-      </details>
+      <PlayStrip label="은신처·출구 표시" prefix={stripId} value={open ? 'marks' : null} onChange={(next) => setOpen(next !== null)}
+        items={[{ id: 'marks', label: kind ? '은신처·출구 직접 표시' : stateLabel }]} />
+      <PlayStripPane prefix={stripId} id="marks" open={open}>{details}</PlayStripPane>
     </section>
   );
 }

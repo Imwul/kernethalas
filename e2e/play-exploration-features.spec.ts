@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 
 async function enter(locator: Locator, name: string, value: string) {
   const input = locator.getByRole('textbox', { name, exact: true });
@@ -43,14 +44,14 @@ test('event 55 preserves separate searches, while event 40 exposes only two atte
   await enter(explore.getByRole('region', { name: '조우 판정', exact: true }), '직접 굴린 값', '1');
   const event = explore.getByRole('region', { name: '이벤트', exact: true });
   await enter(event, '직접 굴린 값', '55');
-  await explore.getByText('방 뒤지기', { exact: true }).click();
+  await openPane(explore, '방 뒤지기');
 
   const attempts = explore.getByRole('group', { name: '방 뒤지기 시도 선택' });
   await expect(attempts.getByRole('button')).toHaveCount(3);
   for (const [attempt, roll, amount, reward] of [[1, '13', '2', 'Cooking Ingredients'], [2, '4', '3', 'Crafting Supplies']]) {
     await attempts.getByRole('button', { name: `${attempt}회차` }).click();
     const search = explore.getByRole('region', { name: `방 뒤지기 판정 ${attempt}회차` });
-    await search.getByLabel('보정 Scavenge Skill').fill('55');
+    await search.getByLabel('Scavenge 수치').fill('55');
     await enter(search, 'Scavenge D100', '31');
     await enter(search.getByRole('group', { name: '뒤지기 결과 D20' }), '직접 굴린 값', String(roll));
     await enter(search.getByRole('group', { name: `${reward} 수량 D4` }), '직접 굴린 값', String(amount));
@@ -64,6 +65,8 @@ test('event 55 preserves separate searches, while event 40 exposes only two atte
   await expect(journal.getByRole('checkbox', { name: 'Cooking Ingredients +2', exact: true })).toBeVisible();
   await expect(journal.getByRole('checkbox', { name: 'Crafting Supplies +3', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '탐험', exact: true }).click();
+  // the finished event is folded to one line; reopen it to enter a different result
+  await event.getByRole('button', { name: /^D100 55 · .*다시 보기$/ }).click();
   await enter(event, '직접 굴린 값', '40');
   await expect(attempts.getByRole('button')).toHaveCount(2);
   await expect(explore.getByText('2/2회 사용', { exact: true })).toBeVisible();
@@ -74,7 +77,7 @@ test('paper-map IDs keep a room kind and notes when revisited in a later locatio
   await page.goto('/play');
   const explore = page.getByRole('region', { name: '장소 탐험' });
   await explore.getByRole('button', { name: '통로', exact: true }).click();
-  await explore.getByText('종이 지도 메모', { exact: true }).click();
+  await openPane(explore, '종이 지도 메모');
   const index = explore.getByRole('region', { name: '종이 지도 장소 색인' });
   await index.getByLabel('종이 지도 번호', { exact: true }).fill('B-07');
   await index.getByLabel('장소 메모', { exact: true }).fill('북쪽에서 발소리가 들림');
@@ -87,7 +90,7 @@ test('paper-map IDs keep a room kind and notes when revisited in a later locatio
   await expect(journal.getByText(/B-07 · 통로/).first()).toBeVisible();
   await journal.getByRole('button', { name: '다음 장소', exact: true }).click();
   await page.reload();
-  await explore.getByText('종이 지도 메모', { exact: true }).click();
+  await openPane(explore, '종이 지도 메모');
   await index.getByRole('combobox', { name: '저장한 지도 번호' }).selectOption({ label: 'B-07 (통로)' });
   await index.getByRole('button', { name: '재방문에 불러오기' }).click();
   await expect(explore.getByRole('button', { name: '재방문', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -110,10 +113,10 @@ test('the next-action shortcut follows search rewards, resolved encounters and c
   await enter(explore.getByRole('region', { name: '긴장 주사위', exact: true }), '긴장 주사위 굴린 값', '3');
   await enter(explore.getByRole('region', { name: '조우 판정', exact: true }), '직접 굴린 값', '1');
   await enter(explore.getByRole('region', { name: '이벤트', exact: true }), '직접 굴린 값', '55');
-  await explore.getByText('방 뒤지기', { exact: true }).click();
+  await openPane(explore, '방 뒤지기');
 
   const first = explore.getByRole('region', { name: '방 뒤지기 판정 1회차' });
-  await first.getByLabel('보정 Scavenge Skill').fill('55');
+  await first.getByLabel('Scavenge 수치').fill('55');
   await enter(first, 'Scavenge D100', '31');
   await enter(first.getByRole('group', { name: '뒤지기 결과 D20' }), '직접 굴린 값', '13');
   await expect(next).toHaveAccessibleDescription('Cooking Ingredients 수량 · D4');
@@ -125,7 +128,7 @@ test('the next-action shortcut follows search rewards, resolved encounters and c
   await secondTab.press('Enter');
 
   const second = explore.getByRole('region', { name: '방 뒤지기 판정 2회차' });
-  await second.getByLabel('보정 Scavenge Skill').fill('55');
+  await second.getByLabel('Scavenge 수치').fill('55');
   await enter(second, 'Scavenge D100', '99');
   const encounter = second.getByRole('button', { name: '뒤지기 조우로', exact: true });
   await expect(next).toHaveAccessibleDescription('뒤지기 조우로');

@@ -1,9 +1,10 @@
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
 import type { CreatureRecord } from '../content/entries/creatures';
 import type { CheckResult, Edge } from '../lib/dice';
 import { encounterCheck, encounterFear, encounterInitiativeModifier, encounterInteger, encounterOpposed } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { usePlayCharacter } from '../lib/play-character';
 import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
 import { useRecordSkillCritical } from '../lib/skill-growth';
 import { XRef } from './bits';
@@ -81,7 +82,11 @@ function EncounterCriticalRecord({ skill, check, recorded, onRecord }: {
   );
 }
 
-export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, 'name' | 'mind' | 'traits'> }) {
+export function EncounterStart({ creature, onResolved }: {
+  creature?: Pick<CreatureRecord, 'name' | 'mind' | 'traits'>;
+  /** Called with the turn order once it is settled (and any fear check is done), or null while it is open. */
+  onResolved?: (summary: string | null, fold: boolean) => void;
+}) {
   const id = useId();
   const commit = usePlayRoll();
   const record = useRecordSkillCritical();
@@ -91,9 +96,10 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
   const [alert, setAlert] = usePlayDraftState('start-alert', false);
   const [fear, setFear] = usePlayDraftState('start-fear', 0);
   const [mindOverride, setMind] = usePlayDraftState<string | null>('start-mind', null);
-  const [resolve, setResolve] = usePlayDraftState('start-resolve', emptyCheck);
-  const [stealth, setStealth] = usePlayDraftState('start-stealth', emptyCheck);
-  const [perception, setPerception] = usePlayDraftState('start-perception', emptyCheck);
+  const pc = usePlayCharacter();
+  const [resolve, setResolve] = usePlayDraftState('start-resolve', { ...emptyCheck, skill: pc?.skill('Resolve') ?? '' });
+  const [stealth, setStealth] = usePlayDraftState('start-stealth', { ...emptyCheck, skill: pc?.skill('Stealth') ?? '' });
+  const [perception, setPerception] = usePlayDraftState('start-perception', { ...emptyCheck, skill: pc?.skill('Perception') ?? '' });
   const [surpriseEnemy, setSurpriseEnemy] = usePlayDraftState('start-enemy-surprise', emptyRoll);
   const [initiativeEnemy, setInitiativeEnemy] = usePlayDraftState('start-enemy-initiative', emptyRoll);
   const [followers, setFollowers] = usePlayDraftState('start-followers', '');
@@ -120,6 +126,15 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
   const initiativePC = encounterCheck(perception.roll, initiativeTarget, perception.edge);
   const enemyInitiativeCheck = encounterCheck(initiativeEnemy.roll, enemyMind, initiativeEnemy.edge);
   const initiative = initiativePC && enemyInitiativeCheck ? encounterOpposed(initiativePC, enemyInitiativeCheck) : null;
+  const order = surprise?.winner === 'pc' ? '기습 성공 · PC 측 선공'
+    : initiative && initiative.winner !== 'reroll' ? labels[initiative.winner] : null;
+  // A fear check waits for its Resolve roll before the step counts as done.
+  const settled = order && (fearLoss === 0 || resolveCheck) ? order : null;
+  // A double leaves an effect to read and a growth mark to make, so the step stays open for the player to close.
+  const doubled = [fearLoss > 0 ? resolveCheck : null, mode === 'surprise' ? surprisePC : null, initiativePC]
+    .some((check) => check && isSkillDouble(check.outcome));
+  const fold = !!settled && !doubled;
+  useEffect(() => { onResolved?.(settled, fold); }, [onResolved, settled, fold]);
 
   return (
     <section className="encounter-start" aria-label="조우 시작 계산기">
@@ -160,7 +175,7 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
           <div className="encounter-grid">
             <CheckField label="PC Resolve" value={resolve.skill} set={(skill) => setResolve({ ...resolve, skill })} />
             <CheckField label="Resolve D100" value={resolve.roll} roll set={(roll) => setResolve(changeCriticalRoll(resolve, roll))} />
-            <EdgeField label="Resolve 이점" value={resolve.edge} set={(edge) => setResolve({ ...resolve, edge })} />
+            <EdgeField label="Resolve 유불리" value={resolve.edge} set={(edge) => setResolve({ ...resolve, edge })} />
           </div>
           {resolveCheck && (
             <p className="encounter-outcome" role="status" aria-label="Resolve 결과">
@@ -191,8 +206,8 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
             <CheckField label="솔로 동료 수" value={followers} set={setFollowers} nonnegative />
             <CheckField label="PC 기습 D100" value={stealth.roll} roll set={(roll) => setStealth(changeCriticalRoll(stealth, roll))} />
             <CheckField label="적 기습 D100" value={surpriseEnemy.roll} roll set={(roll) => setSurpriseEnemy({ ...surpriseEnemy, roll })} />
-            <EdgeField label="PC 기습 이점" value={stealth.edge} set={(edge) => setStealth({ ...stealth, edge })} />
-            <EdgeField label="적 기습 이점" value={surpriseEnemy.edge} set={(edge) => setSurpriseEnemy({ ...surpriseEnemy, edge })} />
+            <EdgeField label="PC 기습 유불리" value={stealth.edge} set={(edge) => setStealth({ ...stealth, edge })} />
+            <EdgeField label="적 기습 유불리" value={surpriseEnemy.edge} set={(edge) => setSurpriseEnemy({ ...surpriseEnemy, edge })} />
           </div>
           <p className="encounter-note">PC가 혼자이고 동료가 있으면 동료마다 Stealth −10.{stealthTarget !== null && ` 적용 Skill ${stealthTarget}.`}</p>
           {surprise && (
@@ -218,8 +233,8 @@ export function EncounterStart({ creature }: { creature?: Pick<CreatureRecord, '
             <CheckField label="PC 최고 Perception" value={perception.skill} set={(skill) => setPerception({ ...perception, skill })} />
             <CheckField label="PC Initiative D100" value={perception.roll} roll set={(roll) => setPerception(changeCriticalRoll(perception, roll))} />
             <CheckField label="적 Initiative D100" value={initiativeEnemy.roll} roll set={(roll) => setInitiativeEnemy({ ...initiativeEnemy, roll })} />
-            <EdgeField label="PC Initiative 이점" value={perception.edge} set={(edge) => setPerception({ ...perception, edge })} />
-            <EdgeField label="적 Initiative 이점" value={initiativeEnemy.edge} set={(edge) => setInitiativeEnemy({ ...initiativeEnemy, edge })} />
+            <EdgeField label="PC Initiative 유불리" value={perception.edge} set={(edge) => setPerception({ ...perception, edge })} />
+            <EdgeField label="적 Initiative 유불리" value={initiativeEnemy.edge} set={(edge) => setInitiativeEnemy({ ...initiativeEnemy, edge })} />
           </div>
           <label className="encounter-option">
             <input type="checkbox" checked={quick} onChange={(event) => setQuick(event.target.checked)} /> Quick 무기 +10

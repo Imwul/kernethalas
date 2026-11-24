@@ -14,7 +14,7 @@ test('a mobile monster hit carries the critical, weak spot, armor and damage rea
 
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
-  await attack.getByRole('textbox', { name: '공격자 보정 Skill' }).fill('60');
+  await attack.getByRole('textbox', { name: '공격자 수치' }).fill('60');
   await attack.getByRole('textbox', { name: '공격자 D100' }).fill('22');
   await attack.getByRole('textbox', { name: '방어자 D100' }).fill('79');
   await expect(attack.getByRole('status')).toContainText('Critical Strike');
@@ -59,7 +59,7 @@ test('an enemy critical carries the PC hit into Toughness and Health without spe
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
   await attack.getByRole('button', { name: '적이 공격' }).click();
-  await attack.getByRole('textbox', { name: '방어자 보정 Skill' }).fill('50');
+  await attack.getByRole('textbox', { name: '방어자 수치' }).fill('50');
   await attack.getByRole('textbox', { name: '공격자 D100' }).fill('22');
   await attack.getByRole('textbox', { name: '방어자 D100' }).fill('79');
   await attack.getByRole('button', { name: 'PC 명중 부위 D20' }).click();

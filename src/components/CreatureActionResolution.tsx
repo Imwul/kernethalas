@@ -33,7 +33,8 @@ export function CreatureActionResolution({ action, rule, summons }: {
     || rule.setupDuration || rule.summons || rule.elemental)) return null;
 
   return (
-    <details className="fold creature-action-resolution">
+    // Opens with the rolled action: its resistance check and effects are the next thing to resolve.
+    <details className="fold creature-action-resolution" open>
       <summary>{rule.resistance ? `${rule.resistance} 판정과 행동 효과` : '행동 효과 처리'}</summary>
       <div className="creature-resolution-body">
         {(rule.target || rule.timing || rule.healthOnly) && <dl>

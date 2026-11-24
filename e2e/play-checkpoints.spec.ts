@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
 
 const setup = async (page: Page) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -18,8 +19,7 @@ async function rollShape(page: Page, raw: string) {
 }
 
 async function registerGear(page: Page, name: string, amount: string) {
-  const disclosure = page.locator('.play-gear-fold > summary');
-  await disclosure.click();
+  await openDrawer(page, '장비');
   const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
   await gear.getByRole('button', { name: '장비 추가', exact: true }).click();
   const form = gear.getByRole('form', { name: '장비 등록' });
@@ -27,16 +27,15 @@ async function registerGear(page: Page, name: string, amount: string) {
   await form.getByRole('textbox', { name: '현재 수량' }).fill(amount);
   await form.getByRole('button', { name: '장부에 저장' }).click();
   await expect(form).toHaveCount(0);
-  await disclosure.click();
+  await closeDrawer(page);
 }
 
 async function verifyGear(page: Page, gearName: string, absent: string) {
-  const disclosure = page.locator('.play-gear-fold > summary');
-  await disclosure.click();
+  await openDrawer(page, '장비');
   const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
   await expect(gear).toContainText(gearName);
   await expect(gear).not.toContainText(absent);
-  await disclosure.click();
+  await closeDrawer(page);
 }
 
 function reviewFor(panel: Locator) {
@@ -49,7 +48,7 @@ test('play checkpoints confirm changes and transfer dice, stage, gear and roll h
   await rollShape(page, '29');
   const shape = page.getByRole('img', { name: '29번 방 모양 예시 · 출입구 8개' });
   await expect(shape).toBeVisible();
-  await panel.getByText('플레이 저장·이어하기', { exact: true }).click();
+  await openDrawer(page, '저장');
   await panel.getByRole('textbox', { name: '저장 지점 이름', exact: true }).fill('첫 계단');
   await panel.getByRole('button', { name: '저장 지점 만들기', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('첫 계단 저장 완료');
@@ -73,6 +72,7 @@ test('play checkpoints confirm changes and transfer dice, stage, gear and roll h
   const journal = stages.getByRole('button', { name: '저널', exact: true });
   const explore = stages.getByRole('button', { name: '탐험', exact: true });
   await journal.click();
+  await openDrawer(page, '저장');
   await panel.getByRole('button', { name: '첫 계단 이어서 하기', exact: true }).click();
   const review = reviewFor(panel);
   await expect(review).toContainText('장소 1 · 탐험');
@@ -89,7 +89,7 @@ test('play checkpoints confirm changes and transfer dice, stage, gear and roll h
   try {
     const other = await otherContext.newPage();
     const otherPanel = await setup(other);
-    await otherPanel.getByText('플레이 저장·이어하기', { exact: true }).click();
+    await openDrawer(other, '저장');
     const upload = otherPanel.getByLabel('플레이 저장 JSON 파일', { exact: true });
     await upload.setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('{bad') });
     await expect(otherPanel.getByRole('alert')).toBeVisible();
@@ -101,7 +101,7 @@ test('play checkpoints confirm changes and transfer dice, stage, gear and roll h
     await expect(other.getByRole('img', { name: '29번 방 모양 예시 · 출입구 8개' })).toBeVisible();
     await verifyGear(other, 'Bandage', 'Torch');
     await other.reload();
-    await otherPanel.getByText('플레이 저장·이어하기', { exact: true }).click();
+    await openDrawer(other, '저장');
     await expect(otherPanel.getByRole('button', { name: '첫 계단 이어서 하기', exact: true })).toBeVisible();
   } finally {
     await otherContext.close();
@@ -116,7 +116,7 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await explore.getByText('종이 지도에 모양 옮기기', { exact: true }).click();
   const tile = explore.getByRole('region', { name: '방·통로 모양 편집' });
   await tile.getByRole('button', { name: '오른쪽 90° 회전' }).click();
-  await explore.getByText('종이 지도 메모', { exact: true }).click();
+  await openPane(explore, '종이 지도 메모');
   const map = explore.getByRole('region', { name: '종이 지도 장소 색인' });
   await map.getByLabel('종이 지도 번호', { exact: true }).fill('B-07');
   await map.getByRole('checkbox', { name: '잠긴 문' }).check();
@@ -124,9 +124,9 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await enter(explore.getByRole('region', { name: '긴장 주사위', exact: true }), '긴장 주사위 굴린 값', '3');
   await enter(explore.getByRole('region', { name: '조우 판정', exact: true }), '직접 굴린 값', '1');
   await enter(explore.getByRole('region', { name: '이벤트', exact: true }), '직접 굴린 값', '55');
-  await explore.getByText('방 뒤지기', { exact: true }).click();
+  await openPane(explore, '방 뒤지기');
   const search = explore.getByRole('region', { name: '방 뒤지기 판정 1회차' });
-  await search.getByLabel('보정 Scavenge Skill').fill('55');
+  await search.getByLabel('Scavenge 수치').fill('55');
   await enter(search, 'Scavenge D100', '11');
   await enter(search.getByRole('group', { name: '뒤지기 결과 D20' }), '직접 굴린 값', '13');
 
@@ -137,7 +137,7 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
-  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
+  await openPane(combat, '라운드');
   const board = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
   await board.getByRole('button', { name: '다음 라운드' }).click();
   await board.getByText('확인 항목 추가', { exact: true }).click();
@@ -145,7 +145,7 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await board.getByRole('checkbox', { name: '확인 · 출혈' }).check();
 
   const panel = page.locator('.play-checkpoints');
-  await panel.getByText('플레이 저장·이어하기', { exact: true }).click();
+  await openDrawer(page, '저장');
   await panel.getByRole('button', { name: '저장 지점 만들기', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('B-07 저장 완료');
   await board.getByRole('button', { name: '다음 라운드' }).click();

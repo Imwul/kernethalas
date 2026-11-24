@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { closeDrawer, openDrawer } from './helpers/play-desk';
 
 async function enterDie(group: Locator, value: string) {
   const input = group.getByRole('textbox', { name: '직접 굴린 값', exact: true });
@@ -27,11 +28,10 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
   const go = playNavigation(page);
-  const disclosure = page.locator('.play-gear-fold > summary');
   const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
-  await disclosure.click();
+  await openDrawer(page, '장비');
   await register(gear, 'Leather Armor', '1', 'D8');
-  await disclosure.click();
+  await closeDrawer(page);
   await go('조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('t-overseer');
@@ -45,7 +45,6 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   await wrap.getByRole('button', { name: '전투 종료', exact: true }).click();
   await enterDie(wrap.getByRole('group', { name: '전투 후 Toughness 회복 D4' }), '2');
   await enterDie(wrap.getByRole('group', { name: 'Infernal Archon 처치 후 Sanity 회복 D4' }), '3');
-  await wrap.getByText('사용한 방어구 내구도', { exact: true }).click();
   const worn = wrap.getByRole('combobox', { name: '이번 전투에 사용한 장부 방어구' });
   await worn.selectOption({ label: 'Leather Armor · D8' });
   await enterDie(wrap.getByRole('region', { name: '방어구 내구도 굴림' }), '1');
@@ -61,9 +60,10 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   await apply.click();
   await expect(apply).toBeDisabled();
   await expect(equipped).toContainText('내구도 D6');
+  await closeDrawer(page);
   await journal.getByRole('button', { name: '다음 장소', exact: true }).click();
   await page.reload();
-  await disclosure.click();
+  await openDrawer(page, '장비');
   await expect(equipped).toContainText('내구도 D6');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
@@ -72,20 +72,19 @@ test('paper records offer a one-time inventory change, undo, and valid carrying 
   await page.setViewportSize({ width: 3440, height: 1440 });
   await page.goto('/play');
   const go = playNavigation(page);
-  const disclosure = page.locator('.play-gear-fold > summary');
   const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
-  await disclosure.click();
+  await openDrawer(page, '장비');
   await register(gear, 'Bandage', '3');
-  await disclosure.click();
+  await closeDrawer(page);
   await go('휴식·정리');
   const wrap = page.getByRole('region', { name: '휴식과 전리품 정리' });
   await wrap.getByRole('button', { name: '치료·성장', exact: true }).click();
   const treatment = wrap.getByRole('region', { name: '지속 피해와 붕대 처치' });
-  await treatment.getByRole('textbox', { name: '보정 Medicine' }).fill('50');
+  await treatment.getByRole('textbox', { name: 'Medicine 수치' }).fill('50');
   await enterDie(treatment.getByRole('group', { name: 'Medicine D100' }), '29');
   await enterDie(treatment.getByRole('group', { name: '붕대 회복 D4' }), '3');
   await treatment.getByRole('button', { name: '붕대 처치 기록' }).click();
-  await disclosure.click();
+  await openDrawer(page, '장비');
   const bag = gear.getByRole('region', { name: '가방', exact: true });
   const amount = bag.locator('.play-gear-amount');
   const apply = gear.getByRole('button', { name: '장부에 반영 Bandage −1 (붕대 처치)', exact: true });
@@ -98,7 +97,7 @@ test('paper records offer a one-time inventory change, undo, and valid carrying 
   await gear.getByRole('button', { name: '마지막 장부 변경 되돌리기' }).click();
   await expect(amount).toHaveText('3');
   await expect(apply).toBeEnabled();
-  await wrap.locator('..').getByText('소지칸·상인 거래', { exact: true }).click();
+  await page.getByRole('group', { name: '정리할 항목' }).getByRole('button', { name: '소지칸·상인', exact: true }).click();
   const carry = page.getByRole('region', { name: '소지칸 검산' });
   await carry.getByRole('button', { name: '장부에서 보유 수량 가져오기' }).click();
   await expect(carry.getByRole('textbox', { name: 'Light 보유 수량' })).toHaveValue('3');
@@ -113,9 +112,8 @@ test('paper records offer a one-time inventory change, undo, and valid carrying 
 test('quick consumption requires confirmation and links a later paper use without a second debit at 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
-  const disclosure = page.locator('.play-gear-fold > summary');
   const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
-  await disclosure.click();
+  await openDrawer(page, '장비');
   await register(gear, 'Bandage', '2');
   const amount = gear.getByRole('region', { name: '가방', exact: true }).locator('.play-gear-amount');
   const quick = gear.getByRole('region', { name: '소모품 빠른 사용' });
@@ -131,16 +129,16 @@ test('quick consumption requires confirmation and links a later paper use withou
   await start.click();
   await review.getByRole('button', { name: '사용 확정' }).click();
   await expect(amount).toHaveText('1');
-  await disclosure.click();
+  await closeDrawer(page);
   await playNavigation(page)('휴식·정리');
   const wrap = page.getByRole('region', { name: '휴식과 전리품 정리' });
   await wrap.getByRole('button', { name: '치료·성장', exact: true }).click();
   const treatment = wrap.getByRole('region', { name: '지속 피해와 붕대 처치' });
-  await treatment.getByRole('textbox', { name: '보정 Medicine' }).fill('50');
+  await treatment.getByRole('textbox', { name: 'Medicine 수치' }).fill('50');
   await enterDie(treatment.getByRole('group', { name: 'Medicine D100' }), '29');
   await enterDie(treatment.getByRole('group', { name: '붕대 회복 D4' }), '3');
   await treatment.getByRole('button', { name: '붕대 처치 기록' }).click();
-  await disclosure.click();
+  await openDrawer(page, '장비');
   const pending = gear.getByRole('region', { name: '이번 장소의 장비 변경' });
   await quick.getByRole('button', { name: 'Bandage · 가방 사용 기록 확인' }).click();
   await expect(pending).toBeFocused();
@@ -150,7 +148,7 @@ test('quick consumption requires confirmation and links a later paper use withou
   await expect(pending).toContainText('기존 사용 1개 연결');
 
   await page.reload();
-  await disclosure.click();
+  await openDrawer(page, '장비');
   await expect(pending).toContainText('기존 사용 1개 연결');
   await gear.getByText(/장비 변경 내역/).click();
   await gear.getByRole('button', { name: '마지막 장부 변경 되돌리기' }).click();

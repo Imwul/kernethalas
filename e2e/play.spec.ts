@@ -18,7 +18,8 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     await tension.getByRole('combobox', { name: '긴장 주사위 크기' }).selectOption('6');
     await tension.getByRole('textbox', { name: '긴장 주사위 굴린 값' }).fill('2');
     await tension.getByRole('button', { name: '긴장 주사위 확인' }).click();
-    await expect(tension.getByRole('status')).toContainText('다음 긴장 주사위 D4');
+    // the finished tension roll folds to its one-line result
+    await expect(tension.getByRole('button', { name: /^D6 2 · 다음 D4 다시 보기$/ })).toBeVisible();
     await manualRoll(exploration.getByRole('region', { name: '조우 판정', exact: true }), '12');
     await expect(stages.getByRole('button', { name: '탐험', exact: true })).toHaveAttribute('aria-current', 'step');
     await exploration.getByRole('button', { name: '조우 표로', exact: true }).click();
@@ -32,7 +33,7 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     const card = combat.getByRole('region', { name: '전투 카드' });
     await card.getByRole('button', { name: '공격 판정', exact: true }).click();
     const attack = card.getByRole('region', { name: '공격 판정 해석기' });
-    await attack.getByRole('textbox', { name: '공격자 보정 Skill' }).fill('55');
+    await attack.getByRole('textbox', { name: '공격자 수치' }).fill('55');
     await attack.getByRole('textbox', { name: '공격자 D100' }).fill('31');
     await attack.getByRole('textbox', { name: '방어자 D100' }).fill('79');
     await attack.getByRole('button', { name: '적 명중 부위 보기' }).click();
@@ -56,14 +57,17 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     await expect(damageRef).toBeFocused();
 
     await stages.getByRole('button', { name: '탐험', exact: true }).click();
-    await expect(tension.getByRole('status')).toContainText('다음 긴장 주사위 D4');
+    // the finished tension roll folds to its one-line result
+    await expect(tension.getByRole('button', { name: /^D6 2 · 다음 D4 다시 보기$/ })).toBeVisible();
     await stages.getByRole('button', { name: '조우·전투', exact: true }).click();
     await expect(damage.getByRole('status')).toHaveText('최종 피해 6 Piercing');
     await combat.getByRole('button', { name: '승리 후 전투 마치기', exact: true }).click();
     const wrap = page.getByRole('region', { name: '휴식과 전리품 정리' });
-    await manualRoll(wrap.getByRole('group', { name: '자원 D10', exact: true }), '7');
-    await wrap.getByRole('button', { name: '전투 종료', exact: true }).click();
+    // A finished fight opens on its after-fight steps first, then loot.
+    await expect(wrap.getByRole('button', { name: '전투 종료', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await manualRoll(wrap.getByRole('group', { name: '전투 후 Toughness 회복 D4', exact: true }), '3');
+    await wrap.getByRole('button', { name: '전리품', exact: true }).click();
+    await manualRoll(wrap.getByRole('group', { name: '자원 D10', exact: true }), '7');
     await page.getByRole('button', { name: '저널 기록 보기', exact: true }).click();
 
     const journal = page.getByRole('region', { name: '이번 장소 기록', exact: true });
@@ -92,8 +96,8 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
       await expect(journal).not.toContainText('Crafting Supplies 1');
     }
 
-    await page.getByRole('button', { name: '새 장소 시작', exact: true }).click();
-    await page.getByRole('button', { name: '초기화하고 시작', exact: true }).click();
+    await page.getByRole('button', { name: '이번 장소 지우기', exact: true }).click();
+    await page.getByRole('button', { name: '지우고 새로 시작', exact: true }).click();
     await expect(exploration.getByRole('region', { name: '방·통로 모양' })).toBeVisible();
     await stages.getByRole('button', { name: '저널', exact: true }).click();
     await expect(journal.getByRole('button', { name: '장소 기록 복사' })).toHaveCount(0);

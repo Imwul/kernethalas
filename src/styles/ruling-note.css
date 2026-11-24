@@ -6,6 +6,18 @@
   border-inline-start: 2px solid var(--copper);
   background: var(--paper);
 }
+section.ruling-note {
+  display: grid;
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--s1) var(--s2);
+  border-inline-start: 2px solid var(--copper);
+  font: 14px/1.5 var(--f-ui);
+}
+.ruling-note-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 var(--s2); min-inline-size: 0; }
+.ruling-note-label { flex: none; color: var(--ink-2); font-weight: 700; }
+.ruling-note-line > .ruling-note-text { flex: 1 1 16rem; }
+.ruling-note-open { flex: none; }
 .reference-record .ruling-note { grid-column: 1; }
 .ruling-note.fold > summary {
   min-block-size: 44px;
@@ -27,6 +39,7 @@
 }
 .ruling-note[open] .ruling-note-preview { display: none; }
 .ruling-note-body, .ruling-note-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+section.ruling-note > .ruling-note-form { padding-block: var(--s1); }
 .ruling-note-body { padding-block-end: var(--s2); }
 .ruling-note-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
 .ruling-note :is(button, input) { min-block-size: 44px; }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { usePlayDraft } from '../../lib/play-draft';
 import { encounterInteger } from '../../lib/encounter-start';
 import {
@@ -20,7 +20,9 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
   label?: string;
 }) {
   const play = usePlayDraft();
+  const panel = useId();
   const [chosen, setChosen] = useState('');
+  const [open, setOpen] = useState(false);
   if (!play) return null;
   const known = skillPresetName(skill);
   const selected = known ?? skillPresetName(chosen);
@@ -42,8 +44,13 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
   };
 
   return (
-    <details className="fold play-skill-adjustments">
-      <summary>{label ? `${label} 기본값·보정` : '기본값·보정'}</summary>
+    <div className="play-skill-adjustments">
+      <button type="button" className="toggle-btn play-skill-toggle" aria-expanded={open} aria-controls={panel}
+        onClick={() => setOpen((value) => !value)}>
+        <span>{label && <span className="sr-only">{label} </span>}기본값·보정</span>
+        {modifiers.length > 0 && <span className="toggle-count" aria-label={`보정 ${modifiers.length}개`}>{modifiers.length}</span>}
+      </button>
+      <div className="toggle-panel play-skill-panel" id={panel} hidden={!open}>
       <div className="play-skill-preset">
         {!known && <label className="field"><span>저장할 기술</span>
           <select value={chosen} disabled={disabled} onChange={(event) => setChosen(event.target.value)}>
@@ -52,7 +59,7 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
           </select>
         </label>}
         <div className="play-skill-buttons">
-          {saved !== undefined && <button type="button" className="btn ghost" disabled={disabled} onClick={() => onBase(String(saved))}>
+          {saved !== undefined && saved !== original && <button type="button" className="btn ghost" disabled={disabled} onClick={() => onBase(String(saved))}>
             {selected} {saved} 불러오기
           </button>}
           <button type="button" className="btn ghost" disabled={disabled || !selected || original === null || original < 0 || saved === original}
@@ -82,6 +89,7 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
           onClick={() => onModifiers([...modifiers, { reason: '상태·어둠', amount: '' }])}>보정 추가</button>
         {breakdown && <output aria-label="Skill 계산" className="play-skill-total">{formatSkillBreakdown(breakdown)}</output>}
       </div>
-    </details>
+      </div>
+    </div>
   );
 }

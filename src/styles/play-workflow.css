@@ -60,8 +60,10 @@
   display: grid;
   align-items: center;
   gap: var(--s2);
+  min-width: 0;
   padding: var(--s2);
-  border-color: var(--copper-ink);
+  border-block-start: 1px solid var(--copper-ink);
+  background: var(--paper);
   font: 14px/1.35 var(--f-ui);
 }
 .play-action-bar .btn { min-height: 44px; }
@@ -131,10 +133,4 @@
 @media (max-width: 767px) {
   .play-context .play-action-bar { inset-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
   .play-desk input[data-play-dice] { scroll-margin-block-end: calc(var(--tabbar-h) + 80px); }
-}
-
-@container play-desk (1040px <= width < 1260px) {
-  .play-layout { grid-template-columns: 136px minmax(0, 1fr) 172px; gap: var(--s3); }
-  .play-context { grid-column: 3; grid-template-columns: minmax(0, 1fr); position: sticky; top: calc(var(--play-sticky-top) + var(--s3));
-    max-block-size: calc(100dvh - var(--header-h) - var(--s5)); overflow-y: auto; }
 }

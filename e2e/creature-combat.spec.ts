@@ -43,7 +43,7 @@ test('Overseer action opens its summoned creature and preserves the result', asy
   const card = page.getByRole('region', { name: '전투 카드' }).first();
   await expect(card.locator('.creature-combat-meta div').filter({ hasText: '라운드당 턴' }).first()).toContainText('2');
   await enterRoll(card, '3');
-  await card.getByRole('link', { name: /Lesser Demon/ }).click();
+  await card.getByRole('link', { name: 'Lesser Demon', exact: true }).click();
   const demon = page.getByRole('dialog', { name: 'Lesser Demon' });
   await expect(demon.getByRole('region', { name: '전투 카드' })).toBeVisible();
   await demon.getByRole('button', { name: '참고 패널 닫기' }).click();

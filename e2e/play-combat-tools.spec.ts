@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 
 async function selectCreature(combat: Locator, name: string) {
   await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
@@ -17,7 +18,7 @@ test('compares one damage type across the current lineup and remembers the selec
   await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('Infernal Tormentor');
   await combat.getByRole('button', { name: 'Infernal Tormentor', exact: true }).click();
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
-  await combat.getByText('피해 유형 비교', { exact: true }).click();
+  await openPane(combat, '피해 비교');
 
   const panel = combat.getByRole('region', { name: '조우 피해 유형 비교' });
   const type = panel.getByRole('combobox', { name: '비교할 피해 유형' });
@@ -62,7 +63,7 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await selectCreature(combat, 'Necropede');
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
-  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
+  await openPane(combat, '라운드');
 
   const board = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
   const position = board.getByRole('status');
@@ -107,7 +108,7 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
 
   await combat.getByRole('button', { name: '조우 다시 선택' }).click();
   await selectCreature(combat, 'Necropede');
-  await combat.getByText(/^라운드 정리 · \d+라운드$/).click();
+  await openPane(combat, '라운드');
   await expect(position).toContainText('1라운드');
   await expect(board.getByRole('list', { name: '등록한 효과' })).toHaveCount(0);
 });

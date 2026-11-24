@@ -3,8 +3,7 @@
   margin-block: 0;
 }
 
-.play-combat-tools > summary,
-.play-round-add > summary {
+.play-combat-tools > summary {
   min-height: 44px;
 }
 
@@ -171,7 +170,7 @@
 .play-damage-response[data-reaction='guard'] { color: var(--copper-ink); }
 .play-damage-immunity { color: var(--ink-2); }
 
-.play-damage-actions > label {
+.play-damage-actions .toggle-panel > label {
   display: flex;
   align-items: start;
   padding-block: var(--s1);
@@ -181,6 +180,6 @@
   margin-block-start: var(--s1);
 }
 
-.play-damage-actions :is(b, label span > span) {
+.play-damage-actions label :is(b, span > span) {
   display: block;
 }

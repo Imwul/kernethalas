@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
 
 async function physical(locator: Locator, name: string, value: string) {
@@ -50,7 +51,7 @@ test('force and deep-search darkness follow-ups stay independent after archiving
   await entry.getByRole('combobox', { name: '긴장 주사위 크기' }).selectOption('6');
   await physical(entry, '긴장 주사위 굴린 값', '2');
   const actions = explore.getByRole('region', { name: '선택 탐험 행동' });
-  await actions.getByText('문·함정 조사', { exact: true }).click();
+  await openPane(actions, '문·함정 조사');
   await actions.getByRole('combobox', { name: '조사할 대상' }).selectOption('present');
   const door = actions.getByRole('region', { name: '문 조사' });
   await detectTrap(door);
@@ -72,7 +73,7 @@ test('force and deep-search darkness follow-ups stay independent after archiving
   await physical(light, '직접 굴린 값', '3');
   await actions.getByRole('button', { name: '다른 문 조사', exact: true }).click();
 
-  await actions.getByText('깊은 수색', { exact: true }).click();
+  await openPane(actions, '깊은 수색');
   await actions.getByRole('button', { name: '깊은 수색 시작' }).click();
   const deep = actions.getByRole('region', { name: '깊은 수색 긴장 굴림' });
   await expect(deep.getByRole('combobox', { name: '긴장 주사위 크기' })).toHaveValue('8');

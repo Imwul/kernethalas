@@ -41,7 +41,8 @@ function visiblePendingRolls(section: HTMLElement, wrapBattleId?: string) {
   });
 }
 
-export function PlayPendingRolls({ stage, roomId, place, wrapBattleId, rolls, onChange, onJump }: {
+export function PlayPendingRolls({ open, stage, roomId, place, wrapBattleId, rolls, onChange, onJump }: {
+  open: boolean;
   stage: Stage;
   roomId: string;
   place: string;
@@ -50,7 +51,6 @@ export function PlayPendingRolls({ stage, roomId, place, wrapBattleId, rolls, on
   onChange: Dispatch<SetStateAction<PendingPlayRoll[]>>;
   onJump: (roll: PendingPlayRoll, onResult: (focused: boolean) => void) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [scan, setScan] = useState<{ stage: Stage; roomId: string; wrapBattleId?: string; candidates: Candidate[] }>();
   const [selection, setSelection] = useState('');
   const [target, setTarget] = useState('');
@@ -81,10 +81,9 @@ export function PlayPendingRolls({ stage, roomId, place, wrapBattleId, rolls, on
   }, [stage, open, roomId, wrapBattleId]);
 
   return (
-    <details className="fold play-pending-rolls" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary><span>보류한 굴림</span>{rolls.length > 0 && <span>{rolls.length}개</span>}</summary>
+    <>
       {open && (
-        <section className="play-pending-body" aria-label="보류한 굴림 목록">
+        <section className="play-pending-rolls play-pending-body" aria-label="보류한 굴림 목록">
           <form className="play-pending-form" onSubmit={(event) => {
             event.preventDefault();
             if (!roomId || !selected) return;
@@ -131,6 +130,6 @@ export function PlayPendingRolls({ stage, roomId, place, wrapBattleId, rolls, on
           {feedback && <p className="play-explore-note" role="status">{feedback}</p>}
         </section>
       )}
-    </details>
+    </>
   );
 }

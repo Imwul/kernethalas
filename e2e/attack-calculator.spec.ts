@@ -1,6 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 
-const skill = (calculator: Locator, side: string) => calculator.getByRole('textbox', { name: `${side} 보정 Skill` });
+const skill = (calculator: Locator, side: string) => calculator.getByRole('textbox', { name: `${side} 수치` });
 const roll = (calculator: Locator, side: string) => calculator.getByRole('textbox', { name: `${side} D100` });
 
 test('the attack procedure opens the right defense and fumble tables and retains the calculation', async ({ page }) => {

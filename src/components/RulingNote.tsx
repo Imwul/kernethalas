@@ -11,12 +11,12 @@ export function RulingNote({ id }: { id: string }) {
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
-  const summary = useRef<HTMLElement>(null);
+  const opener = useRef<HTMLButtonElement>(null);
 
   const closeEditor = () => {
     setDraft(null);
     setError('');
-    summary.current?.focus({ preventScroll: true });
+    requestAnimationFrame(() => opener.current?.focus({ preventScroll: true }));
   };
   const save = (text: string) => {
     const result = saveRulingNote(id, text, draft?.expected);
@@ -33,37 +33,33 @@ export function RulingNote({ id }: { id: string }) {
       : text.trim() ? '이 브라우저에 메모를 저장했습니다.' : '메모를 삭제했습니다.');
   };
 
+  const openEditor = () => {
+    setDraft({ text: note ?? '', expected: note });
+    setFeedback('');
+    requestAnimationFrame(() => input.current?.focus());
+  };
+
+  // One line until it is used: the label, the saved note (if any) and a single button that opens the editor in place.
   return (
-    <details className="fold ruling-note">
-      <summary ref={summary} aria-label="내 판정 메모">
-        <span>내 판정 메모</span>
-        {note && <span className="ruling-note-preview" aria-hidden="true">{note}</span>}
-      </summary>
-      <div className="ruling-note-body">
-        {draft ? <form className="ruling-note-form" onSubmit={(event) => { event.preventDefault(); if (draft.text.trim()) save(draft.text); }}>
-          <label className="field" htmlFor={inputId}><span>내 판정</span>
-            <textarea id={inputId} ref={input} rows={3} maxLength={RULING_NOTE_MAX} value={draft.text}
-              onChange={(event) => setDraft({ ...draft, text: event.target.value })} />
-          </label>
-          {error && <p className="field-err" role="alert">{error}</p>}
-          <div className="ruling-note-actions">
-            <button type="submit" className="btn primary" disabled={!draft.text.trim() || draft.text.trim() === note}>메모 저장</button>
-            <button type="button" className="btn ghost" onClick={closeEditor}>취소</button>
-            {note && <button type="button" className="linkbtn" onClick={() => save('')}>메모 삭제</button>}
-          </div>
-        </form> : <>
-          {note && <p className="ruling-note-text">{note}</p>}
-          <div className="ruling-note-actions">
-            <button type="button" className="btn ghost" onClick={() => {
-              setDraft({ text: note ?? '', expected: note });
-              setFeedback('');
-              requestAnimationFrame(() => input.current?.focus());
-            }}>{note ? '메모 편집' : '메모 쓰기'}</button>
-            {feedback && <p className="ruling-note-status" role="status">{feedback}</p>}
-          </div>
-        </>}
-      </div>
-    </details>
+    <section className="ruling-note" aria-label="내 판정 메모">
+      {draft ? <form className="ruling-note-form" onSubmit={(event) => { event.preventDefault(); if (draft.text.trim()) save(draft.text); }}>
+        <label className="field" htmlFor={inputId}><span>내 판정</span>
+          <textarea id={inputId} ref={input} rows={3} maxLength={RULING_NOTE_MAX} value={draft.text}
+            onChange={(event) => setDraft({ ...draft, text: event.target.value })} />
+        </label>
+        {error && <p className="field-err" role="alert">{error}</p>}
+        <div className="ruling-note-actions">
+          <button type="submit" className="btn primary" disabled={!draft.text.trim() || draft.text.trim() === note}>메모 저장</button>
+          <button type="button" className="btn ghost" onClick={closeEditor}>취소</button>
+          {note && <button type="button" className="linkbtn" onClick={() => save('')}>메모 삭제</button>}
+        </div>
+      </form> : <div className="ruling-note-line">
+        <span className="ruling-note-label" aria-hidden="true">내 판정 메모</span>
+        {note && <p className="ruling-note-text">{note}</p>}
+        <button type="button" className="linkbtn ruling-note-open" ref={opener} onClick={openEditor}>{note ? '메모 편집' : '메모 쓰기'}</button>
+        {feedback && <p className="ruling-note-status" role="status">{feedback}</p>}
+      </div>}
+    </section>
   );
 }
 

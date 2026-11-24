@@ -27,7 +27,7 @@ test('a trap event opens the same environmental trap form at mobile width', asyn
   await followUp.getByRole('button', { name: '환경 함정 처리로', exact: true }).click();
 
   const actions = explore.getByRole('region', { name: '선택 탐험 행동' });
-  await expect(actions.getByText('환경 함정', { exact: true })).toBeFocused();
+  await expect(actions.getByRole('button', { name: '환경 함정', exact: true })).toBeFocused();
   const trap = actions.getByRole('region', { name: '환경 함정 조사', exact: true });
   await expect(trap).toBeVisible();
   await expect(trap.getByRole('textbox', { name: '함정 여부 D10' })).toHaveCount(0);
@@ -48,19 +48,21 @@ test('room follow-up actions sit under one heading and a corridor offers only do
   const { explore } = await enterPlace(page, '방', '9');
   await physicalRoll(explore.getByRole('region', { name: '이벤트', exact: true }), '직접 굴린 값', '59');
   const next = explore.getByRole('group', { name: '탐험 후속 행동' });
-  for (const summary of ['문·함정 조사', '방 뒤지기', '깊은 수색']) {
-    await expect(next.getByText(summary, { exact: true })).toBeVisible();
+  for (const action of ['문·함정 조사', '환경 함정', '방 뒤지기', '깊은 수색']) {
+    await expect(next.getByRole('button', { name: action, exact: true })).toBeVisible();
   }
   await expect(explore.getByRole('button', { name: '방 뒤지기로', exact: true })).toHaveCount(0);
   await expect(explore.getByRole('button', { name: '저널로', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
 
   await explore.getByRole('button', { name: '통로', exact: true }).click();
-  await physicalRoll(explore.getByRole('region', { name: '조우 판정', exact: true }), '직접 굴린 값', '14');
+  const encounter = explore.getByRole('region', { name: '조우 판정', exact: true });
+  await encounter.getByRole('button', { name: /^D20 9 · .*다시 보기$/ }).click();
+  await physicalRoll(encounter, '직접 굴린 값', '14');
   await expect(explore.getByRole('region', { name: '이벤트', exact: true })).toHaveCount(0);
-  await expect(next.getByText('문·함정 조사', { exact: true })).toBeVisible();
-  await expect(next.getByText('방 뒤지기', { exact: true })).toHaveCount(0);
-  await expect(next.getByText('깊은 수색', { exact: true })).toHaveCount(0);
+  await expect(next.getByRole('button', { name: '문·함정 조사', exact: true })).toBeVisible();
+  await expect(next.getByRole('button', { name: '방 뒤지기', exact: true })).toHaveCount(0);
+  await expect(next.getByRole('button', { name: '깊은 수색', exact: true })).toHaveCount(0);
 });
 
 test('combat wrap-up links back to the current room with its encounter and tension rolls', async ({ page }) => {
@@ -78,9 +80,10 @@ test('combat wrap-up links back to the current room with its encounter and tensi
   await expect(resume.getByRole('button', { name: '방 뒤지기로', exact: true })).toBeVisible();
   await resume.getByRole('button', { name: '깊은 수색으로', exact: true }).click();
   const actions = explore.getByRole('region', { name: '선택 탐험 행동' });
-  await expect(actions.getByText('깊은 수색', { exact: true })).toBeFocused();
-  await expect(explore.getByRole('region', { name: '조우 판정', exact: true }).getByRole('status')).toContainText('12');
-  await expect(tension.getByRole('status')).toContainText('다음 긴장 주사위 D4');
+  await expect(actions.getByRole('button', { name: '깊은 수색', exact: true })).toBeFocused();
+  // finished entry rolls stay folded to their one-line results
+  await expect(explore.getByRole('region', { name: '조우 판정', exact: true }).getByRole('button', { name: /^D20 12 · .*다시 보기$/ })).toBeVisible();
+  await expect(tension.getByRole('button', { name: /^D6 2 · 다음 D4 다시 보기$/ })).toBeVisible();
   await expect(explore.getByRole('region', { name: '이벤트', exact: true })).toHaveCount(0);
   await actions.getByRole('button', { name: '깊은 수색 시작' }).click();
   const deep = actions.getByRole('region', { name: '깊은 수색 긴장 굴림' });

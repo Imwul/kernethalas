@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { d100FromValue, resolveCheck, rollDie, type CheckOutcome, type CheckResult, type Edge } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
+import { usePlayCharacter } from '../lib/play-character';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../lib/play-skill';
@@ -62,8 +63,13 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   const field = usePlayRollField(slot, label, 'D100', !!confirmed, true);
   const [draft, setDraft] = useState<Partial<Inputs>>({});
   const [invalid, setInvalid] = useState(false);
-  const inputs = { ...EMPTY, skill: initialSkill, ...confirmed?.inputs, roll: '', ...draft };
+  const pc = usePlayCharacter();
+  const own = context !== 'npc' ? pc : null;
   const chooseWeapon = context !== 'npc' && skill.includes('무기 Skill');
+  const inputs = { ...EMPTY, ...(chooseWeapon && own?.character.weapon ? { weapon: own.character.weapon } : {}),
+    skill: initialSkill, ...confirmed?.inputs, roll: '', ...draft };
+  // Until the player types here, an empty value falls back to the Character tab.
+  if (!inputs.skill && draft.skill === undefined && !confirmed && own) inputs.skill = own.skill(chooseWeapon ? inputs.weapon : skill);
   const difficultyDie = readOracleValue(inputs.difficulty.trim(), 8);
   const difficulty = randomDifficulty && difficultyDie !== null ? DIFFICULTY[difficultyDie - 1] ?? 0 : 0;
   const fixed = [{ label: '규칙 보정', value: modifier }, { label: '난이도 D8', value: difficulty }];
@@ -101,19 +107,10 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
         <label className="field"><span>{skill} 수치</span>
           <input value={inputs.skill} inputMode="text" placeholder="예: 45" onChange={(event) => update({ skill: event.target.value })} />
         </label>
-        {chooseWeapon && <label className="field"><span>사용한 무기 Skill</span>
-          <select value={inputs.weapon ?? ''} onChange={(event) => update({ weapon: event.target.value })}>
-            <option value="">성장 기록용 선택</option>
-            {WEAPON_SKILLS.map((name) => <option key={name}>{name}</option>)}
-          </select>
-        </label>}
         {randomDifficulty && <div className="field"><label htmlFor={`${id}-difficulty`}>난이도 D8</label>
           <PlayDieHint dice="D8" sides={8} />
           <input id={`${id}-difficulty`} value={inputs.difficulty} inputMode="numeric" placeholder="1–8" onChange={(event) => update({ difficulty: event.target.value })} />
         </div>}
-        {context !== 'npc' && !existingRoll && <SkillAdjustments skill={chooseWeapon ? inputs.weapon : skill} base={inputs.skill}
-          onBase={(value) => update({ skill: value })} modifiers={inputs.modifiers ?? []} fixed={fixed}
-          onModifiers={(modifiers) => update({ modifiers })} />}
         <label className="field"><span>유불리</span>
           <select value={inputs.edge} onChange={(event) => update({ edge: event.target.value as Edge })}>
             <option value="none">없음</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option>
@@ -123,6 +120,12 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
           <input id={`${id}-roll`} value={inputs.roll} inputMode="numeric" {...field} placeholder="1–100 / 00" aria-invalid={invalid || undefined}
             onChange={(event) => update({ roll: event.target.value })} />
         </div>
+        {chooseWeapon && <label className="field physical-check-weapon"><span>사용한 무기 Skill</span>
+          <select value={inputs.weapon ?? ''} onChange={(event) => update({ weapon: event.target.value })}>
+            <option value="">성장 기록용 선택</option>
+            {WEAPON_SKILLS.map((name) => <option key={name}>{name}</option>)}
+          </select>
+        </label>}
         <div className="physical-check-actions">
           <PlayZeroKey onInput={() => update({ roll: '00' })} />
           <button type="submit" className="btn ghost">판정</button>
@@ -134,6 +137,9 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
             onClear();
           })}>판정 지우기</button>}
         </div>
+        {context !== 'npc' && !existingRoll && <SkillAdjustments skill={chooseWeapon ? inputs.weapon : skill} base={inputs.skill}
+          onBase={(value) => update({ skill: value })} modifiers={inputs.modifiers ?? []} fixed={fixed}
+          onModifiers={(modifiers) => update({ modifiers })} />}
         {invalid && <p className="field-err" role="alert">{skill} 수치{randomDifficulty ? '와 난이도 1–8, ' : '와 '}D100의 값을 확인하세요.</p>}
       </form>}
       {result && <div className="physical-check-result" role="status">

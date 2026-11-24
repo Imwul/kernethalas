@@ -37,8 +37,9 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
   const field = usePlayRollField(`oracle:${t.id}`, t.ko, t.dice, value !== null, sides === 100);
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
-  const showLocalSource = t.mode === 'local-only' || t.group === 'flavor' || t.id === 't-events';
-  const original = row && (sourceForRow?.(row) ?? (showLocalSource ? tableRowSource(t.id, row.min) : undefined));
+  // The local overlay's original wording sits under every result; it adds nothing when it only repeats the label.
+  const rawOriginal = row && (sourceForRow?.(row) ?? tableRowSource(t.id, row.min));
+  const original = rawOriginal && !t.gloss && rawOriginal.trim().replace(/\.$/, '') !== row.label ? rawOriginal : undefined;
   const digits = value !== null && sides === 100 ? d100FromValue(value) : null;
   const rollValue = (n: number, source: PlayRollDetails['source']) => {
     setInvalid(false);
@@ -135,7 +136,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
             <div className="oracle-result-text">
               {row && showLabel(t, row) && <span className="oracle-result-label" lang="en">{row.label}</span>}
               <p>{row?.ko ?? '해당 값의 결과는 수록되지 않았습니다. 출처에서 확인하세요.'}</p>
-              {original && <span className="oracle-result-label" lang="en">{original}</span>}
+              {original && <span className="oracle-result-label oracle-result-original" lang="en">{original}</span>}
               {!!t.columns?.length && row?.cols && (
                 <dl>
                   {t.columns.map((c) => (

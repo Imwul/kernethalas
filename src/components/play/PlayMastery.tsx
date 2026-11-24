@@ -2,6 +2,8 @@ import { useEffect, useMemo } from 'react';
 import { creatureDefenses } from '../../content/creature-defenses';
 import type { CreatureRecord } from '../../content/entries/creatures';
 import { masteryCatalog } from '../../content/entries/masteries';
+import { masterySource } from '../../lib/overlay';
+import { usePlayCharacter } from '../../lib/play-character';
 import { calculateCreatureAdaptation, readCreatureLevel } from '../../lib/creature-adaptation';
 import { calculateDirectDamage, ignoresArmor, listedDamageReactions, type DamageReactions } from '../../lib/damage';
 import { pooledDie, resolveAttack, type CheckResult, type RollResult } from '../../lib/dice';
@@ -14,6 +16,7 @@ import { DamageTypeGuide } from '../DamageTypeGuide';
 import { PhysicalDiceRoll } from '../PhysicalDiceRoll';
 import { PhysicalSkillRoll, skillCheckSucceeded } from '../PhysicalSkillRoll';
 import { XRef } from '../bits';
+import { TogglePanel } from '../TogglePanel';
 import '../../styles/play-mastery.css';
 
 type SheetEffect = Omit<PaperChange, 'id'>;
@@ -207,8 +210,7 @@ function TargetControls({ ability, target, draft, level, spent, onChange }: {
               <input inputMode="numeric" value={draft.armor ?? ''} placeholder="방어구 없으면 0" onChange={(event) => onChange({ armor: event.target.value })}
                 aria-invalid={!!draft.armor && readMasteryInteger(draft.armor) === null || undefined} />
             </label>}
-            <details className="fold mastery-adjustments">
-              <summary>추가 피해 보정</summary>
+            <TogglePanel className="mastery-adjustments" label="피해 반응·추가 보정">
               <div className="mastery-form-fields">
                 {Object.entries(REACTION_LABELS).map(([id, label]) => {
                   const key = id as keyof DamageReactions;
@@ -222,7 +224,7 @@ function TargetControls({ ability, target, draft, level, spent, onChange }: {
                   aria-invalid={!!draft.reduction && readMasteryInteger(draft.reduction) === null || undefined}
                   onChange={(event) => onChange({ reduction: event.target.value })} /></label>
               </div>
-            </details>
+            </TogglePanel>
           </>}
         </>}
       </>}
@@ -242,7 +244,9 @@ function AbilityForm({ ability, targets, records, onRecord }: {
   const ongoing = usePlayOngoingEffects();
   const clear = useClearPlayDraftScope();
   const patch = (next: Partial<CastDraft>) => setDraft((previous) => ({ ...previous, ...next }));
-  const level = readCreatureLevel(draft.level);
+  const pc = usePlayCharacter();
+  const levelText = draft.level || pc?.level || '';
+  const level = readCreatureLevel(levelText);
   const manualTargets = draft.manual.split('\n').map((name) => name.trim()).filter(Boolean);
   const usesTargets = ability.targets !== 'self';
   const single = ability.targets === 'one';
@@ -286,6 +290,7 @@ function AbilityForm({ ability, targets, records, onRecord }: {
         <strong lang="en">{ability.name}</strong>
         <span className="mastery-cost">{ability.use}</span>
         <span>{ability.text}</span>
+        {masterySource(ability.id.split(':')[0], ability.name) && <span className="mastery-original" lang="en">{masterySource(ability.id.split(':')[0], ability.name)}</span>}
         {ability.follow && <span className="mastery-note">{ability.follow}</span>}
         {ability.sustained && <span className="mastery-note">유지하는 동안 최대 Aether가 줄어듭니다. 전투 밖에서 해제할 수 있습니다.</span>}
       </div>
@@ -293,11 +298,11 @@ function AbilityForm({ ability, targets, records, onRecord }: {
       {!passive && <>
         <div className="mastery-form-fields">
           {usesTargets && <label className="field"><span>PC 레벨{ability.targets === 'half-level' ? '' : ' (선택)'}</span>
-            <input inputMode="numeric" value={draft.level} onChange={(event) => {
+            <input inputMode="numeric" value={levelText} onChange={(event) => {
               clear('rolls');
               patch({ level: event.target.value, rolls: {} });
             }}
-              placeholder="예 3" aria-invalid={!!draft.level && level === null || undefined} />
+              placeholder="예 3" aria-invalid={!!levelText && level === null || undefined} />
           </label>}
           {cost.aether > 0 && <label className="field"><span>현재 Aether (선택)</span>
             <input inputMode="numeric" value={draft.aether} onChange={(event) => patch({ aether: event.target.value })}
@@ -387,31 +392,51 @@ export function PlayMastery({ targets = NO_TARGETS, onSheetChange, onJournalChan
   const visible = mastery?.abilities.filter((item) => item.tier <= Number(tier)) ?? [];
   const chosen = visible.find(({ id }) => id === abilityId);
   const ability = chosen && describeMasteryAbility(chosen);
+  const sheet = usePlayCharacter();
+  const learned = (sheet?.character.masteries ?? []).flatMap(({ id, tier: last }) => {
+    const entry = masteryCatalog.find((item) => item.id === id);
+    return entry ? [{ entry, last, abilities: entry.abilities.filter((item) => item.tier <= last) }] : [];
+  });
+  const pick = (id: string, last: number, ability: string) => { setMasteryId(id); setTier(String(last)); setAbilityId(ability); };
+  const selects = (
+    <div className="mastery-form-fields">
+      <label className="field"><span>종이 시트의 Mastery</span>
+        <select value={masteryId} onChange={(event) => { setMasteryId(event.target.value); setTier(''); setAbilityId(''); }}>
+          <option value="">선택</option>{masteryCatalog.map(({ id, name }) => <option value={id} key={id}>{name}</option>)}
+        </select>
+      </label>
+      {mastery && <label className="field"><span>배운 마지막 Tier</span>
+        <select value={tier} onChange={(event) => { setTier(event.target.value); setAbilityId(''); }}>
+          <option value="">선택</option>{mastery.abilities.map(({ tier: value, name }) => <option key={value} value={value}>Tier {value} · {name}</option>)}
+        </select>
+      </label>}
+      {visible.length > 0 && <label className="field"><span>사용할 능력</span>
+        <select value={abilityId} onChange={(event) => setAbilityId(event.target.value)}>
+          <option value="">선택</option>{visible.map(({ id, name, use }) => <option key={id} value={id}>
+            {name}{use === '패시브' && !ACTIVE_PAPER_PASSIVES[name] ? ' · 패시브' : ''}
+          </option>)}
+        </select>
+      </label>}
+    </div>
+  );
   return (
     <section className="play-mastery-card" aria-label="PC Mastery 능력">
-      <div className="mastery-form-fields">
-        <label className="field"><span>종이 시트의 Mastery</span>
-          <select value={masteryId} onChange={(event) => { setMasteryId(event.target.value); setTier(''); setAbilityId(''); }}>
-            <option value="">선택</option>{masteryCatalog.map(({ id, name }) => <option value={id} key={id}>{name}</option>)}
-          </select>
-        </label>
-        {mastery && <label className="field"><span>배운 마지막 Tier</span>
-          <select value={tier} onChange={(event) => { setTier(event.target.value); setAbilityId(''); }}>
-            <option value="">선택</option>{mastery.abilities.map(({ tier: value, name }) => <option key={value} value={value}>Tier {value} · {name}</option>)}
-          </select>
-        </label>}
-        {visible.length > 0 && <label className="field"><span>사용할 능력</span>
-          <select value={abilityId} onChange={(event) => setAbilityId(event.target.value)}>
-            <option value="">선택</option>{visible.map(({ id, name, use }) => <option key={id} value={id}>
-              {name}{use === '패시브' && !ACTIVE_PAPER_PASSIVES[name] ? ' · 패시브' : ''}
-            </option>)}
-          </select>
-        </label>}
-      </div>
-      {mastery && <details className="fold mastery-feature">
-        <summary>Mastery 특성 · <span lang="en">{mastery.feature.name}</span></summary>
+      {learned.length > 0 ? <>
+        {learned.map(({ entry, last, abilities }) => (
+          <div className="mastery-learned" role="group" aria-label={`${entry.name} 배운 능력`} key={entry.id}>
+            <span className="mastery-learned-name" lang="en">{entry.name}</span>
+            {abilities.map((item) => {
+              const passive = item.use === '패시브' && !ACTIVE_PAPER_PASSIVES[item.name];
+              return <button type="button" className="mastery-pick" key={item.id} lang="en" aria-pressed={abilityId === item.id}
+                onClick={() => pick(entry.id, last, item.id)}>{item.name}{passive && <span className="mastery-passive" lang="ko"> · 패시브</span>}</button>;
+            })}
+          </div>
+        ))}
+        <TogglePanel label="다른 Mastery 직접 선택" className="mastery-manual">{selects}</TogglePanel>
+      </> : selects}
+      {mastery && <TogglePanel className="mastery-feature" label={<>Mastery 특성 · <span lang="en">{mastery.feature.name}</span></>}>
         <p className="mastery-note">{mastery.feature.text}</p>
-      </details>}
+      </TogglePanel>}
       {ability && <PlayDraftScope name={ability.id}><AbilityForm key={ability.id} ability={ability} targets={targets} records={records}
         onRecord={(record) => setRecords((previous) => [...previous, record])} /></PlayDraftScope>}
       {records.length > 0 && <ul className="mastery-records" aria-label="이번 전투 능력 기록">

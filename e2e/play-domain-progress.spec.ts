@@ -1,7 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
 
 const explore = (page: Page) => page.getByRole('region', { name: '장소 탐험' });
-const domainHeading = (page: Page, name: string) => page.locator('.play-domain > summary').getByText(name, { exact: true });
+async function showDomain(page: Page, name: string) {
+  const drawer = await openDrawer(page, '도메인');
+  await expect(drawer.getByRole('heading', { level: 2 })).toHaveText(name);
+  return drawer;
+}
 
 async function enter(scope: Locator, name: string, value: string) {
   const field = scope.getByRole('textbox', { name, exact: true });
@@ -64,19 +69,20 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
   await expect(explore(page).getByRole('button', { name: '출구로 이동 확정' })).toHaveCount(0);
   await explore(page).getByRole('button', { name: '출구로 이동 선택' }).click();
   await explore(page).getByRole('button', { name: '출구로 이동 확정' }).click();
-  await expect(domainHeading(page, '도메인 2')).toBeVisible();
+  await showDomain(page, '도메인 2');
+  await closeDrawer(page);
   await page.getByRole('button', { name: '저널', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'XP +50 · 새 도메인 첫 진입' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 
   await page.getByRole('button', { name: '탐험', exact: true }).click();
   await place(page, '방');
-  await explore(page).getByText('은신처·출구 직접 표시', { exact: true }).click();
+  await openPane(explore(page), '은신처·출구 직접 표시');
   await explore(page).getByRole('checkbox', { name: '이 방이 Overseer 은신처' }).check();
   await advance(page);
   await place(page, '통로');
   await expect(explore(page).getByRole('region', { name: '출구 소모 주사위' })).toBeVisible();
-  await explore(page).getByText('은신처·출구 직접 표시', { exact: true }).click();
+  await openPane(explore(page), '은신처·출구 직접 표시');
   await explore(page).getByRole('checkbox', { name: '지도에 표시된 출구 위치' }).check();
   await enter(explore(page), '긴장 주사위 굴린 값', '3');
   await explore(page).getByRole('button', { name: '출구로 이동 선택' }).click();
@@ -85,7 +91,7 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
   const effects = page.getByRole('region', { name: '도메인 효과' });
   await page.getByRole('button', { name: '저널', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'XP +50 · 새 도메인 첫 진입' })).toHaveCount(0);
-  await domainHeading(page, '도메인 1').click();
+  await showDomain(page, '도메인 1');
   await expect(effects.getByRole('region', { name: '도메인 진행 설정' })).toContainText('발견한 출구');
   await expect(effects.getByRole('region', { name: '도메인 진행 설정' })).toContainText(lairName);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
@@ -94,13 +100,13 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
 test('the introductory paper map uses its own encounter lookup and a marked exit', async ({ page }) => {
   await page.setViewportSize({ width: 3440, height: 1440 });
   await page.goto('/play');
-  await domainHeading(page, '도메인 1').click();
+  await showDomain(page, '도메인 1');
   const effects = page.getByRole('region', { name: '도메인 효과' });
   const settings = effects.getByRole('region', { name: '도메인 진행 설정' });
   await settings.getByRole('combobox', { name: '도메인 방식' }).selectOption('intro');
   await settings.getByRole('button', { name: '첫 진입 기록 · XP +50' }).click();
   await expect(settings.getByRole('button', { name: '첫 진입 기록 · XP +50' })).toHaveCount(0);
-  await domainHeading(page, '도메인 1').click();
+  await closeDrawer(page);
 
   await place(page, '방');
   await expect(explore(page).getByRole('button', { name: '모양으로 결정' })).toHaveCount(0);
@@ -119,7 +125,7 @@ test('the introductory paper map uses its own encounter lookup and a marked exit
   await expect(explore(page).getByRole('region', { name: '출구 소모 주사위' })).toHaveCount(0);
   await explore(page).getByRole('button', { name: '출구로 이동 선택' }).click();
   await explore(page).getByRole('button', { name: '출구로 이동 확정' }).click();
-  await domainHeading(page, '도메인 2').click();
+  await showDomain(page, '도메인 2');
   await expect(effects.getByRole('combobox', { name: '도메인 전환' })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(3440);
 });

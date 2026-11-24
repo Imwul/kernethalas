@@ -3,6 +3,7 @@ import { procById } from '../content';
 import { d100FromValue, resolveCheck, resolveOpposed, type Edge } from '../lib/dice';
 import { resolvePhysicalAttack, type AttackDefenseMode } from '../lib/attack-defense';
 import { readOracleValue } from '../lib/oracle';
+import { usePlayCharacter } from '../lib/play-character';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { isSkillDouble } from '../lib/skill-criticals';
 import { isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
@@ -10,6 +11,7 @@ import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../lib
 import { CopyButton, XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import { SkillAdjustments } from './play/SkillAdjustments';
+import { TogglePanel } from './TogglePanel';
 
 interface SideState {
   skill: string;
@@ -71,11 +73,19 @@ function Side({ label, s, set, disabled, rollRef, field, editableSkill }: {
       <legend>{label}</legend>
       <div className="row">
         <div className="field">
-          <label htmlFor={`${id}-skill`}><span className="sr-only">{label} </span>보정 Skill</label>
+          <label htmlFor={`${id}-skill`}><span className="sr-only">{label} </span>수치</label>
           <input id={`${id}-skill`} value={s.skill} placeholder="예: 50"
             aria-invalid={invalidSkill || undefined} aria-describedby={invalidSkill ? `${id}-skill-error` : undefined}
             onChange={(e) => set({ skill: e.target.value })} />
           {invalidSkill && <p className="field-err" id={`${id}-skill-error`}>보정한 Skill을 정수로 입력하세요.</p>}
+        </div>
+        <div className="field">
+          <label htmlFor={`${id}-edge`}><span className="sr-only">{label} </span>유불리</label>
+          <select id={`${id}-edge`} value={s.edge} onChange={(e) => set({ edge: e.target.value as Edge })}>
+            <option value="none">없음</option>
+            <option value="advantage">Advantage</option>
+            <option value="disadvantage">Disadvantage</option>
+          </select>
         </div>
         <div className="field">
           <label htmlFor={`${id}-roll`}><span className="sr-only">{label} </span>D100</label>
@@ -86,14 +96,6 @@ function Side({ label, s, set, disabled, rollRef, field, editableSkill }: {
           <PlayZeroKey onInput={() => changeRoll('00')} />
           {invalid && <p className="field-err" id={`${id}-roll-error`}>1–100 사이의 정수 또는 00을 입력하세요.</p>}
         </div>
-        <div className="field">
-          <label htmlFor={`${id}-edge`}><span className="sr-only">{label} </span>이점</label>
-          <select id={`${id}-edge`} value={s.edge} onChange={(e) => set({ edge: e.target.value as Edge })}>
-            <option value="none">없음</option>
-            <option value="advantage">Advantage</option>
-            <option value="disadvantage">Disadvantage</option>
-          </select>
-        </div>
       </div>
       {editableSkill && <SkillAdjustments label={label} skill={s.growthSkill} base={s.skill} modifiers={s.modifiers ?? []}
         disabled={disabled} onBase={(skill) => set({ skill })} onModifiers={(modifiers) => set({ modifiers })} />}
@@ -103,22 +105,22 @@ function Side({ label, s, set, disabled, rollRef, field, editableSkill }: {
 
 function HitLocation({ enemyAttacks, onHitLocation }: { enemyAttacks: boolean; onHitLocation?: () => void }) {
   if (onHitLocation) return (
-    <button type="button" className="btn ghost" onClick={onHitLocation}>{enemyAttacks ? 'PC 명중 부위 D20' : '적 명중 부위 보기'}</button>
+    <button type="button" className="btn primary" data-checkcalc-forward="" onClick={onHitLocation}>{enemyAttacks ? 'PC 명중 부위 D20' : '적 명중 부위 보기'}</button>
   );
   if (enemyAttacks) return (
     <><XRef id="t-hit-humanoid">PC 명중 부위 D20</XRef><XRef id="damage-to-pc">PC 받는 피해 계산</XRef></>
   );
   const tables = procById.get('p-attack')?.nodes.find(({ id }) => id === 'loc')?.tables ?? [];
   return (
-    <details className="fold checkcalc-hit-tables">
-      <summary>적 명중 부위 표 선택</summary>
+    <TogglePanel className="checkcalc-hit-tables" label="적 명중 부위 표 선택">
       <div className="checkcalc-follow-ups">{tables.map((id) => <XRef key={id} id={id} />)}</div>
-    </details>
+    </TogglePanel>
   );
 }
 
 export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?: boolean; creature?: CreatureAttack }) {
   const play = usePlayDraft();
+  const pcCharacter = usePlayCharacter();
   const commit = usePlayRoll();
   const record = useRecordSkillCritical();
   const [mode, setMode] = useState<'single' | 'attack' | 'opposed'>('attack');
@@ -129,6 +131,7 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const [pcDefenseMode, setPcDefenseMode] = usePlayDraftState<AttackDefenseMode>('attack-defense-mode-pc', 'opposed');
   const [enemyDefenseMode, setEnemyDefenseMode] = usePlayDraftState<AttackDefenseMode>('attack-defense-mode-enemy', 'opposed');
   const attackerRoll = useRef<HTMLInputElement>(null);
+  const section = useRef<HTMLElement>(null);
   const defenseModeSelect = useRef<HTMLSelectElement>(null);
   const enemyAttacks = creature?.attacking ?? enemy;
   const trackExchange = !!play && !!creature;
@@ -144,8 +147,11 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const enemySkill = creature?.combatSkill;
   const importedSkill = enemySkill == null ? '' : String(enemySkill + (enemyAttacks ? 10 : 0));
   const noRoll = { rollv: '', edge: 'none' as const };
-  const a = { ...noRoll, skill: creature && enemyAttacks ? importedSkill : attackOnly ? '' : '60', ...inputs[aKey] };
-  const b = { ...noRoll, skill: creature && !enemyAttacks ? importedSkill : attackOnly ? '' : '50', ...inputs[bKey] };
+  const pcSheet = creature ? pcCharacter : null;
+  const a = { ...noRoll, skill: creature && enemyAttacks ? importedSkill : pcSheet ? pcSheet.attackSkill : attackOnly ? '' : '60',
+    ...(pcSheet && !enemyAttacks && pcSheet.character.weapon ? { growthSkill: pcSheet.character.weapon } : {}), ...inputs[aKey] };
+  const b = { ...noRoll, skill: creature && !enemyAttacks ? importedSkill : pcSheet ? pcSheet.defenseSkill : attackOnly ? '' : '50',
+    ...(pcSheet && enemyAttacks && pcSheet.character.defense ? { growthSkill: pcSheet.character.defense } : {}), ...inputs[bKey] };
   const setSide = (key: SideId, patch: Partial<SideState>) =>
     setInputs((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
   const aRoll = readOracleValue(a.rollv.trim(), 100);
@@ -187,6 +193,8 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     commit(() => {
       setConfirmed({ id: crypto.randomUUID(), attacker, defender });
       continueAttack?.();
+      // Move on to the next step (hit location), never onto "다음 공격", which would clear this exchange.
+      if (!continueAttack) requestAnimationFrame(() => section.current?.querySelector<HTMLElement>('[data-checkcalc-forward]')?.focus());
     }, {
       label: `공격 교환 · ${matchup}`,
       dice,
@@ -207,7 +215,7 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     requestAnimationFrame(() => (attackerRoll.current ?? defenseModeSelect.current)?.focus());
   };
   return (
-    <section className="roller checkcalc" aria-label={attackOnly ? '공격 판정 해석기' : '판정 해석기'}>
+    <section className="roller checkcalc" ref={section} aria-label={attackOnly ? '공격 판정 해석기' : '판정 해석기'}>
       {!attackOnly && <span className="kicker">판정 해석기</span>}
       {!attackOnly && <div className="seg" role="group" aria-label="판정 종류">
         {(
@@ -265,10 +273,10 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
         {confirmed && verdict && <p className="checkcalc-note">확정 · {dice} · {summarizeRolls(confirmed.attacker, confirmed.defender)}</p>}
         <div className="checkcalc-follow-ups">
           {confirmed ? <>
-            <button type="button" className="btn primary" onClick={nextAttack}>다음 공격</button>
+            <button key="next" type="button" className="btn ghost" onClick={nextAttack}>다음 공격</button>
             {exchangeOutcome && <CopyButton text={`${matchup} · ${dice} · ${summarizeRolls(confirmed.attacker, confirmed.defender)} · ${exchangeOutcome}`}
               label="공격 결과 복사" />}
-          </> : <button type="button" className="btn primary" disabled={!result} data-play-next={result ? '' : undefined}
+          </> : <button key="confirm" type="button" className="btn primary" disabled={!result} data-play-next={result ? '' : undefined}
             onClick={() => confirm()}>공격 교환 확정</button>}
         </div>
       </div>)}

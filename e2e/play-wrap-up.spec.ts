@@ -102,6 +102,8 @@ test('each defeated creature has an independent loot roll and paper change', asy
   await enterNecropede(combat);
   await combat.getByRole('button', { name: '같은 생물 추가', exact: true }).click();
   await combat.getByRole('button', { name: '승리 후 전투 마치기', exact: true }).click();
+  // A finished fight opens on its after-fight steps; loot is the next tab.
+  await page.getByRole('region', { name: '휴식과 전리품 정리' }).getByRole('button', { name: '전리품', exact: true }).click();
   const loot = page.getByRole('region', { name: '전리품 굴림' });
   await enterRoll(loot.getByRole('region', { name: 'Necropede 1 처치 보상' }), '자원 D10', '7');
   await enterRoll(loot.getByRole('region', { name: 'Necropede 2 처치 보상' }), '자원 D10', '3');
@@ -149,7 +151,7 @@ test('domain darkness triggers a short rest check and its result can clear that 
   await enterRoll(followUp, '광원 감소 D4', '3');
   await expect(followUp.getByRole('list', { name: '종이 시트에 반영할 결과' })).toContainText('광원 −3');
   await enterRoll(extra, '짙어지는 어둠 D100', '33');
-  await expect(extra.getByRole('group', { name: '짙어지는 어둠 D100' })).toContainText('다른 모든 Growing Darkness 효과 해제');
+  await expect(extra.getByRole('group', { name: '짙어지는 어둠 D100' })).toContainText('짙어지는 어둠으로 생긴 다른 효과를 모두 해제한다');
   await expect(followUp.getByRole('group', { name: '광원 감소 D4' })).toHaveCount(0);
   await expect(followUp.getByLabel('해제한 어둠 효과 수')).toHaveValue('1');
   await stages.getByRole('button', { name: '저널', exact: true }).click();

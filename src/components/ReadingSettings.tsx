@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { overlay } from '../lib/overlay';
 import { nav, useNav } from '../lib/store';
 import { IClose } from './icons';
 
@@ -9,8 +10,10 @@ type Preferences = {
   density: typeof DENSITIES[number];
   textSize: typeof TEXT_SIZES[number];
   contrast: boolean;
+  /** Original English wording under our Korean text; only exists with the local overlay. */
+  originals: boolean;
 };
-const INITIAL: Preferences = { density: 'normal', textSize: 'normal', contrast: false };
+const INITIAL: Preferences = { density: 'normal', textSize: 'normal', contrast: false, originals: true };
 
 function readPreferences(): Preferences {
   try {
@@ -19,6 +22,7 @@ function readPreferences(): Preferences {
       density: DENSITIES.find((density) => density === saved?.density) ?? INITIAL.density,
       textSize: TEXT_SIZES.find((size) => size === saved?.textSize) ?? INITIAL.textSize,
       contrast: saved?.contrast === true,
+      originals: saved?.originals !== false,
     };
   } catch { return INITIAL; }
 }
@@ -36,6 +40,8 @@ export function ReadingSettings() {
     root.dataset.readingDensity = preferences.density;
     root.dataset.readingText = preferences.textSize;
     root.dataset.readingContrast = preferences.contrast ? 'high' : 'normal';
+    if (overlay && !preferences.originals) root.dataset.readingOriginals = 'hidden';
+    else delete root.dataset.readingOriginals;
   }, [preferences]);
 
   useLayoutEffect(() => {
@@ -100,6 +106,8 @@ export function ReadingSettings() {
           </label>
           <label className="reading-settings-check"><input type="checkbox" checked={preferences.contrast}
             onChange={(event) => update({ contrast: event.target.checked })} />높은 대비</label>
+          {overlay && <label className="reading-settings-check"><input type="checkbox" checked={preferences.originals}
+            onChange={(event) => update({ originals: event.target.checked })} />원문 함께 보기</label>}
           {temporary && <p role="status">저장 공간을 사용할 수 없어 현재 탭에 적용했습니다.</p>}
         </div>
       </dialog>

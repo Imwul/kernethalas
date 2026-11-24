@@ -7,9 +7,7 @@ export function PlayFlee({ onFlee }: { onFlee: () => void }) {
   const [outcome, setOutcome] = usePlayDraftState<CheckOutcome | null>('flee-outcome', null);
   const passed = outcome === 'success' || outcome === 'critical';
   return (
-    <details className="fold play-flee">
-      <summary>도주 판정</summary>
-      <section className="play-aux-body" aria-label="전투 도주">
+      <section className="play-flee play-aux-body" aria-label="전투 도주">
         <p className="play-combat-note">표준 행동을 사용해 Dodge를 굴립니다.</p>
         <PhysicalSkillRoll label="도주 Dodge 판정" skill="Dodge" slot="flee-dodge"
           onResult={(result) => setOutcome(result.outcome)} onClear={() => setOutcome(null)} />
@@ -22,6 +20,5 @@ export function PlayFlee({ onFlee }: { onFlee: () => void }) {
         }}>후퇴하고 적 편성 기록</button>}
         <XRef id="q-flee" />
       </section>
-    </details>
   );
 }

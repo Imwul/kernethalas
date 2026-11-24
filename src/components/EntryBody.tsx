@@ -3,6 +3,7 @@ import type { Entry } from '../content/schema';
 import { CATEGORY_LABEL } from '../content';
 import { creatureById } from '../content/entries/creatures';
 import { bestiaryEncounterHref } from '../lib/bestiary-encounter';
+import { entrySource, masterySource } from '../lib/overlay';
 import { isUsageDieRule } from '../lib/usage-die';
 import { CreatureCombatCard } from './CreatureCombatCard';
 import { DamageCalculator } from './DamageCalculator';
@@ -19,6 +20,9 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
   const creature = creatureById.get(e.id);
   const hasDetails = !!(e.resolution?.length || e.outcomes?.length || (!creature && e.stats) || e.details?.length);
   const hasRelated = !!(e.related.length || e.tables?.length || e.procedures?.length);
+  // Original wording from the owner's local overlay (never in public builds), shown under the Korean.
+  const original = isMastery ? undefined : entrySource(e.id);
+  const abilityOriginal = (label: string) => isMastery ? masterySource(e.id, label.split(' · ').slice(1).join(' · ')) : undefined;
   return (
     <article className="folio reference-folio">
       {!(creature && hideTitle) && <header className={`folio-head${hideTitle ? ' folio-head-compact' : ''}`}>
@@ -71,7 +75,8 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
                 {e.outcomes.map((outcome, index) => (
                   <div className={`outcome${isMastery && index === 0 ? ' feature' : ''}`} key={index}>
                     <dt>{outcome.label}</dt>
-                    <dd>{outcome.meta && <span className="o-meta">{outcome.meta}</span>}{outcome.text}</dd>
+                    <dd>{outcome.meta && <span className="o-meta">{outcome.meta}</span>}{outcome.text}
+                      {abilityOriginal(outcome.label) && <span className="o-original" lang="en">{abilityOriginal(outcome.label)}</span>}</dd>
                   </div>
                 ))}
               </dl>
@@ -88,6 +93,13 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
               <ul className="bullets">{e.details.map((item, index) => <li key={index}>{item}</li>)}</ul>
             </div>
           ) : null}
+        </section>
+      )}
+
+      {original && (
+        <section className="reference-original" aria-label="원문">
+          <h2 className="reference-label">원문</h2>
+          <p lang="en">{original}</p>
         </section>
       )}
 

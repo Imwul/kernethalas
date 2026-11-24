@@ -51,13 +51,11 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate,
   const progressStarted = !!(progress.lair || progress.exit || progress.lastCheck);
   const extraInfluences = activeEffects.filter(({ roll }) => roll >= 81);
   return (
-    <details className="fold play-domain">
-      <summary>
-        <span>{domainName(domain)}</span>
-        {overseer && <span lang="en">{overseer.name}</span>}
-        {activeEffects.length > 0 && <span>어둠 {activeEffects.length}개</span>}
-      </summary>
-      <section className="play-domain-body" aria-label="도메인 효과">
+    <section className="play-domain play-domain-body" aria-label="도메인 효과">
+        {(overseer || activeEffects.length > 0) && <p className="play-domain-summary">
+          {overseer && <span lang="en">{overseer.name}</span>}
+          {activeEffects.length > 0 && <span>어둠 {activeEffects.length}개</span>}
+        </p>}
         <div className="play-domain-fields">
           <label className="field"><span>도메인 이름</span>
             <input value={domain.name} onChange={(event) => onUpdate({ name: event.target.value })} />
@@ -141,7 +139,6 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate,
             onChange={(roll) => onUpdate({ extra: { ...domain.extra, [effect.id]: roll } })} />
         ))}
         <div className="play-refs"><XRef id="overseer-influence" /><XRef id="growing-darkness" /></div>
-      </section>
-    </details>
+    </section>
   );
 }

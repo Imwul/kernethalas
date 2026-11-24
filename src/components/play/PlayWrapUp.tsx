@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from 'react';
 import { tableById, titleOf } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import { creatureSpoilsTables } from '../../lib/creature-combat';
@@ -37,9 +37,17 @@ interface Props {
   onBreatherTensionChange?: (sides: TensionDie | null) => void;
   onBreatherDarknessChange?: (roll: number | null) => void;
   onBreatherAmbush?: () => void;
+  /** Desk tools that belong with the rest stop (trade, advancement) share the pane row. */
+  extraPanes?: { id: string; label: string; content: ReactNode }[];
+  handleRef?: Ref<WrapUpHandle>;
 }
 
-type Pane = 'loot' | 'breather' | 'camp' | 'survival' | 'recovery';
+export interface WrapUpHandle {
+  open: (pane: string) => void;
+}
+
+const BASE_PANES = ['loot', 'breather', 'camp', 'survival', 'recovery'] as const;
+type Pane = typeof BASE_PANES[number] | (string & {});
 type Source = 'creature' | typeof MANUAL_SOURCES[number];
 
 const FOLLOW_LOOT = new Set([
@@ -82,6 +90,7 @@ export function PlayWrapUp({
   inventory = [],
   onCampEncounter, campEncounterResolved, campDarkness, campAttunementBlocked,
   afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush,
+  extraPanes = [], handleRef,
 }: Props) {
   const paneId = useId();
   const pendingGrowth = usePendingSkillGrowth();
@@ -89,6 +98,7 @@ export function PlayWrapUp({
   const ongoing = usePlayOngoingEffects();
   const [pane, setPane] = usePlayDraftState<Pane>('pane', 'loot');
   const [survivalPane, setSurvivalPane] = usePlayDraftState<SurvivalPane>('survival-pane', 'treatment');
+  const [paneBattle, setPaneBattle] = usePlayDraftState('pane-battle', '');
   const [camp, setCamp] = useState<CampReport>(EMPTY_CAMP);
   const [survival, setSurvival] = useState<SurvivalReport>(EMPTY_SURVIVAL);
   const [lootReports, setLootReports] = usePlayDraftState<Record<string, LootReport>>('loot-reports', {});
@@ -102,9 +112,37 @@ export function PlayWrapUp({
   const [sanity, setSanity] = usePlayDraftState<Record<string, number>>(`${battleId}:overseer-sanity`, {});
   const [armorReport, setArmorReport] = usePlayDraftState(`${battleId}:armor-report`, '');
   const [armorRolls, setArmorRolls] = usePlayDraftState<ArmorRolls>(`${battleId}:armor-checks`, EMPTY_ARMOR);
-  const [armorOpen, setArmorOpen] = usePlayDraftState(`${battleId}:armor-open`, false);
   const clearScope = useClearPlayDraftScope();
-  const active = !combatEnded && pane === 'recovery' ? 'loot' : pane;
+  const known = (BASE_PANES as readonly string[]).includes(pane) || extraPanes.some(({ id }) => id === pane);
+  const active = !known || (!combatEnded && pane === 'recovery') ? 'loot' : pane;
+  // A freshly finished fight opens on its after-fight steps (Toughness, armor, Overseer Sanity) before loot, as in the book.
+  // A fight that broke into a breather or camp returns to that rest instead, so its saved plan can be finished.
+  useEffect(() => {
+    if (!combatEnded || paneBattle === battleId) return;
+    setPaneBattle(battleId);
+    if (pane !== 'camp' && pane !== 'breather') setPane('recovery');
+  }, [combatEnded, paneBattle, battleId, pane, setPaneBattle, setPane]);
+  const goToPane = (next: string, focusLabel?: string) => {
+    setPane(next);
+    requestAnimationFrame(() => {
+      const pane = document.getElementById(`${paneId}-${next}`);
+      const control = 'input:not([disabled]), select:not([disabled]), button:not([disabled])';
+      const anchor = focusLabel ? pane?.querySelector<HTMLElement>(`[aria-label="${CSS.escape(focusLabel)}"], [data-play-roll-label="${CSS.escape(focusLabel)}"]`) : null;
+      const target = (anchor?.matches(control) ? anchor : anchor?.querySelector<HTMLElement>(control)) ?? pane?.querySelector<HTMLElement>(control);
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'center' });
+    });
+  };
+  useImperativeHandle(handleRef, () => ({
+    open(next) {
+      setPane(next);
+      requestAnimationFrame(() => {
+        const button = document.querySelector<HTMLElement>(`button[aria-controls="${CSS.escape(`${paneId}-${next}`)}"]`);
+        button?.focus({ preventScroll: true });
+        button?.scrollIntoView({ block: 'nearest' });
+      });
+    },
+  }), [paneId, setPane]);
   const victoryIds = combatEnded ? (victoryCreatures ?? (creature ? [creature] : [])).map(({ id }) => id).join(',') : '';
   const victoryNames = victoryLabels?.join('\n') ?? '';
   const bosses = useMemo(() => victoryIds.split(',').flatMap((id, index) => {
@@ -192,14 +230,13 @@ export function PlayWrapUp({
   useEffect(() => {
     if (!combatEnded) {
       setRecovery(null);
-      setArmorOpen(false);
       if (Object.keys(armorRolls).length) setArmorRolls(EMPTY_ARMOR);
       if (armorReport) {
         setArmorReport('');
         clearScope(`${battleId}:armor`);
       }
     }
-  }, [combatEnded, setRecovery, setArmorOpen, armorReport, setArmorReport, armorRolls, setArmorRolls, battleId, clearScope]);
+  }, [combatEnded, setRecovery, armorReport, setArmorReport, armorRolls, setArmorRolls, battleId, clearScope]);
   useEffect(() => {
     if (victoryIds) return;
     if (Object.keys(sanity).length) setSanity({});
@@ -235,20 +272,28 @@ export function PlayWrapUp({
       {combatEnded && <section className="play-fight-checklist" aria-label="전투 종료 처리 목록">
         <h3>전투 직후</h3>
         <dl>
-          <div><dt>Toughness</dt><dd>{recovery === null ? 'D4 회복' : `+${recovery}`}</dd></div>
-          <div><dt>방어구</dt><dd>{armorChanges.length ? `${armorChanges.length}개 판정` : armorReport || '사용한 장비 내구도 확인'}</dd></div>
-          {bosses.length > 0 && <div><dt>Overseer 처치</dt><dd>{bosses.every(({ id }) => sanity[id])
-            ? `Sanity +${bosses.reduce((total, { id }) => total + sanity[id], 0)}` : 'Sanity D4 회복'}</dd></div>}
-          {!!victoryXp && <div><dt>승리 보상</dt><dd>XP +{victoryXp} · 전리품</dd></div>}
+          <div><dt>Toughness</dt><dd><button type="button" className="linkbtn" onClick={() => goToPane('recovery', '전투 후 Toughness 회복')}>
+            {recovery === null ? 'D4 회복' : `+${recovery}`}</button></dd></div>
+          <div><dt>방어구</dt><dd><button type="button" className="linkbtn" onClick={() => goToPane('recovery', '사용한 방어구 내구도')}>
+            {armorChanges.length ? `${armorChanges.length}개 판정` : armorReport || '사용한 장비 내구도 확인'}</button></dd></div>
+          {bosses.length > 0 && <div><dt>Overseer 처치</dt><dd><button type="button" className="linkbtn" onClick={() => goToPane('recovery')}>
+            {bosses.every(({ id }) => sanity[id]) ? `Sanity +${bosses.reduce((total, { id }) => total + sanity[id], 0)}` : 'Sanity D4 회복'}</button></dd></div>}
+          {!!victoryXp && <div><dt>승리 보상</dt><dd><button type="button" className="linkbtn" onClick={() => goToPane('loot')}>XP +{victoryXp} · 전리품</button></dd></div>}
         </dl>
       </section>}
       <div className="seg play-wrap-nav" role="group" aria-label="정리할 항목">
+        {combatEnded && <button type="button" aria-controls={`${paneId}-recovery`} aria-pressed={active === 'recovery'} onClick={() => setPane('recovery')}>전투 종료</button>}
         <button type="button" aria-controls={`${paneId}-loot`} aria-pressed={active === 'loot'} onClick={() => setPane('loot')}>전리품</button>
         <button type="button" aria-controls={`${paneId}-breather`} aria-pressed={active === 'breather'} onClick={() => setPane('breather')}>숨 고르기</button>
         <button type="button" aria-controls={`${paneId}-camp`} aria-pressed={active === 'camp'} onClick={() => setPane('camp')}>야영</button>
         <button type="button" aria-controls={`${paneId}-survival`} aria-pressed={active === 'survival'} onClick={() => setPane('survival')}>치료·성장</button>
-        {combatEnded && <button type="button" aria-controls={`${paneId}-recovery`} aria-pressed={active === 'recovery'} onClick={() => setPane('recovery')}>전투 종료</button>}
+        {extraPanes.map(({ id, label }) => (
+          <button key={id} type="button" aria-controls={`${paneId}-${id}`} aria-pressed={active === id} onClick={() => setPane(id)}>{label}</button>
+        ))}
       </div>
+      {extraPanes.map(({ id, content }) => (
+        <div key={id} className="play-wrap-slot" id={`${paneId}-${id}`} hidden={active !== id}>{content}</div>
+      ))}
       <div className="play-wrap-slot" id={`${paneId}-loot`} hidden={active !== 'loot'}>
         <PlaySpoils groups={groups} onReport={updateLoot} />
       </div>
@@ -332,12 +377,12 @@ export function PlayWrapUp({
           {bosses.map(({ id, name }) => <JournalRoll key={`${battleId}:${id}`} die="D4" label={`${name} 처치 후 Sanity 회복`}
             value={sanity[id] ?? null} onValue={(value) => setSanity((previous) => ({ ...previous, [id]: value }))}
             resultText={sanity[id] ? `Sanity +${sanity[id]}` : undefined} />)}
-          <details className="fold play-wrap-armor" open={armorOpen} onToggle={(event) => setArmorOpen(event.currentTarget.open)}>
-            <summary>사용한 방어구 내구도</summary>
+          <section className="play-wrap-armor" aria-label="사용한 방어구 내구도">
+            <h4>사용한 방어구 내구도</h4>
             <PlayDraftScope key={battleId} name={`${battleId}:armor`}>
               <PlayFightArmor items={inventory} rolls={armorRolls} onRoll={setArmorRolls} onReport={setArmorReport} />
             </PlayDraftScope>
-          </details>
+          </section>
           <div className="play-wrap-links">
             <XRef id="combat-end">전투 종료 규칙</XRef>
             <button className="btn ghost" type="button" onClick={() => openSurvival('treatment')}>남은 지속 피해 처리</button>

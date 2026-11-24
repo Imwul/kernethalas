@@ -18,7 +18,7 @@ test('a bandage resolves lingering damage and future room damage remains a previ
   await treatment.getByRole('checkbox', { name: '중독' }).check();
   await expect(treatment.getByRole('status', { name: '다음 방 지속 피해' })).toContainText('Health −3');
   await treatment.getByLabel('붕대 처치 목적').selectOption('bleeding');
-  await treatment.getByLabel('보정 Medicine').fill('45');
+  await treatment.getByLabel('Medicine 수치').fill('45');
   await physicalRoll(treatment, 'Medicine D100', '24');
   await treatment.getByRole('button', { name: '붕대 처치 기록' }).click();
   await expect(bleeding).not.toBeChecked();
@@ -51,7 +51,7 @@ test('manual Rot and camp skill checks record their adjustments with aligned fie
   await page.getByRole('button', { name: '야영', exact: true }).click();
   await page.getByRole('button', { name: '부패병 판정', exact: true }).click();
   const rot = page.getByRole('region', { name: '부패병 판정' });
-  await rot.getByLabel('보정 Endurance').fill('30');
+  await rot.getByLabel('Endurance 수치').fill('30');
   await physicalRoll(rot, 'Endurance D100', '48');
   await expect(rot.getByRole('status', { name: '부패병 결과' })).toContainText('1단계로 진행');
   await rot.getByRole('button', { name: '부패병 판정 기록' }).click();
@@ -90,7 +90,7 @@ test('manual Rot and camp skill checks record their adjustments with aligned fie
 
   await page.getByRole('button', { name: '저널 기록 보기' }).click();
   const sheet = page.getByRole('group', { name: '종이 시트에 반영' });
-  await expect(sheet).toContainText('부패병 1단계 · Necrotic 면역, Holy 취약.');
+  await expect(sheet).toContainText('부패병 1단계 · Necrotic 피해에 면역이 되지만 Holy 피해에 취약해진다.');
   await expect(sheet).toContainText('Health +3 (부패병 야영 효과)');
   await expect(sheet).toContainText('Medicine 78 → 80 (+2) (성장 표시 지우기)');
 });
@@ -103,7 +103,7 @@ test('PC skill doubles stay marked until camp, and undo restores the mark', asyn
   const treatment = page.getByRole('region', { name: '지속 피해와 붕대 처치' });
   const undo = page.getByRole('button', { name: '직전 굴림 되돌리기' });
   const skillRoll = treatment.getByRole('group', { name: 'Medicine D100' });
-  await treatment.getByLabel('보정 Medicine').fill('45');
+  await treatment.getByLabel('Medicine 수치').fill('45');
   await physicalRoll(treatment, 'Medicine D100', '22');
   await expect(skillRoll.getByRole('status')).toContainText('대성공 · 야영 성장 표시');
   await undo.click();
@@ -118,7 +118,7 @@ test('PC skill doubles stay marked until camp, and undo restores the mark', asyn
   const survival = page.getByRole('region', { name: '치료·성장 도구' });
   await survival.getByRole('button', { name: '부패병', exact: true }).click();
   const rot = page.getByRole('region', { name: '부패병 판정' });
-  await rot.getByLabel('보정 Endurance').fill('30');
+  await rot.getByLabel('Endurance 수치').fill('30');
   await physicalRoll(rot, 'Endurance D100', '00');
   await expect(rot.getByRole('group', { name: 'Endurance D100' }).getByRole('status')).toContainText('대실패');
   await page.getByRole('button', { name: '야영', exact: true }).click();
@@ -148,7 +148,7 @@ test('PC skill doubles stay marked until camp, and undo restores the mark', asyn
   await expect(pending).toHaveCount(0);
 
   await survival.getByRole('button', { name: '붕대·지속 피해', exact: true }).click();
-  await treatment.getByLabel('보정 Medicine').fill('48');
+  await treatment.getByLabel('Medicine 수치').fill('48');
   await physicalRoll(treatment, 'Medicine D100', '33');
   await survival.getByRole('button', { name: '기술 성장', exact: true }).click();
   await pending.getByRole('button', { name: 'Medicine', exact: true }).click();

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openDrawer } from './helpers/play-desk';
 
 async function go(page: Page, stage: string) {
   await page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: stage, exact: true }).click();
@@ -29,11 +30,11 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   const verdict = attack.getByRole('status', { name: '공격 판정 결과' });
   await defenseMode.selectOption('unopposed');
   await expect(attack.getByRole('link', { name: '기절' })).toBeVisible();
-  await attack.getByRole('textbox', { name: '공격자 보정 Skill' }).fill('60');
+  await attack.getByRole('textbox', { name: '공격자 수치' }).fill('60');
   await attack.getByText('공격자 기본값·보정', { exact: true }).click();
   await attack.getByRole('combobox', { name: '저장할 기술' }).selectOption('Bladed Weapons');
   await attack.getByRole('button', { name: '현재 수치를 기본값으로 저장' }).click();
-  await attack.getByRole('textbox', { name: '공격자 보정 Skill' }).fill('41');
+  await attack.getByRole('textbox', { name: '공격자 수치' }).fill('41');
   await attack.getByRole('button', { name: 'Bladed Weapons 60 불러오기' }).click();
   await attack.getByRole('button', { name: '보정 추가' }).click();
   await attack.getByRole('textbox', { name: '보정값 1' }).fill('-5');
@@ -46,7 +47,7 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   await attack.getByRole('button', { name: '공격 교환 확정' }).click();
   await attack.getByRole('button', { name: '다음 공격', exact: true }).click();
   await expect(defenseMode).toHaveValue('opposed');
-  await expect(attack.getByRole('textbox', { name: '공격자 보정 Skill' })).toHaveValue('60');
+  await expect(attack.getByRole('textbox', { name: '공격자 수치' })).toHaveValue('60');
   await expect(attack.getByRole('textbox', { name: '보정값 1' })).toHaveCount(0);
 
   await defenseMode.selectOption('automatic');
@@ -54,7 +55,7 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   await expect(attack.getByRole('textbox', { name: /D100/ })).toHaveCount(0);
   await expect(verdict).toContainText('굴림 없이 명중');
   await attack.getByRole('button', { name: '적 명중 부위 보기' }).click();
-  await go(page, '저널');
+  await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
   await expect(history.getByRole('button', { name: /D100 공격 33 · 능동 방어 불가/ })).toBeVisible();
   await expect(history).toContainText('기본 60 · 상태·어둠 −5 = 55');
@@ -69,7 +70,6 @@ test('area saves stay separate and apply full or rounded half damage to named ta
   const combat = await selectCreature(page, 'Astral Beast');
   const card = combat.getByRole('region', { name: '전투 카드' });
   await roll(card.getByRole('region', { name: '표 굴리기', exact: true }), '직접 굴린 값', '5');
-  await card.getByText('Spellward 판정과 행동 효과', { exact: true }).click();
   await card.getByRole('button', { name: '여러 대상 판정' }).click();
   await card.getByRole('textbox', { name: '대상 이름 (한 줄에 하나씩)' }).fill('PC\n동료');
   await card.getByRole('button', { name: '대상 목록 적용' }).click();
@@ -86,7 +86,6 @@ test('area saves stay separate and apply full or rounded half damage to named ta
   await expect(pc).toContainText('Arcane 피해 4 (절반 · 올림)');
   await expect(ally).toContainText('Arcane 피해 7');
   await page.reload();
-  await card.getByText('Spellward 판정과 행동 효과', { exact: true }).click();
   await expect(pc).toContainText('Arcane 피해 4 (절반 · 올림)');
   await expect(ally).toContainText('Arcane 피해 7');
 
@@ -94,7 +93,7 @@ test('area saves stay separate and apply full or rounded half damage to named ta
   await roll(pc, '직접 굴린 값', '5');
   await roll(ally, '직접 굴린 값', '6');
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
-  await go(page, '저널');
+  await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
   await history.getByRole('button', { name: /Spellward 판정 · PC D100 19 수정 미리보기/ }).click();
   const preview = history.getByRole('group', { name: '굴림 수정 미리보기' });
@@ -138,7 +137,7 @@ test('a bestiary handoff confirms a count and appends to the original encounter 
 test('a creature reference opened during play returns to the same named campaign', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
-  await page.locator('summary[aria-label="플레이 캠페인 선택"]').click();
+  await page.getByRole('button', { name: '플레이 캠페인 선택', exact: true }).click();
   await page.getByRole('button', { name: '새 캠페인', exact: true }).click();
   await page.getByRole('textbox', { name: '캠페인 이름' }).fill('묘지 캠페인');
   await page.getByRole('button', { name: '만들고 열기', exact: true }).click();

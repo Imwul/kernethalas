@@ -6,16 +6,16 @@ import { creatures, describeCreatureTrait } from '../src/content/entries/creatur
 describe('creature trait summaries', () => {
   it('uses the creature’s printed Penetrating amount', () => {
     expect(describeCreatureTrait('Penetrating (2)')).toEqual({
-      text: '공격 시 Armor 2 무시.',
+      text: '공격할 때 Armor를 2만큼 무시한다.',
       reference: 'creature-traits',
     });
-    expect(describeCreatureTrait('Penetrating (1)')?.text).toContain('Armor 1');
+    expect(describeCreatureTrait('Penetrating (1)')?.text).toContain('Armor를 1만큼');
   });
 
   it('lists distinct encounter-start Sanity losses and their reference', () => {
     const frightening = describeCreatureTrait('Frightening');
     const horrifying = describeCreatureTrait('Horrifying');
-    expect(frightening?.text).toContain('전투 시작 시 조우당 Resolve 1회');
+    expect(frightening?.text).toContain('전투를 시작할 때 조우당 한 번 Resolve를 판정');
     expect(frightening?.text).toContain('Sanity 2');
     expect(horrifying?.text).toContain('Sanity 4');
     expect(horrifying?.reference).toBe('frightening-horrifying');

@@ -43,9 +43,7 @@ export function PlayTargetAllocation({ targets }: { targets: { id: string; label
     setError('');
   };
   return (
-    <details className="fold play-target-allocation">
-      <summary>PC·동료에게 적 배분</summary>
-      <section className="play-aux-body" aria-label="전투 대상 배분">
+      <section className="play-target-allocation play-aux-body" aria-label="전투 대상 배분">
         <div className="play-aux-grid">
           <label className="field"><span>PC 수</span>
             <input inputMode="numeric" value={pcs} aria-invalid={pcCount === null || undefined}
@@ -99,6 +97,5 @@ export function PlayTargetAllocation({ targets }: { targets: { id: string; label
         )}
         <XRef id="multiple-targets" />
       </section>
-    </details>
   );
 }

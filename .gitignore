@@ -6,6 +6,7 @@ dist
 src/local/*.json
 !src/local/.gitkeep
 scripts/.overlay-manifest.json
+scripts/.overlay-hints.json
 .deploy/
 .vercel/
 .DS_Store

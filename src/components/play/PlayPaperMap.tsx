@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import type { EncounterPlace } from '../../content/tables/exploration';
 import { PAPER_MAP_TAGS, paperMapKey, type PaperMapLocation, type PaperMapTag } from '../../lib/paper-map';
 import { ROOM_EXIT_MARKS } from '../RoomShapeDiagram';
+import { PlayStrip, PlayStripPane } from './PlayPanels';
 
 interface Props {
   area: EncounterPlace | null;
@@ -20,7 +21,10 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, on
   const [tags, setTags] = useState<PaperMapTag[]>(active?.tags ?? []);
   const [selected, setSelected] = useState(paperMapKey(active?.paperId ?? ''));
   const [feedback, setFeedback] = useState('');
+  const [pane, setPane] = useState<'memo' | 'return' | null>(null);
+  const stripId = useId();
   const entries = locations.filter((record) => record.domainId === domainId);
+  const returnCount = entries.filter(({ tags: marked }) => marked.length > 0).length;
   const saved = entries.find((record) => paperMapKey(record.paperId) === selected);
 
   const revisit = (record: PaperMapLocation) => {
@@ -34,9 +38,12 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, on
   };
 
   return (
-    <>
-      <details className="fold play-paper-map">
-        <summary>종이 지도 메모</summary>
+    <div className="play-paper-map">
+      <PlayStrip label="종이 지도" prefix={stripId} value={pane} onChange={setPane} items={[
+        { id: 'memo', label: active ? `종이 지도 메모 · ${active.paperId}` : '종이 지도 메모' },
+        ...(entries.length > 0 ? [{ id: 'return' as const, label: '돌아갈 곳', badge: returnCount }] : []),
+      ]} />
+      <PlayStripPane prefix={stripId} id="memo" open={pane === 'memo'}>
         <section className="play-explore-action-body" aria-label="종이 지도 장소 색인">
           {entries.length > 0 && <div className="play-paper-map-lookup">
             <label className="field">
@@ -95,9 +102,11 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, on
           ) : <p className="play-explore-note">현재 방이나 통로를 정하면 지도 번호와 메모를 저장할 수 있습니다.</p>}
           {feedback && <p className="play-explore-note" role="status">{feedback}</p>}
         </section>
-      </details>
-      {entries.length > 0 && <PlayReturnPlaces entries={entries} canRevisit={canRevisit} onRevisit={revisit} />}
-    </>
+      </PlayStripPane>
+      {entries.length > 0 && <PlayStripPane prefix={stripId} id="return" open={pane === 'return'}>
+        <PlayReturnPlaces entries={entries} canRevisit={canRevisit} onRevisit={revisit} />
+      </PlayStripPane>}
+    </div>
   );
 }
 
@@ -122,9 +131,7 @@ function PlayReturnPlaces({ entries, canRevisit, onRevisit }: {
   const shown = candidates.filter(({ tags }) => filter === 'all' || tags.includes(filter));
 
   return (
-    <details className="fold play-return-places">
-      <summary><span>돌아갈 곳</span><span>{candidates.length}곳</span></summary>
-      <section className="play-explore-action-body" aria-label="돌아갈 곳 목록">
+      <section className="play-return-places play-explore-action-body" aria-label="돌아갈 곳 목록">
         {candidates.length > 0 && (
           <div className="seg play-return-filters" role="group" aria-label="돌아갈 곳 필터">
             {(['all', ...PAPER_MAP_TAGS] as const).map((tag) => (
@@ -169,6 +176,5 @@ function PlayReturnPlaces({ entries, canRevisit, onRevisit }: {
         )}
         {announced && <p className="play-explore-note" role="status">{announced}</p>}
       </section>
-    </details>
   );
 }

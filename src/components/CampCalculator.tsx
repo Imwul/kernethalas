@@ -5,6 +5,7 @@ import { readOracleValue } from '../lib/oracle';
 import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { GEAR_LOCATIONS, gearCount, gearKey, type GearItem, type PaperChange } from '../lib/play-inventory';
 import { XRef } from './bits';
+import { TogglePanel } from './TogglePanel';
 import { JournalRoll } from './LootJournal';
 import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/camp-calculator.css';
@@ -163,6 +164,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
   const spend = plan ? materials(plan.spent) : '';
   const produce = plan ? materials(plan.produced) : '';
 
+  const activityCount = CAMP_ACTIVITIES.filter(({ id: key }) => (readInteger(quantities[key] ?? '') ?? 0) > 0).length + (swapAmulets ? 1 : 0);
   const quantityField = (key: CampActivityId, label: string) => (
     <CampNumberField
       key={key} label={label} value={quantities[key] ?? ''}
@@ -187,11 +189,11 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
       <div className="camp-options">
         <label><input type="checkbox" checked={sleep} onChange={(event) => setField('sleep', event.target.checked)} /> 취침 (Sleep)</label>
         <label><input type="checkbox" checked={bedroll} onChange={(event) => setField('bedroll', event.target.checked)} /> 침낭 (Bedroll)</label>
-        <label><input type="checkbox" checked={effectiveDarkness} disabled={domainDarkness} onChange={(event) => setField('darkness', event.target.checked)} /> Growing Darkness 17–18</label>
+        <label><input type="checkbox" checked={effectiveDarkness} disabled={domainDarkness} onChange={(event) => setField('darkness', event.target.checked)} /> 짙어지는 어둠 17–18</label>
       </div>
       {sleep && <p>취침 중에는 방어벽만 설치할 수 있습니다.</p>}
-      <details className="fold camp-activities" open={activitiesOpen} onToggle={(event) => setActivitiesOpen(event.currentTarget.open)}>
-        <summary>요리 · 제작 · 그 밖의 야영 활동</summary>
+      <TogglePanel className="camp-activities" label="요리 · 제작 · 그 밖의 야영 활동" open={activitiesOpen} onOpenChange={setActivitiesOpen}
+        badge={activityCount || undefined}>
         {attunementBlocked && <p>짙어지는 어둠 19–20 · 야영 중 아이템 조율 불가</p>}
         <fieldset className="camp-grid" disabled={sleep}>
           <legend className="sr-only">추가 야영 활동</legend>
@@ -200,7 +202,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
             <input type="checkbox" checked={swapAmulets} onChange={(event) => setField('swapAmulets', event.target.checked)} /> Mastery Amulet 교체
           </label>
         </fieldset>
-      </details>
+      </TogglePanel>
       {inventory && plan && roll === null && Object.keys(plan.spent).length > 0 && <CampStock spent={plan.spent} inventory={inventory} />}
       <div className="camp-grid">
         <CampNumberField label="기타 판정 보정" value={other} onChange={(value) => setField('other', value)} canBeNegative
@@ -331,8 +333,7 @@ function CampBenefits({
         <div><dt>Sanity</dt><dd>{sanityRecovery}</dd></div>
         <div><dt>Exhaustion</dt><dd>{exhaustion}</dd></div>
       </dl>
-      <details className="fold camp-activities" open={open} onToggle={(event) => onOpen(event.currentTarget.open)}>
-        <summary>회복량 직접 계산</summary>
+      <TogglePanel className="camp-activities" label="회복량 직접 계산" open={open} onOpenChange={onOpen}>
         <div className="camp-grid">
           <CampNumberField label="잃은 Toughness" value={lostToughness} onChange={setLostToughness} invalid={lost === null} />
           {!showRollControls && <CampNumberField label="Sanity D4 결과" value={sanityDie} onChange={setSanityDie} placeholder="1–4"
@@ -340,7 +341,7 @@ function CampBenefits({
         </div>
         {showRollControls && <JournalRoll die="D4" label="야영 Sanity 회복" value={sanity}
           onValue={(value) => setSanityDie(String(value))} resultText={`Sanity ${sanityRecovery}`} />}
-      </details>
+      </TogglePanel>
     </section>
   );
 }

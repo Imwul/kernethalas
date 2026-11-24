@@ -2,6 +2,7 @@ import type { creatureDefenses } from '../content/creature-defenses';
 import { calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, listedDamageReactions, splitPcDamage, type DamageReactions, type DamageType } from '../lib/damage';
 import { usePlayDraftState } from '../lib/play-draft';
 import { XRef } from './bits';
+import { TogglePanel } from './TogglePanel';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import '../styles/damage-calculator.css';
 
@@ -129,8 +130,7 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
           </div>
           {type && <DamageTypeGuide type={type} reactions={defenses || Object.keys(reactionOverrides).length ? reactions : undefined}
             immuneConditions={defenses?.immuneConditions} />}
-          <details className="fold damage-extra">
-            <summary>추가 피해 보정</summary>
+          <TogglePanel className="damage-extra" label="추가 피해 보정">
             <div className="damage-fields">
               <label className="field"><span>추가로 무시할 Armor</span>
                 <input inputMode="numeric" value={ignoreText} onChange={(event) => setIgnoreText(event.target.value)}
@@ -150,7 +150,7 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
                 </fieldset>
               )}
             </div>
-          </details>
+          </TogglePanel>
           {invalid ? <p className="field-err" role="alert">주사위 값은 양의 정수로 입력하세요. Armor·무시·감소에는 0 이상의 정수를 사용하세요.</p>
             : result && type && (
               <DamageBreakdown result={result} armor={armor ?? 0} critical={critical} weak={weak}

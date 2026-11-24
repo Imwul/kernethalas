@@ -1,10 +1,18 @@
-.play-skill-adjustments {
+/* The toggle sits among its form's buttons; the panel takes a full row below them. */
+.play-skill-adjustments { display: contents; }
+.play-skill-toggle { justify-self: start; }
+.play-skill-panel:not([hidden]) {
+  flex: 1 0 100%;
   grid-column: 1 / -1;
+  display: grid;
+  gap: var(--s2);
   min-width: 0;
-  margin: 0;
+  padding: var(--s2);
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
   font: 14px/1.45 var(--f-ui);
 }
-.play-skill-adjustments > summary { display: flex; align-items: center; min-height: 44px; }
+.play-skill-panel > .play-skill-terms { margin: 0; }
 .play-skill-preset, .play-skill-terms { display: grid; gap: var(--s2); min-width: 0; }
 .play-skill-preset > .field { max-width: 24rem; }
 .play-skill-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1); }
@@ -13,3 +21,5 @@
 .play-skill-terms > li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: var(--s1); }
 .play-skill-total, .play-roll-log .play-skill-total { color: var(--copper-ink); font: 14px/1.45 var(--f-ui); overflow-wrap: anywhere; }
 .play-roll-log .play-skill-total { display: block; }
+.checkcalc-side > .play-skill-adjustments > :is(.play-skill-toggle, .play-skill-panel),
+.survival-card .play-skill-adjustments > .play-skill-panel { margin-block-start: var(--s2); }

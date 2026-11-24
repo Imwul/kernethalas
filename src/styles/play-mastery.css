@@ -21,8 +21,6 @@
 .play-mastery-card :is(h3, h5, p) { margin: 0; }
 .play-mastery-card h3 { font: 400 1.2rem/1.35 var(--f-ko-display); }
 .play-mastery-card h5 { font: 600 15px/1.35 var(--f-ui); }
-.play-combat > .play-mastery-fold { margin-block: 0; }
-.play-mastery-fold > summary { min-block-size: 44px; }
 .play-mastery-card .field { min-inline-size: 0; }
 .play-mastery-card :is(input:not([type='checkbox'], [type='radio']), select, textarea) { inline-size: 100%; min-block-size: 44px; }
 .play-mastery-card .btn { min-block-size: 44px; }
@@ -66,7 +64,7 @@
   border: 1px solid var(--rule);
 }
 .mastery-target-picks legend { padding-inline: var(--s1); }
-.mastery-feature > summary > span { overflow-wrap: anywhere; }
+.mastery-feature .toggle-btn { max-inline-size: 100%; overflow-wrap: anywhere; text-align: start; }
 
 .mastery-result {
   grid-template-columns: minmax(0, 1fr) max-content;
@@ -83,3 +81,22 @@
   .mastery-result .btn { justify-self: start; }
   .play-mastery-card { padding: var(--s2); }
 }
+.mastery-original { padding-inline-start: 8px; border-inline-start: 2px solid var(--rule); color: var(--slate-2); font: 14.5px/1.5 var(--f-display-i); overflow-wrap: anywhere; }
+
+/* Learned abilities from the Character tab: one press picks Mastery, Tier and ability. */
+.mastery-learned { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); min-width: 0; }
+.mastery-learned-name { flex: 1 0 100%; color: var(--ink-2); font: 600 13px/1.4 var(--f-ui); }
+.mastery-pick {
+  min-height: 40px;
+  padding: 5px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: 600 14px/1.3 var(--f-ui);
+  cursor: pointer;
+}
+.mastery-pick:hover { background: var(--bone-2); }
+.mastery-pick[aria-pressed='true'] { border-color: var(--copper-ink); background: var(--copper-wash); }
+.mastery-passive { color: var(--ink-2); font-weight: 400; }
+@media (pointer: coarse) { .mastery-pick { min-height: 44px; } }

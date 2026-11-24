@@ -32,7 +32,8 @@ test('physical rolls focus the next field, undo linked effects, and carry tensio
   await journal.getByRole('textbox', { name: '장소 이름 (선택)' }).fill('입구 묘실');
   const light = journal.getByRole('checkbox', { name: '광원 −1' });
   await light.check();
-  await page.getByRole('navigation', { name: '주요 영역' }).getByRole('link', { name: '생물 도감' }).click();
+  // Phones hide the site tab bar in play mode, so leave through the address bar.
+  await page.goto('/bestiary');
   await expect(page).toHaveURL('/bestiary');
   await page.getByRole('link', { name: '플레이 모드', exact: true }).click();
   await page.reload();

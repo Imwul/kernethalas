@@ -216,9 +216,10 @@ export function PlayDraftProvider({ children }: { children: ReactNode }) {
   </Draft.Provider>;
 }
 
-export function PlayDraftScope({ name, children }: { name: string; children: ReactNode }) {
+/** `root` starts the scope at the top of the draft, for tools shown inside another stage's panes. */
+export function PlayDraftScope({ name, children, root = false }: { name: string; children: ReactNode; root?: boolean }) {
   const parent = useContext(Scope);
-  return <Scope.Provider value={`${parent}${encodeURIComponent(name)}/`}>{children}</Scope.Provider>;
+  return <Scope.Provider value={`${root ? '' : parent}${encodeURIComponent(name)}/`}>{children}</Scope.Provider>;
 }
 
 export function PlayReferenceTool({ children }: { children: ReactNode }) {

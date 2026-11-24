@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { openPane } from './helpers/play-desk';
 
 test('a physical tie roll assigns the extra opponent, and a Dodge roll records and restores a retreat', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -17,7 +18,7 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   await creatureRoll.press('Enter');
   for (let index = 0; index < 4; index += 1) await combat.getByRole('button', { name: '같은 생물 추가' }).click();
 
-  await combat.getByText('PC·동료에게 적 배분', { exact: true }).click();
+  await openPane(combat, '적 배분');
   const allocation = combat.getByRole('region', { name: '전투 대상 배분' });
   await allocation.getByRole('textbox', { name: '동료·Minion 수' }).fill('2');
   const tie = allocation.getByRole('textbox', { name: '후보 선택 D4' });
@@ -31,7 +32,7 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   const second = allocation.getByRole('combobox', { name: 'Necropede 2 상대' });
   await expect(second.getByRole('option', { name: '동료·Minion 1' })).toBeDisabled();
 
-  await combat.getByText('도주 판정', { exact: true }).click();
+  await openPane(combat, '도주');
   const flee = combat.getByRole('region', { name: '전투 도주' });
   const dodge = flee.getByRole('textbox', { name: '직접 굴린 D100' });
   await flee.getByRole('textbox', { name: 'Dodge 수치' }).fill('50');
@@ -45,14 +46,13 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   await expect(journal).not.toContainText('승리');
   await journal.getByRole('button', { name: '다음 장소', exact: true }).click();
   await page.reload();
-  await page.getByText('후퇴했던 장소 다시 열기', { exact: true }).click();
   await page.getByRole('button', { name: '동쪽 묘실 재진입' }).click();
   await expect(combat.getByRole('group', { name: '전투 대상' }).getByRole('button')).toHaveCount(5);
   await expect(combat.getByText('재진입 · 적 Health 전부 회복').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   await combat.getByRole('button', { name: '승리 후 전투 마치기', exact: true }).click();
   await go('탐험');
-  await expect(page.getByText('후퇴했던 장소 다시 열기', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '후퇴했던 장소', exact: true })).toHaveCount(0);
 });
 
 test('custom encounter sets migrate the old table, validate imports and round-trip JSON', async ({ page }) => {

@@ -371,3 +371,14 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
     padding-block: 10px;
   }
 }
+
+/* Original wording from the local overlay sits under the Korean text it explains. */
+.reference-original p, .outcome .o-original {
+  margin: 0;
+  padding-inline-start: 8px;
+  border-inline-start: 2px solid var(--rule);
+  color: var(--slate-2);
+  font: 15px/1.55 var(--f-display-i);
+  overflow-wrap: anywhere;
+}
+.outcome .o-original { display: block; margin-top: 6px; font-size: 14.5px; }

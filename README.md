@@ -55,11 +55,14 @@ links the two topics; anything else must be `ed(...)` (editorial), which the UI 
 ## Copyright
 
 The Gravebound Edition (p.4) allows free use of its mechanics but reserves its wording and forbids copying or translating the text.
-The Korean rule text and creature action effects use original summaries of mechanics. Flavor tables for room and corridor
+The Korean rule text, table results, creature action effects and Mastery abilities explain the mechanics in full
+sentences in our own words; they are not translations of the book's sentences. Flavor tables for room and corridor
 descriptions and magic item peculiarities use numbers and page pointers.
 
 `npm run overlay` reads your own PDF (default `./KerNethalas-Corebook.pdf`, or `npm run overlay --pdf=/path/to/book.pdf`)
-and writes `src/local/source-overlay.json`, which shows the original English next to each summary **in the dev server only**.
+and writes `src/local/source-overlay.json` (table rows, creature actions, rule entries and Mastery abilities), which shows
+the original English under each Korean text **in the dev server only**. Rule entries whose title is not a heading in the
+book are pinned to their section or paragraph in `ENTRY_HINTS` (scripts/extract_overlay.py).
 That file is git-ignored, and production builds replace it with an empty stub unless `LOCAL_SOURCE=1` is set. Never deploy with that flag.
 
 ## Status

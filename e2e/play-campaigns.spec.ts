@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { closeDrawer, openDrawer } from './helpers/play-desk';
 
 const legacyRoom = {
   active: 'journal', placeName: '오래된 묘실', roomLedgerId: 'old-place', roomNumber: 4,
@@ -23,8 +24,9 @@ test('legacy room and gear stay in their own live campaign while a new tab resum
   await page.goto('/play');
   await expect(stage(page, '저널')).toHaveAttribute('aria-current', 'step');
   await expect(placeName(page)).toHaveValue('오래된 묘실');
-  await page.locator('.play-gear-fold > summary').click();
+  await openDrawer(page, '장비');
   await expect(gear(page)).toContainText('Ration');
+  await closeDrawer(page);
 
   await page.getByLabel('플레이 캠페인 선택', { exact: true }).click();
   await picker(page).getByRole('button', { name: '새 캠페인', exact: true }).click();
@@ -33,15 +35,16 @@ test('legacy room and gear stay in their own live campaign while a new tab resum
   await expect(page).toHaveURL(/\/play\?campaign=[0-9a-f-]+$/);
   const expedition = page.url();
   await expect(stage(page, '탐험')).toHaveAttribute('aria-current', 'step');
-  await page.locator('.play-gear-fold > summary').click();
+  await openDrawer(page, '장비');
   await expect(gear(page)).not.toContainText('Ration');
   await gear(page).getByRole('button', { name: '장비 추가', exact: true }).click();
   await gear(page).getByRole('textbox', { name: '품목 이름', exact: true }).fill('Torch');
   await gear(page).getByRole('button', { name: '장부에 저장', exact: true }).click();
+  await closeDrawer(page);
   await stage(page, '저널').click();
   await placeName(page).fill('붉은 관문');
   const saves = page.locator('.play-checkpoints');
-  await saves.getByText('플레이 저장·이어하기', { exact: true }).click();
+  await openDrawer(page, '저장');
   await saves.getByRole('button', { name: '저장 지점 만들기', exact: true }).click();
   await expect(saves.getByRole('button', { name: '붉은 관문 이어서 하기', exact: true })).toBeVisible();
   await page.close();
@@ -53,17 +56,17 @@ test('legacy room and gear stay in their own live campaign while a new tab resum
   await resume.getByRole('link', { name: '심연 원정대 이어하기', exact: true }).click();
   await expect(resume).toHaveURL(expedition);
   await expect(placeName(resume)).toHaveValue('붉은 관문');
-  await resume.locator('.play-gear-fold > summary').click();
+  await openDrawer(resume, '장비');
   await expect(gear(resume)).toContainText('Torch');
   await expect(gear(resume)).not.toContainText('Ration');
 
   const first = await context.newPage();
   await first.goto('/play?campaign=default');
   await expect(placeName(first)).toHaveValue('오래된 묘실');
-  await first.locator('.play-gear-fold > summary').click();
+  await openDrawer(first, '장비');
   await expect(gear(first)).toContainText('Ration');
   await expect(gear(first)).not.toContainText('Torch');
-  await first.locator('.play-checkpoints').getByText('플레이 저장·이어하기', { exact: true }).click();
+  await openDrawer(first, '저장');
   await expect(first.getByRole('button', { name: '붉은 관문 이어서 하기', exact: true })).toHaveCount(0);
   await placeName(first).fill('기본 원정대의 다음 방');
   await expect(placeName(resume)).toHaveValue('붉은 관문');

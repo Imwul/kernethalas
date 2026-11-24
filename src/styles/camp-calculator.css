@@ -53,7 +53,6 @@
 
 .camp-calc input[type='checkbox'] { accent-color: var(--copper-ink); }
 
-.camp-activities { border-top: 1px solid var(--rule-soft); }
 
 .camp-activities fieldset {
   border: 0;

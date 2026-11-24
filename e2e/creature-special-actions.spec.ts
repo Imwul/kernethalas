@@ -18,7 +18,7 @@ test('a successful Spellward roll halves Astral Tempest and a new action clears 
   await playRoll(card, '5');
   await expect(card.getByRole('status')).toContainText('Astral Tempest');
   const followUp = card.locator('.creature-action-resolution');
-  await followUp.locator('summary').click();
+  // The follow-up opens by itself once an action with a check is rolled.
   await expect(followUp).toContainText('범위 안 대상마다');
   const check = followUp.getByRole('group', { name: 'Spellward 판정', exact: true });
   await tryCheck(check, '50', '42');
@@ -30,7 +30,6 @@ test('a successful Spellward roll halves Astral Tempest and a new action clears 
   expect(await followUp.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 
   await playRoll(card, '5');
-  await followUp.locator('summary').click();
   await expect(check.getByRole('status')).toHaveCount(0);
   await expect(damage).toHaveCount(0);
 });
@@ -42,7 +41,6 @@ test('an action-specific Endurance check opens its damage on failure', async ({ 
   await playRoll(card, '6');
   await expect(card.getByRole('status')).toContainText('Abyssal Wither');
   const followUp = card.locator('.creature-action-resolution');
-  await followUp.locator('summary').click();
   await expect(followUp).toContainText('룰북에서 불명확');
   const check = followUp.getByRole('group', { name: 'Endurance 판정', exact: true });
   await tryCheck(check, '50', '79');

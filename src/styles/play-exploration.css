@@ -69,15 +69,7 @@
   scroll-margin-block-start: calc(var(--play-stage-top) + var(--s2));
 }
 .play-action-darkness-heading { scroll-margin-top: var(--play-stage-top, 6rem); }
-.play-scavenge-check {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-  align-items: end;
-  gap: var(--s2);
-}
-.play-scavenge-check > .field-err { grid-column: 1 / -1; margin: 0; }
 
-.play-tile-controls > summary,
 .play-paper-map > summary,
 .play-return-places > summary {
   display: flex;

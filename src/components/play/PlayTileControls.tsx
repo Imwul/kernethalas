@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ROOM_EXIT_MARKS, type RoomExitMark, type RoomShapeState } from '../RoomShapeDiagram';
+import { TogglePanel } from '../TogglePanel';
 
 export const EMPTY_ROOM_SHAPE: RoomShapeState = { turns: 0, entrance: null, marks: {} };
 
@@ -17,8 +18,7 @@ export function PlayTileControls({ exits, state, open, onOpen, onChange, onInves
   const mark = state.marks[activeExit] ?? 'unexplored';
 
   return (
-    <details className="fold play-tile-controls" open={open} onToggle={(event) => onOpen(event.currentTarget.open)}>
-      <summary>종이 지도에 모양 옮기기</summary>
+    <TogglePanel className="play-tile-controls" label="종이 지도에 모양 옮기기" open={open} onOpenChange={onOpen}>
       <section className="play-explore-action-body" aria-label="방·통로 모양 편집">
         <div className="play-explore-next">
           <div className="play-tile-turns" role="group" aria-label="모양 회전">
@@ -69,6 +69,6 @@ export function PlayTileControls({ exits, state, open, onOpen, onChange, onInves
         {onInvestigateExit && <button type="button" className="btn ghost play-explore-action-btn"
           onClick={() => onInvestigateExit(activeExit)}>{activeExit + 1}번 출입구 조사</button>}
       </section>
-    </details>
+    </TogglePanel>
   );
 }

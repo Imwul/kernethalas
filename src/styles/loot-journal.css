@@ -67,7 +67,6 @@
 .loot-property { display: grid; gap: var(--s2); }
 .loot-refs { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .loot-journal .xref { min-height: 44px; align-items: center; }
-.loot-appearance { border-top: 1px solid var(--rule-soft); }
 
 .loot-journal-line {
   display: grid;

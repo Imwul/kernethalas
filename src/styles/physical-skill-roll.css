@@ -7,18 +7,20 @@
   border: 1px solid var(--rule-soft);
 }
 .physical-check legend { padding-inline: var(--s1); font: 650 14px/1.4 var(--f-ui); }
+/* One row when it fits: 수치 · 유불리 · D100 · 판정 buttons · 기본값·보정 toggle. */
 .physical-check-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.25rem), 1fr));
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--s2);
 }
-.physical-check-form .field { min-width: 0; }
+.physical-check-form > .field { flex: 1 1 7.5rem; min-width: 0; max-inline-size: 12rem; }
+.physical-check-form > .physical-check-weapon { flex-basis: 11rem; max-inline-size: 16rem; }
 .physical-check-form :is(input, select, button) { min-height: 44px; }
 .physical-check-form :is(input, select) { width: 100%; min-width: 0; }
 .physical-check-actions, .physical-check-result { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s1) var(--s2); }
-.physical-check-actions { grid-column: 1 / -1; }
-.physical-check-form > .field-err { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.physical-check-actions { flex: 0 1 auto; align-items: center; }
+.physical-check-form > .field-err { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }
 .physical-check-result { padding-block-start: var(--s1); border-block-start: 1px solid var(--rule-soft); overflow-wrap: anywhere; }
 .physical-check-result > .readout { font-size: 1.45rem; }
 .physical-check-critical { flex: 1 0 100%; display: grid; min-width: 0; gap: var(--s1); }
