@@ -219,7 +219,7 @@ function TargetControls({ ability, target, draft, level, spent, onChange }: {
                   return <label className="mastery-tick" key={key}><input type="checkbox" checked={reactions?.[key] ?? false}
                     onChange={(event) => onChange({ reactions: { ...draft.reactions, [key]: event.target.checked } })} />{label}</label>;
                 })}
-                <label className="field"><span>추가 피해 보정</span><input value={draft.modifier ?? ''} placeholder="예 +2"
+                <label className="field"><span>추가 피해 보정</span><input value={draft.modifier ?? ''} placeholder="예: +2"
                   aria-invalid={!!draft.modifier && encounterInteger(draft.modifier) === null || undefined}
                   onChange={(event) => onChange({ modifier: event.target.value })} /></label>
                 <label className="field"><span>추가 피해 감소</span><input inputMode="numeric" value={draft.reduction ?? ''} placeholder="0"
@@ -305,7 +305,7 @@ function AbilityForm({ ability, targets, records, onRecord }: {
               clear('rolls');
               patch({ level: event.target.value, rolls: {} });
             }}
-              placeholder="예 3" aria-invalid={!!levelText && level === null || undefined} />
+              placeholder="예: 3" aria-invalid={!!levelText && level === null || undefined} />
           </label>}
           {cost.aether > 0 && <label className="field"><span>현재 Aether (선택)</span>
             <input inputMode="numeric" value={draft.aether} onChange={(event) => patch({ aether: event.target.value })}

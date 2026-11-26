@@ -63,7 +63,8 @@
 .bestiary-lookup-tables button[aria-pressed='true'] {
   border-color: var(--copper-ink);
   background: var(--copper-wash);
-  color: var(--copper-ink);
+  color: var(--ink);
+  font-weight: 700;
 }
 .bestiary-lookup-hint {
   color: var(--faded);
@@ -115,16 +116,8 @@
   font-family: var(--f-ui);
   font-size: 14px;
 }
-.bestiary-sort select {
-  min-height: 36px;
-  padding: 4px 8px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: var(--paper);
-  color: var(--ink);
-  font: inherit;
-}
-@media (pointer: coarse) { .bestiary-sort select { min-height: 44px; } }
+.bestiary-sort .choice-field { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) 10px; }
+.bestiary-sort .choice-field > span { color: var(--ink-2); }
 .bestiary-count {
   margin-left: auto;
   color: var(--faded);
@@ -179,16 +172,20 @@
 .bestiary-table .name a:hover {
   color: var(--oxblood-ink);
 }
+/* the appearance text wraps on its own; "조우에 추가" keeps one line at the cell's right edge so the links form a column */
 .bestiary-creature-actions {
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 0 var(--s2);
 }
+.bestiary-creature-actions > span { min-width: 0; }
 .bestiary-table .bestiary-encounter-link {
   display: inline-flex;
+  flex: none;
   align-items: center;
   min-height: 32px;
+  white-space: nowrap;
   color: var(--copper-ink);
   font: 13px/1.25 var(--f-ui);
 }

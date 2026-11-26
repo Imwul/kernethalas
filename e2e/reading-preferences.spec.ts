@@ -1,13 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { choose, chosen } from './helpers/choice';
 
 test('reading settings persist across routes and keep trap skills readable in a narrow drawer', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/ref/locks-traps');
   await page.getByRole('button', { name: '읽기 설정', exact: true }).click();
   const settings = page.getByRole('dialog', { name: '읽기 설정', exact: true });
-  await settings.getByRole('combobox', { name: '테마', exact: true }).selectOption('dark');
-  await settings.getByRole('combobox', { name: '글자 크기', exact: true }).selectOption('large');
-  await settings.getByRole('combobox', { name: '읽기 간격', exact: true }).selectOption('spacious');
+  await choose(settings, '테마', 'dark');
+  await choose(settings, '글자 크기', 'large');
+  await choose(settings, '읽기 간격', 'spacious');
   await settings.getByRole('checkbox', { name: '높은 대비', exact: true }).check();
   await expect(page.locator('html')).toHaveAttribute('data-reading-text', 'large');
   await expect(page.locator('html')).toHaveAttribute('data-reading-density', 'spacious');
@@ -31,8 +32,8 @@ test('reading settings persist across routes and keep trap skills readable in a 
   await page.goto('/oracle/t-traps');
   await expect(page.locator('html')).toHaveAttribute('data-reading-contrast', 'high');
   await page.getByRole('button', { name: '읽기 설정', exact: true }).click();
-  await expect(settings.getByRole('combobox', { name: '테마' })).toHaveValue('dark');
-  await expect(settings.getByRole('combobox', { name: '글자 크기' })).toHaveValue('large');
-  await expect(settings.getByRole('combobox', { name: '읽기 간격' })).toHaveValue('spacious');
+  await expect(chosen(settings, '테마')).toHaveAttribute('data-value', 'dark');
+  await expect(chosen(settings, '글자 크기')).toHaveAttribute('data-value', 'large');
+  await expect(chosen(settings, '읽기 간격')).toHaveAttribute('data-value', 'spacious');
   await expect(settings.getByRole('checkbox', { name: '높은 대비' })).toBeChecked();
 });

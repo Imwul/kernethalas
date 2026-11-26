@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { openPane } from './helpers/play-desk';
+import { choose, chosen } from './helpers/choice';
 
 test('play combat accepts a physical Overseer roll and supports Korean creature search', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
   await page.getByRole('button', { name: /조우·전투/ }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  const method = combat.getByRole('combobox', { name: '조우 방식' });
-  await method.selectOption('t-overseer');
+  await choose(combat, '조우 방식', 't-overseer');
   const overseer = combat.getByRole('textbox', { name: 'D10 결과' });
   await overseer.fill('11');
   await overseer.press('Enter');
@@ -15,9 +15,9 @@ test('play combat accepts a physical Overseer roll and supports Korean creature 
   await expect(combat.getByRole('region', { name: '전투 카드' })).toHaveCount(0);
 
   await overseer.fill('5');
-  await method.selectOption('t-encounter-b');
+  await choose(combat, '조우 방식', 't-encounter-b');
   await expect(combat.getByRole('textbox', { name: 'D20 결과' })).toHaveValue('');
-  await method.selectOption('t-overseer');
+  await choose(combat, '조우 방식', 't-overseer');
   await expect(overseer).toHaveValue('5');
   await page.reload();
   await expect(overseer).toHaveValue('5');
@@ -31,9 +31,9 @@ test('play combat accepts a physical Overseer roll and supports Korean creature 
   await expect(combat.getByRole('button', { name: '전투만 마치기' })).toBeVisible();
 
   await combat.getByRole('button', { name: '조우 다시 선택' }).click();
-  await expect(method).toBeFocused();
+  await expect(chosen(combat, '조우 방식')).toBeFocused();
   await expect(overseer).toHaveValue('');
-  await method.selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('네크로피드');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
   await expect(combat.getByRole('heading', { name: 'Necropede' })).toBeVisible();
@@ -45,7 +45,7 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('네크로피드');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
 
@@ -104,7 +104,7 @@ test('the custom D20 table validates overlaps, allows gaps, and restores saved r
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('custom');
+  await choose(combat, '조우 방식', 'custom');
   const rangeStart = combat.getByRole('textbox', { name: '시작 D20', exact: true });
   const rangeEnd = combat.getByRole('textbox', { name: '끝 D20 (선택)', exact: true });
   const creatureSearch = combat.getByRole('searchbox', { name: '범위에 연결할 생물', exact: true });
@@ -129,7 +129,7 @@ test('the custom D20 table validates overlaps, allows gaps, and restores saved r
 
   await page.reload();
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
-  await expect(combat.getByRole('combobox', { name: '조우 방식' })).toHaveValue('custom');
+  await expect(chosen(combat, '조우 방식')).toHaveAttribute('data-value', 'custom');
   const roll = combat.getByRole('textbox', { name: 'D20 결과', exact: true });
   await roll.fill('9');
   await roll.press('Enter');

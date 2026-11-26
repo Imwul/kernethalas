@@ -123,7 +123,7 @@ function OracleList({ list, pins }: { list: OracleTable[]; pins: string[] }) {
             </Link>
             <div className="oracle-ledger-actions">
               {canRoll && (
-                <button className="btn ghost" type="button" aria-label={`${t.ko} ${t.dice} 굴리기`} onClick={() => {
+                <button className="btn ghost roll" type="button" aria-label={`${t.ko} ${t.dice} 굴리기`} onClick={() => {
                   const href = quickRollHref(t);
                   if (href) navigate(href);
                 }}>

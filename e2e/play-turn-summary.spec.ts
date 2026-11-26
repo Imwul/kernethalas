@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { closeDrawer } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 test('a fight keeps round actions and opens target-specific tactics from one place', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -17,7 +18,7 @@ test('a fight keeps round actions and opens target-specific tactics from one pla
   await page.goto('/play');
   await page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Fangvine');
   await combat.getByRole('button', { name: 'Fangvine', exact: true }).click();
   const summary = combat.getByRole('region', { name: '현재 전투 턴', exact: true });

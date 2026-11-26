@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { openPane } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 async function physicalRoll(container: Locator, name: string, value: string) {
   const input = container.getByRole('group', { name, exact: true }).getByRole('textbox', { name: '직접 굴린 값' });
@@ -12,7 +13,7 @@ test('a physical Magic Resistance failure opens the damage roll and confirmed Ma
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Fangvine');
   await combat.getByRole('button', { name: 'Fangvine', exact: true }).click();
   await openPane(combat, 'Mastery·마법');

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { overlay } from '../lib/overlay';
 import { nav, useNav } from '../lib/store';
 import { IClose } from './icons';
+import { ChoiceButtons } from './ChoiceButtons';
 
 const KEY = 'kn-reading-preferences-v1';
 const DENSITIES = ['normal', 'compact', 'spacious'] as const;
@@ -83,27 +84,15 @@ export function ReadingSettings() {
             <h2 id="reading-settings-title">읽기 설정</h2>
             <button type="button" className="iconbtn" aria-label="읽기 설정 닫기" onClick={() => setOpen(false)}><IClose /></button>
           </div>
-          <label className="field"><span>테마</span>
-            <select value={theme} onChange={(event) => {
-              const value = event.target.value;
-              if (value === 'system' || value === 'dark' || value === 'light') nav.setTheme(value);
-            }}>
-              <option value="system">시스템</option><option value="dark">어두움</option><option value="light">밝음</option>
-            </select>
-          </label>
-          <label className="field"><span>글자 크기</span>
-            <select value={preferences.textSize} onChange={(event) => update({ textSize: event.target.value === 'large' ? 'large' : 'normal' })}>
-              <option value="normal">기본</option><option value="large">크게</option>
-            </select>
-          </label>
-          <label className="field"><span>읽기 간격</span>
-            <select value={preferences.density} onChange={(event) => {
-              const density = DENSITIES.find((choice) => choice === event.target.value);
-              if (density) update({ density });
-            }}>
-              <option value="normal">기본</option><option value="compact">촘촘하게</option><option value="spacious">여유 있게</option>
-            </select>
-          </label>
+          <ChoiceButtons label="테마" value={theme} onChange={(value) => nav.setTheme(value)} options={[
+            { value: 'system', label: '시스템' }, { value: 'dark', label: '어두움' }, { value: 'light', label: '밝음' },
+          ]} />
+          <ChoiceButtons label="글자 크기" value={preferences.textSize} onChange={(textSize) => update({ textSize })} options={[
+            { value: 'normal', label: '기본' }, { value: 'large', label: '크게' },
+          ]} />
+          <ChoiceButtons label="읽기 간격" value={preferences.density} onChange={(density) => update({ density })} options={[
+            { value: 'normal', label: '기본' }, { value: 'compact', label: '촘촘하게' }, { value: 'spacious', label: '여유 있게' },
+          ]} />
           <label className="reading-settings-check"><input type="checkbox" checked={preferences.contrast}
             onChange={(event) => update({ contrast: event.target.checked })} />높은 대비</label>
           {overlay && <label className="reading-settings-check"><input type="checkbox" checked={preferences.originals}

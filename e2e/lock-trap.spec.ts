@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
+import { choose } from './helpers/choice';
 
 test('door and container thresholds differ and a missed trap triggers on contact', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 820 });
@@ -42,7 +43,7 @@ test('every force attempt shows Tension, including success, and a failed attempt
   await tool.getByLabel('함정 여부 D10', { exact: true }).fill('3');
   await tool.getByLabel('잠김 여부 D20', { exact: true }).fill('12');
   const opening = tool.getByRole('region', { name: '잠긴 대상 열기' });
-  await opening.getByLabel('개방 방법').selectOption('force');
+  await choose(opening, '개방 방법', 'force');
   await opening.getByRole('checkbox', { name: /Crowbar 사용/ }).check();
   await expect(opening.getByRole('status')).toHaveText('1번째 시도 · Athletics +10');
   await skillRoll(opening, '강제 개방 판정', 'Athletics', 45, 62);
@@ -76,7 +77,7 @@ test('physical detection, disarm and lockpick apply the random and retry modifie
 
   const trap = tool.getByRole('region', { name: '함정 처리' });
   await trap.getByLabel('함정 종류 D10', { exact: true }).fill('1');
-  await trap.getByLabel('함정 처리 방법').selectOption('disarm');
+  await choose(trap, '함정 처리 방법', 'disarm');
   const disarm = await skillRoll(trap, '해제 판정', 'Thievery', 60, 29, 8);
   await expect(disarm.getByRole('status')).toContainText('보정 후 Thievery 35');
   await expect(trap.getByText('함정 해제 · XP +10')).toBeVisible();

@@ -16,6 +16,7 @@ import { CopyButton, XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import { SkillAdjustments } from './play/SkillAdjustments';
 import { TogglePanel } from './TogglePanel';
+import { ChoiceButtons } from './ChoiceButtons';
 
 interface SideState {
   skill: string;
@@ -136,7 +137,7 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const [selectedEffects, setSelectedEffects] = useState<string[]>([]);
   const attackerRoll = useRef<HTMLInputElement>(null);
   const section = useRef<HTMLElement>(null);
-  const defenseModeSelect = useRef<HTMLSelectElement>(null);
+  const defenseModeSelect = useRef<HTMLButtonElement>(null);
   const enemyAttacks = creature?.attacking ?? enemy;
   const trackExchange = !!play && !!creature;
   const confirmed = trackExchange ? (enemyAttacks ? enemyConfirmed : pcConfirmed) : null;
@@ -292,15 +293,12 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
         </div>
       )}
       {attack && <div className="checkcalc-defense-mode">
-        <label className="field"><span>방어 방식</span>
-          <select ref={defenseModeSelect} value={defenseMode} disabled={!!confirmed}
-            data-play-attack-field={attackField['data-play-roll-field']}
-            onChange={(event) => setDefenseMode(event.target.value as AttackDefenseMode)}>
-            <option value="opposed">공격·방어 대항</option>
-            <option value="unopposed">능동 방어 불가 · 공격만 굴림</option>
-            <option value="automatic">자동 명중 · 굴림 없음</option>
-          </select>
-        </label>
+        <ChoiceButtons label="방어 방식" value={defenseMode} disabled={!!confirmed} focusRef={defenseModeSelect}
+          groupData={{ 'data-play-attack-field': attackField['data-play-roll-field'] }} onChange={setDefenseMode} options={[
+            { value: 'opposed', label: '공격·방어 대항' },
+            { value: 'unopposed', label: '능동 방어 불가 · 공격만 굴림' },
+            { value: 'automatic', label: '자동 명중 · 굴림 없음' },
+          ]} />
         {defenseMode === 'unopposed' && <p className="checkcalc-note"><XRef id="stunned">기절</XRef>처럼 능동 방어가 불가능한 경우에 적용합니다.</p>}
         {defenseMode === 'automatic' && <p className="checkcalc-note"><XRef id="unconscious-target">의식 없음·수면·마비</XRef>라면 공격과 방어 굴림 없이 명중합니다.</p>}
       </div>}

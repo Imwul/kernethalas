@@ -96,7 +96,7 @@ export function App() {
   useEffect(() => { setStack([]); }, [path, bestiaryRequest, campaignRequest]);
   // Play mode has its own sticky stage bar and fixed action bar; the site tab bar would stack a third bar on phones.
   useEffect(() => {
-    document.documentElement.dataset.route = path === '/play' ? 'play' : '';
+    document.documentElement.dataset.route = path === '/play' ? 'play' : path === '/' ? 'home' : '';
   }, [path]);
   useEffect(() => { if (currentId) nav.visit(currentId); }, [currentId]);
 
@@ -191,7 +191,8 @@ export function App() {
       <nav className="tabbar" aria-label="주요 영역">
         {SECTIONS.map((s, index) => (
           <Fragment key={s.to}>
-            {index === 3 && <button className="tab-search" onClick={() => openSearch()} aria-label="규칙 검색"><ISearch /><span aria-hidden="true">검색</span></button>}
+            {/* Play is the main destination on a phone, so it takes the centre slot; search stays in the header. */}
+            {index === 3 && <Link to="/play" className="tab-play"><IDie /><span aria-hidden="true">플레이</span><span className="sr-only">플레이 모드</span></Link>}
             <Link to={s.to} aria-current={path.startsWith(s.to) ? 'page' : undefined}>
               {s.icon}
               <span aria-hidden="true">{s.short}</span>

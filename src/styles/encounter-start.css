@@ -21,6 +21,8 @@
   min-width: 0;
   align-content: start;
 }
+/* option chips need the row's width; the number fields keep their own small cells */
+.encounter-start .choice-field { grid-column: 1 / -1; }
 
 .encounter-start .field input, .encounter-start .field select { min-height: 44px; }
 .encounter-start .field select { padding-inline: var(--s2); font-family: var(--f-ui); }
@@ -47,6 +49,5 @@
   font: 14px/1.4 var(--f-ui);
 }
 
-.encounter-option input { accent-color: var(--copper-ink); }
 .encounter-links { display: flex; flex-wrap: wrap; gap: 0 var(--s3); }
 .encounter-links .xref { align-items: center; min-height: 44px; }

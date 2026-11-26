@@ -1,8 +1,9 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { openPane } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 async function selectCreature(combat: Locator, name: string) {
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill(name);
   await combat.getByRole('button', { name, exact: true }).click();
 }

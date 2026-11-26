@@ -40,14 +40,7 @@ export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
       <div className="archive-layout">
         <div className="archive-main">
           <SituationFinder onSearch={onSearch} />
-            {recent.length > 0 && (
-              <section aria-labelledby="recent">
-                <div className="section-head"><h2 id="recent">최근 열람</h2></div>
-                <ul className="ledger">{recent.slice(0, 6).map((id) => <LedgerItem key={id} id={id} />)}</ul>
-              </section>
-            )}
-        </div>
-        <aside className="archive-index" aria-label="자주 보는 자료">
+          {/* the player's own shelf (pins, then recent pages) sits under the finder; the right column keeps the fixed table list */}
           <section aria-labelledby="pins">
             <div className="section-head">
               <h2 id="pins">고정 항목</h2>
@@ -55,6 +48,14 @@ export function Home({ onSearch }: { onSearch: (q?: string) => void }) {
             </div>
             {pins.length ? <ul className="ledger">{pins.map((id) => <LedgerItem key={id} id={id} />)}</ul> : <p className="empty">고정한 항목이 여기에 표시됩니다.</p>}
           </section>
+          {recent.length > 0 && (
+            <section aria-labelledby="recent">
+              <div className="section-head"><h2 id="recent">최근 열람</h2></div>
+              <ul className="ledger">{recent.slice(0, 6).map((id) => <LedgerItem key={id} id={id} />)}</ul>
+            </section>
+          )}
+        </div>
+        <aside className="archive-index" aria-label="자주 보는 자료">
           <section aria-labelledby="oracles">
             <div className="section-head">
               <h2 id="oracles">자주 쓰는 표</h2>

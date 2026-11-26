@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 const by = (scope: Pick<Locator, 'getByRole'>, role: Parameters<Locator['getByRole']>[0], name: string) => scope.getByRole(role, { name, exact: true });
 
@@ -19,7 +20,7 @@ test('a creature poison reaches the PC, each round asks for its damage, and Endu
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Giant Spider');
   await combat.getByRole('button', { name: 'Giant Spider', exact: true }).click();
 
@@ -28,7 +29,7 @@ test('a creature poison reaches the PC, each round asks for its damage, and Endu
   await card.getByRole('button', { name: '확인', exact: true }).first().click();
   await card.getByRole('button', { name: 'PC에 적용 · 중독 (1)' }).click();
   await expect(card.getByRole('button', { name: '중독 적용함' })).toBeDisabled();
-  const warnings = page.getByRole('group', { name: '캐릭터 경고' });
+  const warnings = page.getByRole('group', { name: '캐릭터 상태와 경고' });
   await expect(warnings.getByRole('button', { name: '중독' })).toBeVisible();
 
   const lingering = combat.getByRole('region', { name: '전투 중 지속 피해' });
@@ -140,7 +141,7 @@ test('camp treatment removes only the selected condition and its roll can be rew
   await die.press('Enter');
   await wrap.getByRole('button', { name: '야영 완료 확인' }).click();
   await page.reload();
-  const warnings = page.getByRole('group', { name: '캐릭터 경고' });
+  const warnings = page.getByRole('group', { name: '캐릭터 상태와 경고' });
   await expect(warnings.getByRole('button', { name: '중독' })).toBeVisible();
   await expect(warnings.getByRole('button', { name: '출혈' })).toHaveCount(0);
   await go(page, '저널');
@@ -162,7 +163,7 @@ test('rewinding a creature action also rewinds its applied condition and round d
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = by(page, 'region', '조우와 전투 도구');
-  await by(combat, 'combobox', '조우 방식').selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await by(combat, 'searchbox', '생물 이름').fill('Giant Spider');
   await by(combat, 'button', 'Giant Spider').click();
   const card = by(combat, 'region', '전투 카드');
@@ -189,7 +190,7 @@ test('the incoming hit handoff focuses its D20 input at 320px', async ({ page })
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = by(page, 'region', '조우와 전투 도구');
-  await by(combat, 'combobox', '조우 방식').selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await by(combat, 'searchbox', '생물 이름').fill('Giant Spider');
   await by(combat, 'button', 'Giant Spider').click();
   const card = by(combat, 'region', '전투 카드');
@@ -220,7 +221,7 @@ test('Madness at Sanity 0 restores Sanity, and death is recorded with an undo', 
   const sanity = drawer.getByRole('region', { name: 'Sanity', exact: true });
   await sanity.getByRole('textbox', { name: '최대 Sanity' }).fill('12');
   await sanity.getByRole('textbox', { name: '현재 Sanity' }).fill('0');
-  await expect(page.getByRole('group', { name: '캐릭터 경고' }).getByRole('button', { name: 'Sanity 0 · 광기' })).toBeVisible();
+  await expect(page.getByRole('group', { name: '캐릭터 상태와 경고' }).getByRole('button', { name: 'Sanity 0 · 광기' })).toBeVisible();
   const madness = sanity.getByRole('alert');
   const input = madness.getByRole('textbox', { name: '직접 굴린 값' });
   await input.fill('10');

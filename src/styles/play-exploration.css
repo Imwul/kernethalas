@@ -36,7 +36,6 @@
   gap: var(--s1);
   font: 14px/1.4 var(--f-ui);
 }
-.play-explore-lair input { accent-color: var(--copper-ink); }
 .play-explore-step { display: grid; min-width: 0; gap: var(--s2); }
 .play-explore-step h3 { margin: 0; font: 18px/1.35 var(--f-ko-display); }
 .play-explore-step .tension-tool {

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
+import { choiceGroup, choose, chosen } from './helpers/choice';
 
 function button(scope: Page | Locator, name: string | RegExp) {
   return scope.getByRole('button', { name, exact: true });
@@ -22,7 +23,7 @@ async function go(page: Page, name: string) {
 async function selectEnemy(page: Page, name = 'Necropede') {
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill(name);
   await button(combat, name).click();
   return combat;
@@ -56,7 +57,7 @@ test('Exhaustion defaults apply to PC checks and repeat attacks, while Madness c
 
   const combat = await selectEnemy(page);
   const start = combat.getByRole('region', { name: '조우 시작 계산기' });
-  await start.getByRole('combobox', { name: '조우의 공포 특성' }).selectOption('4');
+  await choose(start, '조우의 공포 특성', '4');
   await expect(disadvantage(start, 'Resolve 유불리')).toHaveAttribute('aria-pressed', 'true');
   await expect(disadvantage(start, 'PC Initiative 유불리')).toHaveAttribute('aria-pressed', 'true');
   await expect(disadvantage(start, '적 Initiative 유불리')).toHaveAttribute('aria-pressed', 'false');
@@ -103,12 +104,12 @@ test('opening mode replaces stale Initiative and Living Shadow respects Alert', 
   await page.goto('/play');
   const combat = await selectEnemy(page);
   const start = combat.getByRole('region', { name: '조우 시작 계산기' });
-  const choose = start.getByRole('combobox', { name: '조우 시작 방식' });
+  const mode = choiceGroup(start, '조우 시작 방식');
   await textbox(start, 'PC 최고 Perception').fill('70');
   await textbox(start, 'PC Initiative D100').fill('22');
   await textbox(start, '적 Initiative D100').fill('80');
   await expect(button(combat, /^조우 시작/)).toContainText('PC 측 선공');
-  await choose.selectOption('surprise');
+  await choose(start, '조우 시작 방식', 'surprise');
   await expect(button(combat, /^조우 시작/)).not.toContainText('측 선공');
 
   const drawer = await characterTab(page, 'Goal');
@@ -119,8 +120,8 @@ test('opening mode replaces stale Initiative and Living Shadow respects Alert', 
   await openPane(combat, '조우 시작');
   await expect(start.getByRole('status', { name: '기습 결과' })).toContainText('PC 측 첫 공격 +20');
   await start.getByRole('checkbox', { name: '조우에 Alert 적 있음' }).check();
-  await expect(choose).toHaveValue('initiative');
-  await expect(choose.getByRole('option', { name: '적에게 기습당함' })).toBeDisabled();
+  await expect(chosen(start, '조우 시작 방식')).toHaveAttribute('data-value', 'initiative');
+  await expect(mode.getByRole('button', { name: '적에게 기습당함' })).toBeDisabled();
   await expect(start.getByRole('status', { name: '기습 결과' })).toHaveCount(0);
 });
 

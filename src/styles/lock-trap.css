@@ -42,6 +42,7 @@
 .lock-trap-choices { display: grid; gap: var(--s1); justify-items: start; }
 .lock-trap-roll { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s1); }
 .lock-trap-select { max-width: 17rem; }
+.lock-trap-select.choice-field { max-width: none; }
 .lock-trap-tool input:not([type='checkbox']),
 .lock-trap-tool select,
 .lock-trap-tool button,
@@ -57,7 +58,6 @@
   border-inline-start: 2px solid var(--copper-ink);
 }
 .lock-trap-check { display: inline-flex; align-items: center; gap: var(--s1); min-height: 44px; }
-.lock-trap-check input { accent-color: var(--copper-ink); }
 .lock-trap-physical { min-width: 0; }
 .lock-opening-comparison dl {
   display: grid;

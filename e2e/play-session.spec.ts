@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openDrawer } from './helpers/play-desk';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
+import { choose } from './helpers/choice';
 
 async function roll(scope: Locator, label: string, value: string) {
   const field = scope.getByRole('textbox', { name: label, exact: true });
@@ -31,7 +32,7 @@ test('the session card reopens a suspended door and focuses its roll offline', a
   await roll(explore.getByRole('region', { name: '이벤트', exact: true }), '직접 굴린 값', '55');
   const actions = explore.getByRole('region', { name: '선택 탐험 행동', exact: true });
   await actions.getByRole('button', { name: '문·함정 조사', exact: true }).click();
-  await actions.getByRole('combobox', { name: '조사할 대상', exact: true }).selectOption('present');
+  await choose(actions, '조사할 대상', 'present');
   const door = actions.getByRole('region', { name: '문 조사', exact: true });
   await detectTrap(door);
   await roll(door, '함정 여부 D10', '6');
@@ -119,12 +120,12 @@ test('resuming a forced door offline keeps the pending die and finishes required
   await roll(region(explore, '이벤트'), '직접 굴린 값', '55');
   const actions = region(explore, '선택 탐험 행동');
   await actions.getByRole('button', { name: '문·함정 조사', exact: true }).click();
-  await actions.getByRole('combobox', { name: '조사할 대상', exact: true }).selectOption('present');
+  await choose(actions, '조사할 대상', 'present');
   const door = region(actions, '문 조사');
   await detectTrap(door);
   await roll(door, '함정 여부 D10', '6');
   await roll(door, '잠김 여부 D20', '15');
-  await door.getByLabel('개방 방법', { exact: true }).selectOption('force');
+  await choose(door, '개방 방법', 'force');
   await skillRoll(door, '강제 개방 판정', 'Athletics', 50, 38);
   const force = (tab: Page) => region(tab, '강제 개방 긴장 굴림');
   const resultInput = (tab: Page) => force(tab).getByRole('textbox', { name: '긴장 주사위 굴린 값', exact: true });

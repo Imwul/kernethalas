@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { openPane } from './helpers/play-desk';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
+import { choose } from './helpers/choice';
 
 async function enterRoll(section: Locator, value: string) {
   await section.getByRole('textbox', { name: '직접 굴린 값', exact: true }).fill(value);
@@ -73,7 +74,7 @@ test('door noise and deep search pass the resolved Tension die into each action'
   await door.getByRole('button', { name: '함정 여부 D10 확인', exact: true }).click();
   await door.getByLabel('잠김 여부 D20', { exact: true }).fill('15');
   await door.getByRole('button', { name: '잠김 여부 D20 확인', exact: true }).click();
-  await door.getByLabel('개방 방법').selectOption('force');
+  await choose(door, '개방 방법', 'force');
   await skillRoll(door, '강제 개방 판정', 'Athletics', 50, 38);
   const noise = door.getByRole('region', { name: '강제 개방 긴장 굴림' });
   await expect(noise.getByRole('combobox', { name: '긴장 주사위 크기' })).toHaveValue('6');

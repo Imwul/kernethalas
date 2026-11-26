@@ -16,6 +16,10 @@
   scrollbar-width: thin;
 }
 .creator-steps li { display: flex; flex: none; align-items: center; }
+/* on narrow screens the strip scrolls; a fade on the right edge shows there is more */
+@container (width < 760px) {
+  .creator-steps { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-inline-end: 28px; scroll-padding-inline: 28px; }
+}
 .creator-steps li + li::before { flex: none; width: 14px; height: 2px; background: var(--rule); content: ''; }
 .creator-steps li:has(> button[data-done]) + li::before { background: var(--copper); }
 .creator-steps button {
@@ -27,21 +31,22 @@
   min-height: 40px;
   padding: 4px 10px 4px 4px;
   border: 1px solid var(--rule-soft);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink-2);
   font: 14px/1.3 var(--f-ui);
   white-space: nowrap;
 }
-.creator-steps button[aria-current='step'] { border-color: var(--copper-ink); color: var(--ink); font-weight: 700; box-shadow: 0 0 0 1px var(--copper-ink); }
+.creator-steps button:hover:not(:disabled) { background: var(--bone-2); color: var(--ink); }
+.creator-steps button[aria-current='step'] { border-color: var(--copper-ink); background: var(--copper-wash); color: var(--ink); font-weight: 700; }
 .creator-step-num {
   display: grid;
   place-items: center;
   min-width: 30px;
   height: 30px;
   padding-inline: 4px;
-  border: 2px solid var(--rule);
-  border-radius: 15px;
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius);
   background: var(--paper);
   color: var(--faded);
   font: 13px/1 var(--f-display);
@@ -64,7 +69,7 @@
 .creator-name { max-width: 20rem; }
 .creator .field > span { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
 .creator-dice { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: var(--s2); min-width: 0; }
-.creator-dice .loot-roll { margin: 0; }
+.creator-dice .loot-roll { margin: 0; align-content: start; }
 .creator-fixed {
   display: grid;
   align-content: center;
@@ -76,6 +81,9 @@
   font: 13px/1.4 var(--f-ui);
 }
 .creator-fixed b { color: var(--ink); font: 700 22px/1.1 var(--f-mono); }
+.creator-fixed.is-inline { display: inline-flex; align-items: baseline; gap: var(--s2); min-height: 40px; padding-block: var(--s1); }
+.creator-fixed.is-inline b { font-size: 17px; }
+.creator-fixed small { color: var(--faded); font-size: 12px; }
 
 /* Skill allotment: one tap per Skill */
 /* Allotment board: each amount with its slots, filled with the Skill it went to; stays in view over the list. */
@@ -150,7 +158,7 @@
 .creator-skill-chips button:hover:not(:disabled) > span { border-color: var(--rule); background: var(--bone); color: var(--ink); }
 .creator-skill-chips button:focus-visible { outline: none; }
 .creator-skill-chips button:focus-visible > span { outline: 2px solid var(--focus); outline-offset: 1px; }
-.creator-skill-chips button[aria-pressed='true'] > span { border-color: var(--copper); background: var(--copper); color: var(--paper); }
+.creator-skill-chips button[aria-pressed='true'] > span { border-color: var(--copper-ink); background: var(--copper-wash); color: var(--ink); }
 .creator-skill-chips button:disabled { cursor: default; opacity: 0.35; }
 .creator-skill-score { justify-self: end; font: 13px/1.4 var(--f-mono); white-space: nowrap; }
 .creator-skill-score b { font-size: 16px; }

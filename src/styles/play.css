@@ -28,6 +28,13 @@
   .home-launch-tools > :is(.home-play-launch, .home-play-resume) { flex: 1 1 100%; justify-content: center; }
 }
 
+/* phones reach play mode from the tab bar; the header keeps only search and reading settings */
+@media (max-width: 767px) {
+  .head-play { display: none; }
+}
+/* the home page has its own large search box, so the header one would be a second copy */
+:root[data-route='home'] .head-tools .searchtrigger { display: none; }
+
 @media (max-width: 420px) {
   .masthead-inner { padding-inline: var(--s2); }
   .masthead-inner .head-tools { gap: var(--s1); }
@@ -60,7 +67,6 @@
 .play-header .btn, .play-reset .btn, .play-stage-next { min-height: 44px; }
 .play-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
 .play-header > .play-header-actions { margin-inline-start: auto; }
-.play-header-actions .btn:disabled { opacity: 0.58; cursor: default; }
 
 /* Small floating panels (campaign, view settings) */
 .play-popover { position: relative; min-inline-size: 0; }
@@ -98,6 +104,24 @@
 .play-popover[data-align='end'] .play-popover-body { inset-inline: auto 0; }
 .play-popover-body[hidden] { display: none; }
 .play-view-menu .play-header-toggles { display: grid; inline-size: 100%; }
+.play-more-menu .play-popover-trigger { justify-content: center; min-inline-size: 44px; padding-inline: var(--s2); font-size: 18px; letter-spacing: 0; }
+.play-more-menu .play-popover-trigger::after { content: none; }
+.play-more-menu .play-popover-body { min-inline-size: 12rem; padding: 0; }
+.play-menu-item {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding-inline: var(--s3);
+  border: 0;
+  background: transparent;
+  color: var(--oxblood-ink);
+  font: 14px/1.3 var(--f-ui);
+  text-align: start;
+  cursor: pointer;
+}
+.play-menu-item:hover { background: var(--oxblood-wash); }
+.play-menu-item:focus-visible { outline-offset: -2px; }
 .play-view-menu .play-popover-body { padding: 0; }
 
 /* Sticky desk bar: stage tabs on the left, drawer buttons on the right. */
@@ -140,7 +164,10 @@
 .play-tray button[aria-expanded='true'] { border-color: var(--copper-ink); background: var(--copper-wash); color: var(--ink); }
 .play-nav button:focus-visible, .play-tray button:focus-visible { outline-offset: -2px; }
 .play-tray { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
-.play-tray button { padding-inline: var(--s2); }
+/* Drawer buttons open side ledgers, unlike the stage tabs: a divider, a small "장부" label and a lighter, smaller face set them apart. */
+.play-tray { border-inline-start: 1px solid var(--rule); padding-inline-start: var(--s2); }
+.play-tray-label { align-self: center; padding-inline: 0 var(--s1); color: var(--faded); font: 12px/1 var(--f-ui); }
+.play-tray button { padding-inline: var(--s2); font-size: 13px; color: var(--ink-2); }
 .play-tray .play-tray-all { display: none; }
 .play-tray-badge, .play-strip-badge {
   min-inline-size: 1.5em;
@@ -157,10 +184,11 @@
   .play-bar { flex-wrap: wrap; gap: 0; }
   .play-nav { min-inline-size: 0; }
   /* warnings take their own row under the stage tabs instead of squeezing them */
-  .play-alerts { flex: 1 0 100%; order: 3; padding: 4px 0; border-block-start: 1px solid var(--rule-soft); }
+  .play-bar > .play-alerts { flex: 1 0 100%; order: 3; margin-inline-start: 0; padding: 4px 0; border-block-start: 1px solid var(--rule-soft); }
   .play-nav { flex: 1 1 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .play-nav button { padding-inline: 2px; font-size: 13px; }
-  .play-tray { flex: none; border-inline-start: 1px solid var(--rule); }
+  .play-tray { flex: none; padding-inline-start: 0; }
+  .play-tray-label { display: none; }
   .play-tray .play-tray-item { display: none; }
   .play-tray .play-tray-all { display: inline-flex; min-inline-size: 44px; padding-inline: var(--s2); font-size: 13px; }
 }
@@ -325,7 +353,11 @@ details.play-domain { margin-block: 0 var(--s3); }
   .play-context > .play-action-bar { position: sticky; inset-block-start: 0; z-index: 2; }
   .play-desk[data-drawer] .play-context > :is(.play-context-facts, .play-context-refs) { display: none; }
 }
+@container play-desk (width >= 1040px) {
+  /* an open drawer (character sheet, ledgers) is a form, so its column gets wider while it is docked */
+  .play-desk[data-drawer] .play-layout { grid-template-columns: minmax(0, 1fr) 24rem; }
+}
 @container play-desk (width >= 1260px) {
   .play-layout { grid-template-columns: minmax(0, 1fr) minmax(22rem, 28%); gap: var(--s5); }
+  .play-desk[data-drawer] .play-layout { grid-template-columns: minmax(0, 1fr) minmax(26rem, 36%); }
 }
-.play-header .play-reset-toggle { color: var(--ink-2); }

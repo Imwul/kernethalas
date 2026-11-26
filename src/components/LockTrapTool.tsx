@@ -16,6 +16,8 @@ import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { TensionTool, type TensionDie, type TensionResult } from './TensionTool';
 import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/lock-trap.css';
+import { RollButton } from './RollButton';
+import { ChoiceButtons } from './ChoiceButtons';
 
 /** Core p.212: Thieves’ Toolkit, required to disarm traps, gives +5 to Thievery. */
 const TOOLKIT_BONUS = 5;
@@ -216,7 +218,7 @@ function TrapRoll({ label, sides, value, inputRef, onChange, confirm = false }: 
         setSubmittedInvalid(false);
       }} />
     {confirm && <button type="submit" className="btn ghost" aria-label={`${label} 확인`}>확인</button>}
-    <button type="button" className="btn ghost" aria-label={`${label} 굴리기`} onClick={() => apply(rollDie(sides), 'app')}>굴리기</button>
+    <RollButton aria-label={`${label} 굴리기`} onClick={() => apply(rollDie(sides), 'app')} />
   </>;
   return (
     <div className="field">
@@ -240,7 +242,6 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm, resum
   confirm: boolean;
   resume?: TrapInvestigationProgress | null;
 }) {
-  const id = useId();
   const [kind, setKind] = usePlayDraftState('kind', resume?.kind == null ? '' : String(resume.kind));
   const [method, setMethod] = usePlayDraftState<TrapMethod>('method', resume?.method ?? '');
   const [result, setResult] = usePlayDraftState<Outcome | null>('result', resume?.result ?? null);
@@ -284,18 +285,12 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm, resum
         <>
           <p className="lock-trap-note"><b>{row.cols?.avoid}</b> · {row.ko}</p>
           {known && (
-            <div className="field lock-trap-select">
-              <label htmlFor={`${id}-method`}>함정 처리 방법</label>
-              <select id={`${id}-method`} value={method} disabled={resume?.result != null} onChange={(event) => {
-                setMethod(event.target.value as TrapMethod);
-                clearChoice();
-              }}>
-                <option value="">방법 선택</option>
-                <option value="disarm">해제</option>
-                {environment && <option value="bypass">우회</option>}
-                <option value="trigger">고의 발동</option>
-              </select>
-            </div>
+            <ChoiceButtons className="lock-trap-select" label="함정 처리 방법" value={method} disabled={resume?.result != null}
+              onChange={(next) => { setMethod(next); clearChoice(); }} options={[
+                { value: 'disarm', label: '해제' },
+                ...(environment ? [{ value: 'bypass' as const, label: '우회' }] : []),
+                { value: 'trigger', label: '고의 발동' },
+              ]} />
           )}
           {(method === 'disarm' || method === 'bypass') && (
             <>
@@ -354,7 +349,6 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   onReport?: (result: OpeningResult) => void;
   attemptKey: string;
 }) {
-  const id = useId();
   const scope = usePlayDraftScope();
   const [method, setMethod] = usePlayDraftState('method', 'pick');
   const [opened, setOpened] = usePlayDraftState('opened', false);
@@ -363,7 +357,7 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   const [crowbar, setCrowbar] = usePlayDraftState('crowbar', false);
   const [forceResult, setForceResult] = usePlayDraftState<Outcome | null>('force-result', null);
   const [standaloneTension, setStandaloneTension] = usePlayDraftState<Record<number, TensionResult>>('force-tension', {});
-  const openingMethod = useRef<HTMLSelectElement>(null);
+  const openingMethod = useRef<HTMLButtonElement>(null);
   const tensionHeading = useRef<HTMLHeadingElement>(null);
   const attempt = `${attemptKey}-${forceFailures + 1}`;
   const tension = standaloneTension[forceFailures] ?? null;
@@ -396,13 +390,9 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
         pickBonus={lockpickDifficulty(pickFailures)} forceBonus={forceOpeningBonus(completedForceFailures, crowbar)}
         crowbar={crowbar} nextTension={embedded.nextTension} ledger={embedded.gearLedger} />}
       {!opened && !forceResult && (
-        <div className="field lock-trap-select">
-          <label htmlFor={`${id}-lock`}>개방 방법</label>
-          <select id={`${id}-lock`} ref={openingMethod} value={method} onChange={(event) => setMethod(event.target.value)}>
-            <option value="pick">자물쇠 따기</option>
-            <option value="force">강제 개방</option>
-          </select>
-        </div>
+        <ChoiceButtons className="lock-trap-select" label="개방 방법" value={method} focusRef={openingMethod} onChange={setMethod} options={[
+          { value: 'pick', label: '자물쇠 따기' }, { value: 'force', label: '강제 개방' },
+        ]} />
       )}
       {method === 'pick' && (
         <>

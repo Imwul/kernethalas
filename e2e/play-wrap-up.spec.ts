@@ -42,7 +42,7 @@ test('play resolves handwritten loot rolls and keeps the journal while opening c
 
 async function enterNecropede(combat: Locator) {
   await combat.getByRole('textbox', { name: 'D6 결과', exact: true }).fill('4');
-  await combat.getByRole('button', { name: 'D6 확인', exact: true }).click();
+  await combat.getByRole('button', { name: '확인', exact: true }).click();
   await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
   await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
   await expect(combat.getByRole('heading', { name: 'Necropede', exact: true })).toBeVisible();

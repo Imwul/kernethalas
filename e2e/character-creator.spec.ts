@@ -47,7 +47,7 @@ test('a newly created campaign opens character setup in the main workspace and a
   await page.reload();
   await characterWorkspace(page);
   await expect(setup.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('Erthos');
-  await setup.getByRole('button', { name: '탐험 시작', exact: true }).click();
+  await setup.getByRole('button', { name: '이 캐릭터로 탐험 시작', exact: true }).click();
   await expect(setup).toBeHidden();
   await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' }))
     .toHaveAttribute('aria-current', 'step');
@@ -68,16 +68,15 @@ test('the campaign setup creator saves the new survivor before starting explorat
   const creator = setup.locator('.creator');
   await creator.getByRole('textbox', { name: '이름 (선택)', exact: true }).fill('Runa');
   await creator.getByRole('button', { name: '완전 자동 생성', exact: true }).click();
-  const apply = creator.getByRole('button', { name: '캐릭터 탭에 채우기', exact: true });
-  await apply.click();
-  await expect(creator.getByText('시작 장비를 장부에 넣었습니다', { exact: false })).toBeVisible();
-  await page.reload();
-  await characterWorkspace(page);
-  await expect(creator.getByRole('heading', { name: 'VII. 정리', exact: true })).toBeVisible();
-  await expect(apply).toBeDisabled();
-  await expect(setup.getByRole('button', { name: '탐험 시작', exact: true })).toBeVisible();
-  await setup.getByRole('button', { name: '탐험 시작', exact: true }).click();
+  // one button records the survivor, grants the starting gear and opens exploration
+  await creator.getByRole('button', { name: '이 생존자로 탐험 시작', exact: true }).click();
   await expect(setup).toBeHidden();
+  await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' }))
+    .toHaveAttribute('aria-current', 'step');
+  await page.reload();
+  await expect(setup).toBeHidden();
+  const gear = await openDrawer(page, '장비');
+  await expect(gear).toContainText('Torch');
   const drawer = await openDrawer(page, '캐릭터');
   await expect(drawer.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('Runa');
   await expect(drawer.getByRole('textbox', { name: 'PC 레벨', exact: true })).toHaveValue('1');
@@ -190,9 +189,7 @@ test('full auto fills the character tab, the Mastery tree and the gear ledger, a
   expect((await creator.boundingBox())!.width).toBeGreaterThan(compactWidth);
   await creator.getByRole('button', { name: '완전 자동 생성' }).click();
   await expect(creator.getByRole('heading', { name: 'VII. 정리' })).toBeVisible();
-  await creator.getByRole('button', { name: '캐릭터 탭에 채우기' }).click();
-  await expect(creator.getByText('시작 장비를 장부에 넣었습니다', { exact: false })).toBeVisible();
-  await creator.getByRole('button', { name: '캐릭터 탭 보기' }).click();
+  await creator.getByRole('button', { name: '캐릭터 탭에 저장' }).click();
   await expect(setup).toBeHidden();
 
   await expect(drawer.getByRole('textbox', { name: 'PC 레벨' })).toHaveValue('1');

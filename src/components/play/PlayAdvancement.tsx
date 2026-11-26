@@ -174,7 +174,7 @@ export function PlayAdvancement({ onSheetChange, onJournalChange, onXpSpent }: {
       <h3>레벨업과 능력 해금</h3>
       <div className="mastery-form-fields">
         <label className="field"><span>종이 시트 레벨</span><input inputMode="numeric" value={draft.level} onChange={(event) => patch({ level: event.target.value })}
-          aria-invalid={!!draft.level && level === null || undefined} placeholder="예 2" /></label>
+          aria-invalid={!!draft.level && level === null || undefined} placeholder="예: 2" /></label>
         <label className="field"><span>보유 XP</span><input inputMode="numeric" value={draft.xp} onChange={(event) => patch({ xp: event.target.value })}
           aria-invalid={!!draft.xp && xp === null || undefined} placeholder="레벨업 1,000 XP" /></label>
       </div>

@@ -1,12 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer, setViewOption } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 const button = (scope: Locator | Page, name: string) => scope.getByRole('button', { name, exact: true });
 
 async function selectOverseer(page: Page, name: string) {
   await button(page.getByRole('navigation', { name: '플레이 단계' }), '조우·전투').click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill(name);
   await button(combat, name).click();
   return { combat, card: combat.getByRole('region', { name: '전투 카드' }) };
@@ -94,7 +95,7 @@ test('discovery reveals the domain Overseer on selection and folds spoils until 
   await button(stages, '조우·전투').click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await expect(page.getByRole('complementary', { name: '이 단계에 적용되는 도메인 효과' })).toContainText('Skilled');
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('t-overseer');
+  await choose(combat, '조우 방식', 't-overseer');
   await expect(combat).not.toContainText('Dreadlord');
   await button(combat, '이 도메인의 Overseer 선택').click();
   await expect(combat.getByRole('heading', { name: 'Dreadlord', exact: true })).toBeVisible();

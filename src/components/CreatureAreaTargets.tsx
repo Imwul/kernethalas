@@ -5,6 +5,7 @@ import { splitActionDamage } from '../lib/damage-pool';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { usePlayCharacter } from '../lib/play-character';
 import { PhysicalDiceRoll } from './PhysicalDiceRoll';
+import { ChoiceButtons } from './ChoiceButtons';
 
 export type SharedActionDamage = Partial<Record<number, RollResult>>;
 export const CREATURE_AREA_ROLES = ['pc', 'companion', 'minion'] as const;
@@ -69,12 +70,9 @@ export function CreatureAreaTargets({ damage, renderTarget }: {
           </div>
         </form>
         {!!names.length && <>
-          {pool && <label className="field creature-area-damage-mode"><span>피해 주사위</span>
-            <select value={mode} onChange={(event) => setMode(event.target.value === 'shared' ? 'shared' : 'individual')}>
-              <option value="individual">대상마다 굴림</option>
-              <option value="shared">같은 굴림 결과 사용</option>
-            </select>
-          </label>}
+          {pool && <ChoiceButtons className="creature-area-damage-mode" label="피해 주사위" value={mode} onChange={setMode} options={[
+            { value: 'individual', label: '대상마다 굴림' }, { value: 'shared', label: '같은 굴림 결과 사용' },
+          ]} />}
           <div className="creature-area-targets">
             <PlayDraftScope name={areaScope}>
               {names.map((name, index) => {

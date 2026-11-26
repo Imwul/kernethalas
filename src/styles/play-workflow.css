@@ -77,6 +77,10 @@
   overflow-wrap: anywhere;
 }
 .play-jump-roll > span { color: var(--copper-ink); font-size: 13px; }
+/* reads as a button that jumps somewhere: the label sits in the left column and an arrow on the right */
+.play-action-bar .play-jump-roll { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s2); }
+.play-jump-roll > * { grid-column: 1; }
+.play-jump-roll::after { content: '›'; content: '›' / ''; grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--copper-ink); font: 22px/1 var(--f-ui); }
 .play-jump-die { margin-inline-start: 0.15em; color: var(--copper-ink); font: 600 13px/1.35 var(--f-mono); white-space: nowrap; }
 .play-action-bar-tools { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .play-action-bar .play-action-bar-tools > .btn { flex: 1 0 auto; padding-inline: var(--s1); }

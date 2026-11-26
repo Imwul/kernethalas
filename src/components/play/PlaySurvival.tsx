@@ -68,7 +68,7 @@ function CheckInputs({ label, value, result, rules, onChange }: {
     <>
       <div className="survival-fields">
         <label className="field"><span>{label} 수치</span>
-          <input value={value.target} placeholder="예 45" aria-invalid={invalid || undefined}
+          <input value={value.target} placeholder="예: 45" aria-invalid={invalid || undefined}
             onChange={(event) => update({ target: event.target.value })} />
         </label>
         <EdgeToggle value={edge} onChange={(nextEdge) => update({ edge: nextEdge })} />
@@ -324,7 +324,7 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
       <div className="survival-fields">
         <label className="field"><span>기술 이름</span>
           <input maxLength={80} value={name} onChange={(event) => chooseSkill(event.target.value)}
-            placeholder="예 Medicine" aria-invalid={!!name.trim() && !skill || undefined} />
+            placeholder="예: Medicine" aria-invalid={!!name.trim() && !skill || undefined} />
         </label>
         <label className="field"><span>현재 Skill</span>
           <input ref={scoreField} inputMode="numeric" value={score} placeholder="0–80" aria-invalid={!!score.trim() && !valid || undefined}

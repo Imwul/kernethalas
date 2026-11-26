@@ -28,7 +28,8 @@ test('a full backup restores every campaign and can be undone once', async ({ pa
 
   // wipe the room, then restore from the file (at this width the drawer covers the header)
   await closeDrawer(page);
-  await page.getByRole('button', { name: '이번 장소 지우기' }).click();
+  await page.getByRole('button', { name: '그 밖의 동작', exact: true }).click();
+  await page.getByRole('button', { name: '이번 장소 지우기…', exact: true }).click();
   await page.getByRole('button', { name: '지우고 새로 시작' }).click();
   await expect(shape.getByRole('textbox', { name: '직접 굴린 값', exact: true })).toHaveValue('');
   await openDrawer(page, '저장');

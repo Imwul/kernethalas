@@ -94,7 +94,7 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, re
             }}>
               <label className="field">
                 <span>종이 지도 번호</span>
-                <input value={paperId} maxLength={32} autoComplete="off" placeholder="예 B-07"
+                <input value={paperId} maxLength={32} autoComplete="off" placeholder="예: B-07"
                   onChange={(event) => { setPaperId(event.target.value); setFeedback(''); }} />
               </label>
               <fieldset className="play-paper-map-tags">
@@ -112,7 +112,7 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, re
               </fieldset>
               <div className="field">
                 <label htmlFor={noteId}>장소 메모</label>
-                <textarea id={noteId} rows={2} maxLength={400} value={note} placeholder="예 북쪽 잠긴 문 너머에서 소리가 들림"
+                <textarea id={noteId} rows={2} maxLength={400} value={note} placeholder="예: 북쪽 잠긴 문 너머에서 소리가 들림"
                   onChange={(event) => { setNote(event.target.value); setFeedback(''); }} />
               </div>
               <button type="submit" className="btn ghost play-explore-action-btn" disabled={!paperId.trim()}>장소 메모 저장</button>

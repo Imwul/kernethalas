@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
+import { choose } from './helpers/choice';
 
 const WIDTH = Number(process.env.KN_FIELD_WIDTH ?? '320');
 const region = (scope: Page | Locator, name: string) => scope.getByRole('region', { name, exact: true });
@@ -44,7 +45,7 @@ test('numbered and manually labeled door reports return with the paper map witho
   const mapping = region(actions, '종이 지도 출입구 연결');
   const exit = choice(mapping, '조사할 출입구');
   await expect(exit).toHaveValue('exit:2번 출입구');
-  await choice(actions, '조사할 대상').selectOption('present');
+  await choose(actions, '조사할 대상', 'present');
   const door = region(actions, '문 조사');
   await detectTrap(door);
   await roll(door, '함정 여부 D10', '6');
@@ -103,14 +104,14 @@ test('a deferred door resumes confirmed investigation and attempt bonuses withou
   await roomEvent(explore, '55');
   const actions = region(explore, '선택 탐험 행동');
   await openPane(actions, '문·함정 조사');
-  await choice(actions, '조사할 대상').selectOption('present');
+  await choose(actions, '조사할 대상', 'present');
   const door = region(actions, '문 조사');
   await detectTrap(door);
   await roll(door, '함정 여부 D10', '7');
   await roll(door, '잠김 여부 D20', '16');
   const trap = region(door, '함정 처리');
   await roll(trap, '함정 종류 D10', '1');
-  await choice(trap, '함정 처리 방법').selectOption('disarm');
+  await choose(trap, '함정 처리 방법', 'disarm');
   await skillRoll(trap, '해제 판정', 'Thievery', 50, 31, 4);
 
   const opening = region(door, '잠긴 대상 열기');
@@ -120,7 +121,7 @@ test('a deferred door resumes confirmed investigation and attempt bonuses withou
   await expect(comparison).toContainText('Lockpick 장부 2개');
   await expect(comparison).toContainText('긴장 주사위 D8');
   await skillRoll(opening, '자물쇠 따기 판정', 'Thievery', 50, 81);
-  await choice(opening, '개방 방법').selectOption('force');
+  await choose(opening, '개방 방법', 'force');
   await skillRoll(opening, '강제 개방 판정', 'Athletics', 45, 81);
   await expect(button(actions, '나중에 열기')).toHaveCount(0);
   await roll(region(opening, '강제 개방 긴장 굴림'), '긴장 주사위 굴린 값', '3');
@@ -237,7 +238,7 @@ test('a deferred combat roll restores its exact enemy when labels are identical'
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = region(page, '조우와 전투 도구');
-  await choice(combat, '조우 방식').selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
   await button(combat, 'Necropede').click();
   const card = region(combat, '전투 카드');

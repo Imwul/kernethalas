@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { closeDrawer, openDrawer } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 async function enter(scope: Locator, value: string, name = '직접 굴린 값') {
   const input = scope.getByRole('textbox', { name, exact: true });
@@ -59,9 +60,8 @@ test('a survivor can start anew in the same room without inheriting old wounds o
   await drawer.getByRole('button', { name: '새 생존자 만들기' }).click();
   const creator = page.locator('.play-character-workspace .creator');
   await creator.getByRole('button', { name: '완전 자동 생성' }).click();
-  await creator.getByRole('button', { name: '캐릭터 탭에 채우기' }).click();
-  await expect(creator.getByText('시작 장비를 장부에 넣었습니다', { exact: false })).toBeVisible();
-  await creator.getByRole('button', { name: '캐릭터 탭 보기' }).click();
+  await creator.getByRole('button', { name: '캐릭터 탭에 저장' }).click();
+  await expect(creator).toBeHidden();
   await drawer.getByRole('group', { name: '캐릭터 항목' }).getByRole('button', { name: /^상태/ }).click();
   await expect(exhaustion.getByRole('textbox', { name: '현재 Exhaustion' })).toHaveValue('0');
   await expect(drawer.getByRole('button', { name: '사망 기록 · 새 생존자로' })).toHaveCount(0);
@@ -74,7 +74,7 @@ test('introductory damage can be recorded with physical dice and becomes a singl
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/play');
   const drawer = await openDrawer(page, '도메인');
-  await drawer.getByRole('combobox', { name: '도메인 방식' }).selectOption('intro');
+  await choose(drawer, '도메인 방식', 'intro');
   await closeDrawer(page);
   await page.getByText('도입 도메인 지도와 시작 불이익', { exact: true }).click();
   const start = page.getByRole('region', { name: '도입 도메인 시작 불이익' });
@@ -102,7 +102,7 @@ test('victory records the XP bonus for a creature strengthened by Growing Darkne
   await enter(explore.getByRole('region', { name: '조우 판정' }), '10');
   await explore.getByRole('button', { name: '조우 표로' }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Giant Spider');
   await combat.getByRole('button', { name: 'Giant Spider', exact: true }).click();
   await combat.getByRole('combobox', { name: 'Giant Spider 상태' }).selectOption('defeated');

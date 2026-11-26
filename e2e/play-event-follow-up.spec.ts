@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { openDrawer, openPane } from './helpers/play-desk';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
+import { choose } from './helpers/choice';
 
 async function physical(locator: Locator, name: string, value: string) {
   const input = locator.getByRole('textbox', { name, exact: true });
@@ -52,12 +53,12 @@ test('force and deep-search darkness follow-ups stay independent after archiving
   await physical(entry, '긴장 주사위 굴린 값', '2');
   const actions = explore.getByRole('region', { name: '선택 탐험 행동' });
   await openPane(actions, '문·함정 조사');
-  await actions.getByRole('combobox', { name: '조사할 대상' }).selectOption('present');
+  await choose(actions, '조사할 대상', 'present');
   const door = actions.getByRole('region', { name: '문 조사' });
   await detectTrap(door);
   await physical(door, '함정 여부 D10', '6');
   await physical(door, '잠김 여부 D20', '15');
-  await door.getByLabel('개방 방법').selectOption('force');
+  await choose(door, '개방 방법', 'force');
   await skillRoll(door, '강제 개방 판정', 'Athletics', 50, 38);
   const force = door.getByRole('region', { name: '강제 개방 긴장 굴림' });
   const warning = page.getByRole('region', { name: '이동 전에 마칠 판정', exact: true });

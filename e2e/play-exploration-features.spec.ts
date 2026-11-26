@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { openPane } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 async function enter(locator: Locator, name: string, value: string) {
   const input = locator.getByRole('textbox', { name, exact: true });
@@ -134,7 +135,7 @@ test('the next-action shortcut follows search rewards, resolved encounters and c
   await expect(next).toHaveAccessibleDescription('뒤지기 조우로');
   await encounter.click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
   await combat.getByRole('button', { name: '전투만 마치기', exact: true }).click();

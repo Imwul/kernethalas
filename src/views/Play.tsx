@@ -184,6 +184,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const lastRollField = useRef<Partial<Record<StageId, string>>>({});
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [moveBlocked, setMoveBlocked] = useState(false);
   const moveWarning = useRef<HTMLElement>(null);
   const [exploration, setExploration] = useState<ExplorationReport | null>(null);
@@ -716,6 +717,12 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       ...(pcNow.xp !== undefined && pcNow.xp >= XP_TO_LEVEL ? [{ id: 'level', label: '레벨업 가능', level: 'good', icon: 'level' as const, onClick: goToLevelUp }] : []),
     ]),
   ];
+  // The running values the app tracks (Health stays on paper), always in sight; warnings above replace them when they fire.
+  const characterVitals = pcNow && pcRecord ? [
+    ...(pcNow.sanity !== undefined && pcNow.sanity > 0
+      ? [{ id: 'sanity', label: `Sanity ${pcNow.sanity}${pcRecord.sanityMax !== undefined ? `/${pcRecord.sanityMax}` : ''}` }] : []),
+    ...(pcNow.exhaustion !== undefined && pcNow.exhaustion < 11 ? [{ id: 'exhaustion', label: `Exh ${pcNow.exhaustion}` }] : []),
+  ] : [];
   const supplies = playSupplies(gear.ledger, sheet, roomLedgerId);
   const tracksLight = readPlayLight(draft.slots) !== null;
   const postedGear = roomLedgerId ? gear.ledger.entries.flatMap((entry) => {
@@ -855,8 +862,12 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           </PlayPopover>
           {!showCharacterWorkspace && <button className="btn ghost" type="button" ref={sessionButton} aria-expanded={sessionEditing || !!pause}
             aria-controls={sessionVisible ? sessionId : undefined} onClick={() => setSessionEditing(true)}>오늘 여기까지</button>}
-          {!showCharacterWorkspace && <button className="btn ghost play-reset-toggle" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
-            onClick={() => setConfirmReset((open) => !open)}>이번 장소 지우기</button>}
+          {/* Discarding the place is rare and destructive, so it sits behind the "⋯" menu instead of beside the session button. */}
+          {!showCharacterWorkspace && <PlayPopover className="play-more-menu" label="그 밖의 동작" align="end" open={moreOpen} onOpenChange={setMoreOpen}
+            trigger={<span aria-hidden="true">⋯</span>}>
+            <button className="play-menu-item" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
+              onClick={() => { setMoreOpen(false); setConfirmReset(true); }}>이번 장소 지우기…</button>
+          </PlayPopover>}
         </div>
       </header>
       {sessionVisible && <PlaySessionPanel id={sessionId} editing={sessionEditing} pause={pause} nextIntent={session.nextIntent} place={sessionPlace} facts={sessionFacts}
@@ -880,6 +891,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           ))}
         </nav>
         <div className="play-tray" role="group" aria-label="플레이 서랍">
+          <span className="play-tray-label" aria-hidden="true">장부</span>
           {drawerTabs.map(({ id, label, badge, flag }) => (
             <button key={id} type="button" className="play-tray-item" aria-expanded={drawer === id} aria-controls={PLAY_DRAWER_ID}
               onClick={() => toggleDrawer(id)}><DrawerTabLabel label={label} badge={badge} flag={flag} /></button>
@@ -889,7 +901,9 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
             <DrawerTabLabel label="장부" flag={needsBackup ? '백업 필요' : undefined} />
           </button>
         </div>
-        {characterAlerts.length > 0 && <div className="play-alerts" role="group" aria-label="캐릭터 경고">
+        {characterAlerts.length + characterVitals.length > 0 && <div className="play-alerts" role="group" aria-label="캐릭터 상태와 경고">
+          {characterVitals.map(({ id, label }) => <button key={id} type="button" className="play-alert-chip" data-level="info"
+            onClick={() => openCharacterSection('state')}>{label}</button>)}
           {characterAlerts.map(({ id, label, level, icon, onClick }) => <button key={id} type="button" className="play-alert-chip" data-level={level}
             onClick={onClick}><StatusIcon kind={icon} />{label}</button>)}
         </div>}

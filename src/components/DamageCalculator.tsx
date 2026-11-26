@@ -8,6 +8,7 @@ import { PerkNote } from './PerkNote';
 import { TogglePanel } from './TogglePanel';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import '../styles/damage-calculator.css';
+import { ChoiceButtons } from './ChoiceButtons';
 
 interface Impact {
   location: string;
@@ -126,13 +127,9 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
               <input value={modifierText} onChange={(event) => setModifierText(event.target.value)}
                 aria-invalid={modifier === null || undefined} placeholder="0" />
             </label>
-            <label className="field"><span>공격 판정</span>
-              <select value={critical} onChange={(event) => setCritical(Number(event.target.value) as 1 | 2 | 3)}>
-                <option value={1}>일반 명중</option>
-                <option value={2}>치명타 ×2</option>
-                <option value={3}>특수 치명타 ×3</option>
-              </select>
-            </label>
+            <ChoiceButtons label="공격 판정" value={critical} onChange={setCritical} options={[
+              { value: 1, label: '일반 명중' }, { value: 2, label: '치명타 ×2' }, { value: 3, label: '특수 치명타 ×3' },
+            ]} />
             {!pc && critical > 1 && <PerkNote perk="Precision Striker">치명타 피해를 다시 굴릴 수 있습니다.</PerkNote>}
             <label className="field"><span>대상 부위 Armor</span>
               <input value={armorText} onChange={(event) => setArmorOverride(event.target.value)} disabled={bypass}

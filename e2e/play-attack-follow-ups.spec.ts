@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 const button = (scope: Locator | Page, name: string | RegExp) => scope.getByRole('button', { name, exact: true });
 const textbox = (scope: Locator, name: string) => scope.getByRole('textbox', { name, exact: true });
@@ -13,7 +14,7 @@ async function physical(scope: Locator, value: string) {
 async function selectCreature(page: Page, name: string) {
   await button(page.getByRole('navigation', { name: '플레이 단계' }), '조우·전투').click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill(name);
   await button(combat, name).click();
   return { combat, card: combat.getByRole('region', { name: '전투 카드' }) };

@@ -1,23 +1,24 @@
 import { expect, test } from '@playwright/test';
+import { choose } from './helpers/choice';
 
 test('confirmed PC encounter and attack doubles reach camp with the correct skills', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Necropede');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
 
   const start = combat.getByRole('region', { name: '조우 시작 계산기' });
-  await start.getByRole('combobox', { name: '조우의 공포 특성' }).selectOption('4');
+  await choose(start, '조우의 공포 특성', '4');
   await start.getByRole('textbox', { name: 'PC Resolve' }).fill('40');
   await start.getByRole('textbox', { name: 'Resolve D100' }).fill('88');
   await expect(start.getByRole('status', { name: 'Resolve 결과' })).toContainText('Sanity 4 + D4 손실');
   await start.getByRole('button', { name: 'Resolve 더블 저널에 기록', exact: true }).click();
   await expect(start.getByRole('button', { name: 'Resolve 더블 저널에 기록됨', exact: true })).toBeDisabled();
 
-  await start.getByRole('combobox', { name: '조우 시작 방식' }).selectOption('surprise');
+  await choose(start, '조우 시작 방식', 'surprise');
   await start.getByRole('textbox', { name: '적 최고 Mind' }).fill('50');
   await start.getByRole('textbox', { name: 'PC 최저 Stealth' }).fill('50');
   await start.getByRole('textbox', { name: 'PC 기습 D100' }).fill('77');

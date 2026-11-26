@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { choose } from './helpers/choice';
 
 test('camp uses a cooked Ration, computes reduced recovery and opens the encounter after failure', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   const route = '/atlas/p-rest?view=list';
   await page.goto(route);
   const camp = page.getByRole('region', { name: '야영 계산기' });
-  await camp.getByLabel('Ration', { exact: true }).selectOption('missing');
+  await choose(camp, 'Ration', 'missing');
   await camp.getByText('요리 · 제작 · 그 밖의 야영 활동', { exact: true }).click();
   const cooking = camp.getByLabel('요리할 Ration 수');
   await cooking.fill('2');

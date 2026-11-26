@@ -8,6 +8,7 @@ import { ContextLink } from '../components/ReferenceContext';
 import { RulingMatrix } from '../components/RulingMatrix';
 import { TensionTool } from '../components/TensionTool';
 import { procedureTools } from '../components/procedure-tools';
+import { TogglePanel } from '../components/TogglePanel';
 import { BenchButton, Cite, Notes, PinButton, VChip, XRef, useVisit } from '../components/bits';
 import { NotFound } from './NotFound';
 import '../styles/atlas.css';
@@ -63,6 +64,9 @@ function useWidePlan() {
   return wide;
 }
 
+/** Procedures whose tool (the survivor creator) already shows every step in order. */
+const TOOL_COVERS_STEPS = new Set(['p-new-run']);
+
 export function AtlasPage({ id }: { id: string }) {
   const p = procById.get(id);
   const { search } = useLocation();
@@ -90,6 +94,27 @@ export function AtlasPage({ id }: { id: string }) {
       target?.scrollIntoView({ block: 'nearest' });
     });
   };
+  const steps = (
+    <>
+      <div className="atlas-controls">
+        <div className="seg" role="group" aria-label="절차 보기">
+          <button type="button" aria-pressed={view === 'list'} onClick={() => set('view', 'list')}>단계 목록</button>
+          <button type="button" aria-pressed={view === 'plan'} onClick={() => set('view', 'plan')}>도면</button>
+        </div>
+        {view === 'list' && (
+          <button type="button" className="btn ghost" onClick={() => set('detail', full ? null : 'full')}>{full ? '간략히 보기' : '모두 펼치기'}</button>
+        )}
+      </div>
+      {view === 'plan' ? (
+        <div className="atlas-drawing-layout">
+          <Plan key={p.id} p={p} selected={(active ?? start).id} onSelect={(node) => set('node', node)} />
+          <Inspector p={p} node={active ?? start} onSelect={(node) => set('node', node)} />
+        </div>
+      ) : (
+        <Outline p={p} selected={active?.id} full={full} onToggle={(node) => set('node', active?.id === node ? null : node)} onJump={jumpTo} />
+      )}
+    </>
+  );
   return (
     <div className="atlas-page">
       <header className="folio-head">
@@ -115,23 +140,10 @@ export function AtlasPage({ id }: { id: string }) {
       {p.id === 'p-explore-room' && <ExplorationTools />}
       {Tool && <Tool />}
       {p.id === 'p-attack' && <AttackComparison />}
-      <div className="atlas-controls">
-        <div className="seg" role="group" aria-label="절차 보기">
-          <button type="button" aria-pressed={view === 'list'} onClick={() => set('view', 'list')}>단계 목록</button>
-          <button type="button" aria-pressed={view === 'plan'} onClick={() => set('view', 'plan')}>도면</button>
-        </div>
-        {view === 'list' && (
-          <button type="button" className="btn ghost" onClick={() => set('detail', full ? null : 'full')}>{full ? '간략히 보기' : '모두 펼치기'}</button>
-        )}
-      </div>
-      {view === 'plan' ? (
-        <div className="atlas-drawing-layout">
-          <Plan key={p.id} p={p} selected={(active ?? start).id} onSelect={(node) => set('node', node)} />
-          <Inspector p={p} node={active ?? start} onSelect={(node) => set('node', node)} />
-        </div>
-      ) : (
-        <Outline p={p} selected={active?.id} full={full} onToggle={(node) => set('node', active?.id === node ? null : node)} onJump={jumpTo} />
-      )}
+      {/* When the tool on top already walks the player through the same steps, the step view waits behind a toggle. */}
+      {TOOL_COVERS_STEPS.has(p.id)
+        ? <TogglePanel label="절차 단계와 도면" defaultOpen={!!requestedView || !!requestedNode} className="atlas-steps-toggle">{steps}</TogglePanel>
+        : steps}
       <div className="atlas-notes">
         <Notes notes={p.notes} />
         <details className="fold atlas-details">

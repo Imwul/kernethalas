@@ -145,7 +145,7 @@ test('a workbench roll follows the page link and survives browser Back in its ac
 test('a workbench ruling includes the comparison matrix, exceptions, and roll tables', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('button', { name: '규칙 검색 열기', exact: true }).click();
   const search = page.getByRole('dialog', { name: '규칙 검색' });
   await search.getByRole('searchbox').fill('둘 다 실패');
   const title = '공격자와 방어자가 모두 판정에 실패하면?';

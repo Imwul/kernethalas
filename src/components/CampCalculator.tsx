@@ -10,6 +10,8 @@ import { TogglePanel } from './TogglePanel';
 import { JournalRoll } from './LootJournal';
 import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/camp-calculator.css';
+import { RollButton } from './RollButton';
+import { ChoiceButtons } from './ChoiceButtons';
 
 function readInteger(raw: string, signed = false) {
   const value = raw.trim().replace(/^−/, '-');
@@ -204,13 +206,10 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
     <section className="camp-calc" aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`}>야영 계산기</h2>
       <div className="camp-grid">
-        <div className="field">
-          <label htmlFor={`${id}-ration`}>Ration</label>
-            <select id={`${id}-ration`} value={hasRation ? 'available' : 'missing'} disabled={lockedTreatment} onChange={(event) => setField('hasRation', event.target.value === 'available')}>
-            <option value="available">보유분 1개 사용</option>
-            <option value="missing">보유분 없음</option>
-          </select>
-        </div>
+        <ChoiceButtons label="Ration" value={hasRation ? 'available' : 'missing'} disabled={lockedTreatment}
+          onChange={(next) => setField('hasRation', next === 'available')} options={[
+            { value: 'available', label: '보유분 1개 사용' }, { value: 'missing', label: '보유분 없음' },
+          ]} />
         {quantityField(CAMP_BARRICADE.id, CAMP_BARRICADE.label)}
       </div>
       <div className="camp-options">
@@ -261,11 +260,11 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
               disabled={lockedTreatment} placeholder="1–20" physicalDie={campRollField} invalid={invalidRoll} error="1–20 사이의 정수를 입력하세요." />
             <div className="camp-roll-actions">
               <button className="btn ghost" type="submit" disabled={lockedTreatment}>야영 판정 확인</button>
-              <button className="btn ghost" type="button" disabled={lockedTreatment} onClick={() => {
+              <RollButton disabled={lockedTreatment} onClick={() => {
                 recordCampCheck(rollDie(20), 'app');
                 setManual(null);
                 setInvalidRoll(false);
-              }}>D20 굴리기</button>
+              }}>D20 굴리기</RollButton>
             </div>
           </form>
         ) : (

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { chosen } from './helpers/choice';
 
 test('manual encounter lookup validates D20 and preserves the filtered mobile list', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -53,7 +54,7 @@ test('name search accepts Korean and English while preserving filters and sort',
   await expect(names).toHaveCount(0);
   await page.getByRole('button', { name: '필터 모두 해제' }).click();
   await expect(names).toHaveText(['Infernal Archon']);
-  await expect(page.getByLabel('정렬')).toHaveValue('health');
+  await expect(chosen(page, '정렬')).toHaveAttribute('data-value', 'health');
   await page.getByRole('button', { name: '이름 검색어 지우기' }).click();
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('');

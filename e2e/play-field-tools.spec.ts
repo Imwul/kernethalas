@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { openPane } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 test('a physical tie roll assigns the extra opponent, and a Dodge roll records and restores a retreat', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -12,7 +13,7 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   await journal.getByRole('textbox', { name: '장소 이름 (선택)' }).fill('동쪽 묘실');
   await go('조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('t-encounter-b');
+  await choose(combat, '조우 방식', 't-encounter-b');
   const creatureRoll = combat.getByRole('textbox', { name: 'D20 결과' });
   await creatureRoll.fill('2');
   await creatureRoll.press('Enter');
@@ -71,7 +72,7 @@ test('custom encounter sets migrate the old table, validate imports and round-tr
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('custom');
+  await choose(combat, '조우 방식', 'custom');
   const table = combat.getByRole('combobox', { name: '이 도메인에서 사용할 조우표' });
   await combat.getByText('사용자 지정 조우표 편집', { exact: true }).click();
   await expect(combat.getByRole('list', { name: '저장한 조우 범위' })).toContainText('Necropede');

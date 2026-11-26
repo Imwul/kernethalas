@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { choose } from './helpers/choice';
 
 async function manualRoll(scope: Locator, value: string) {
   await scope.getByRole('textbox', { name: '직접 굴린 값', exact: true }).fill(value);
@@ -25,7 +26,7 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     await exploration.getByRole('button', { name: '조우 표로', exact: true }).click();
     const combat = page.getByRole('region', { name: '조우와 전투 도구' });
     await combat.getByRole('textbox', { name: 'D6 결과', exact: true }).fill('4');
-    await combat.getByRole('button', { name: 'D6 확인', exact: true }).click();
+    await combat.getByRole('button', { name: '확인', exact: true }).click();
     await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
     await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
     await expect(combat.getByRole('heading', { name: 'Necropede' })).toBeVisible();
@@ -84,7 +85,7 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
       await stages.getByRole('button', { name: '조우·전투', exact: true }).click();
       await expect(combat.getByRole('button', { name: '조우 다시 선택', exact: true })).toHaveCount(0);
       await combat.getByRole('button', { name: '새 조우 시작', exact: true }).click();
-      await combat.getByRole('combobox', { name: '조우 방식', exact: true }).selectOption('t-encounter-b');
+      await choose(combat, '조우 방식', 't-encounter-b');
       await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
       await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
       await combat.getByRole('button', { name: '전투만 마치기', exact: true }).click();
@@ -109,7 +110,8 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
       await expect(journal).toContainText('Crafting Supplies 1');
     }
 
-    await page.getByRole('button', { name: '이번 장소 지우기', exact: true }).click();
+    await page.getByRole('button', { name: '그 밖의 동작', exact: true }).click();
+    await page.getByRole('button', { name: '이번 장소 지우기…', exact: true }).click();
     await page.getByRole('button', { name: '지우고 새로 시작', exact: true }).click();
     await expect(exploration.getByRole('region', { name: '방·통로 모양' })).toBeVisible();
     await stages.getByRole('button', { name: '저널', exact: true }).click();

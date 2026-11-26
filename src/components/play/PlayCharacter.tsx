@@ -93,10 +93,10 @@ export function PlayCharacterWorkspace({ onboarding, view, onView, onBack, onFin
         </button>}
       </header>
       {view === 'create' ? <PlayDraftScope root name="character">
-        <CharacterCreator onApplyGear={onApplyGear} onUndoGear={onUndoGear} onDone={onFinish} doneLabel={onboarding ? '탐험 시작' : undefined} />
+        <CharacterCreator onApplyGear={onApplyGear} onUndoGear={onUndoGear} onDone={onFinish} doneLabel={onboarding ? '이 생존자로 탐험 시작' : '캐릭터 탭에 저장'} />
       </PlayDraftScope> : view === 'sheet' ? <>
         <PlayCharacter />
-        <div className="play-character-workspace-actions"><button type="button" className="btn primary" onClick={onFinish}>탐험 시작</button></div>
+        <div className="play-character-workspace-actions"><button type="button" className="btn primary" onClick={onFinish}>이 캐릭터로 탐험 시작</button></div>
       </> : <>
         <div className="play-character-setup-choices">
           <button type="button" aria-labelledby="play-setup-create" aria-describedby="play-setup-create-detail" onClick={() => onView('create')}>
@@ -153,22 +153,23 @@ function CharacterSheet({ onCreate }: { onCreate?: () => void }) {
     <section className="play-character" aria-label="캐릭터 기본값">
       <CharacterTabs section={section} onSection={setSection} />
       <div className="play-character-section" hidden={section !== 'sheet'} role="group" aria-label="기본·Skill">
-        {onCreate && <div className="play-character-top">
-          <button type="button" className={empty ? 'btn primary' : 'btn ghost'} onClick={onCreate}>새 생존자 만들기</button>
+        {/* An empty sheet starts with the creator; once a survivor exists, replacing it is a rare step kept at the bottom. */}
+        {onCreate && empty && <div className="play-character-top">
+          <button type="button" className="btn primary" onClick={onCreate}>새 생존자 만들기</button>
         </div>}
         <div className="play-character-head">
           <label className="field play-character-name"><span>이름</span>
-            <input value={character.name ?? ''} maxLength={40} autoComplete="off" placeholder="선택"
+            <input value={character.name ?? ''} maxLength={40} autoComplete="off" placeholder="선택 사항"
               onChange={(event) => pc.update({ name: event.target.value.trim() ? event.target.value.slice(0, 40) : undefined })} />
           </label>
           <label className="field"><span>PC 레벨</span>
             <input inputMode="numeric" maxLength={2} value={text('level', pc.level)} aria-invalid={invalid('level') || undefined}
-              onBlur={() => settle('level')} placeholder="예 3"
+              onBlur={() => settle('level')} placeholder="예: 3"
               onChange={(event) => type('level', event.target.value, (level) => pc.update({ level: level && level <= 99 ? level : undefined }))} />
           </label>
           <label className="field"><span>XP</span>
             <input inputMode="numeric" maxLength={7} value={text('xp', xp === undefined ? '' : String(xp))} aria-invalid={invalid('xp', 7) || undefined}
-              onBlur={() => settle('xp')} placeholder="예 340"
+              onBlur={() => settle('xp')} placeholder="예: 340"
               onChange={(event) => type('xp', event.target.value, (score) => pc.update({ xp: score === undefined ? undefined : score - room.xp }), 7)} />
           </label>
         </div>
@@ -183,6 +184,9 @@ function CharacterSheet({ onCreate }: { onCreate?: () => void }) {
             {skills.map(skillField)}
           </fieldset>
         ))}
+        {onCreate && !empty && <div className="play-character-top play-character-replace">
+          <button type="button" className="btn ghost" onClick={onCreate}>새 생존자 만들기</button>
+        </div>}
         {onCreate && <Graveyard />}
       </div>
       <div className="play-character-section" hidden={section !== 'state'} role="group" aria-label="상태">

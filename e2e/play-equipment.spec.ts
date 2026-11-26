@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { choose } from './helpers/choice';
 
 async function openEquipment(page: Page) {
   const panels = page.getByRole('region', { name: '소지칸 검산' });
@@ -15,7 +16,7 @@ test('carrying capacity previews mixed loot bundles and retains counts at 320px'
   await openEquipment(page);
   const carry = page.getByRole('region', { name: '소지칸 검산' });
   await carry.getByLabel('Backpack', { exact: true }).check();
-  await carry.getByLabel('Pouch 수', { exact: true }).selectOption('2');
+  await choose(carry, 'Pouch 수', '2');
   await carry.getByLabel('Normal 보유 수량').fill('2');
   await carry.getByLabel('Heavy 보유 수량').fill('1');
   await carry.getByLabel('Light 보유 수량').fill('9');
@@ -57,14 +58,13 @@ test('merchant confirms catalog purchases, rarity sales, and negotiated prices i
   await exploration.getByRole('button', { name: '상인 거래로', exact: true }).click();
   const merchant = page.getByRole('region', { name: '상인 거래' });
   const choice = merchant.getByLabel('거래할 품목');
-  const direction = merchant.getByLabel('거래 방식');
   const quantity = merchant.getByLabel('수량', { exact: true });
   const add = merchant.getByRole('button', { name: '거래 목록에 추가' });
 
   await choice.selectOption({ label: 'Torch' });
   await quantity.fill('2');
   await add.click();
-  await direction.selectOption('sell');
+  await choose(merchant, '거래 방식', 'sell');
   await choice.selectOption({ label: 'Dagger' });
   await expect(merchant.locator('.play-trade-unit')).toHaveText('3₵');
   await quantity.fill('2');

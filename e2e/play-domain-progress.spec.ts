@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 const explore = (page: Page) => page.getByRole('region', { name: '장소 탐험' });
 async function showDomain(page: Page, name: string) {
@@ -111,7 +112,7 @@ test('the introductory paper map uses its own encounter lookup and a marked exit
   await showDomain(page, '도메인 1');
   const effects = page.getByRole('region', { name: '도메인 효과' });
   const settings = effects.getByRole('region', { name: '도메인 진행 설정' });
-  await settings.getByRole('combobox', { name: '도메인 방식' }).selectOption('intro');
+  await choose(settings, '도메인 방식', 'intro');
   await settings.getByRole('button', { name: '첫 진입 기록 · XP +50' }).click();
   await expect(settings.getByRole('button', { name: '첫 진입 기록 · XP +50' })).toHaveCount(0);
   await closeDrawer(page);

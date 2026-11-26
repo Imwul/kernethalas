@@ -60,7 +60,7 @@
   min-block-size: 44px;
   font: 14px/1.4 var(--f-ui);
 }
-.survival-conditions input { flex: none; accent-color: var(--copper-ink); }
+.survival-conditions input { flex: none; }
 
 .survival-preview,
 .survival-actions {

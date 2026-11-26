@@ -9,6 +9,7 @@ import { findCreatureNames } from '../lib/search';
 import { ContextLink, ReferenceContext } from '../components/ReferenceContext';
 import { ISearch } from '../components/icons';
 import '../styles/bestiary.css';
+import { ChoiceButtons } from '../components/ChoiceButtons';
 
 /** Bestiary: every creature, Overseer and minion with the numbers you need at the table. */
 
@@ -226,15 +227,8 @@ export function Bestiary() {
         ))}
       </div>
       <div className="bestiary-sort">
-        <label htmlFor="bestiary-sort">정렬</label>
-        <select id="bestiary-sort" value={sort} onChange={(e) => set({ s: e.target.value === 'name' ? null : e.target.value })}>
-          {(Object.keys(SORTS) as SortId[]).map((k) => (
-            <option key={k} value={k}>
-              {SORTS[k].ko}
-              {k === 'name' ? '' : ' 높은 순'}
-            </option>
-          ))}
-        </select>
+        <ChoiceButtons label="정렬" value={sort} onChange={(next) => set({ s: next === 'name' ? null : next })}
+          options={(Object.keys(SORTS) as SortId[]).map((k) => ({ value: k, label: k === 'name' ? SORTS[k].ko : `${SORTS[k].ko} 높은 순` }))} />
         <span className="bestiary-count" role="status">
           {list.length}종
         </span>

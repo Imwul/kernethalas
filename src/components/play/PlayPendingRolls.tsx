@@ -102,7 +102,7 @@ export function PlayPendingRolls({ open, stage, roomId, place, wrapBattleId, rol
             </label>
             <label className="field"><span>대상 메모 (선택)</span>
               <input value={target} maxLength={PLAY_PENDING_TARGET_LIMIT} onChange={(event) => setTarget(event.currentTarget.value)}
-                placeholder="예 북쪽 문 · Necropede" />
+                placeholder="예: 북쪽 문 · Necropede" />
             </label>
             <button className="btn ghost" type="submit" disabled={!roomId || !selected}>보류 표시</button>
           </form>

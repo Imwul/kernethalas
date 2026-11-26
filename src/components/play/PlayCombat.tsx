@@ -15,7 +15,6 @@ import { AttackFollowUpProvider } from '../AttackFollowUps';
 import { CreatureCombatCard, type CreatureCombatHandle } from '../CreatureCombatCard';
 import { EncounterStart } from '../EncounterStart';
 import { XRef } from '../bits';
-import { IDie } from '../icons';
 import { PlayCreatureSearch } from './PlayCreatureSearch';
 import { PlayBestiaryAdd } from './PlayBestiaryAdd';
 import { EncounterLibraryControls, PlayCustomEncounterEditor } from './PlayCustomEncounter';
@@ -28,6 +27,8 @@ import { PlayStrip, PlayStripPane, stripPaneId, type StripItem } from './PlayPan
 import { PlayTargetAllocation } from './PlayTargetAllocation';
 import { PlayTurnSummary } from './PlayTurnSummary';
 import '../../styles/play-combat.css';
+import { RollButton } from '../RollButton';
+import { ChoiceButtons, type Choice } from '../ChoiceButtons';
 
 type EncounterTable = 't-encounter-a' | 't-encounter-b' | 't-overseer';
 type EncounterMethod = 'encounter' | EncounterTable | 'search' | 'custom';
@@ -93,6 +94,15 @@ interface EncounterRollProps {
   onResult: (value: number) => (() => void) | null;
 }
 
+const ENCOUNTER_METHODS: readonly Choice<EncounterMethod>[] = [
+  { value: 'encounter', label: '일반 조우 · D6로 A/B' },
+  { value: 't-encounter-a', label: '조우 표 A · D20' },
+  { value: 't-encounter-b', label: '조우 표 B · D20' },
+  { value: 't-overseer', label: 'Overseer · D10' },
+  { value: 'search', label: '생물 이름으로 찾기' },
+  { value: 'custom', label: '사용자 지정 조우표 · D20' },
+];
+
 function EncounterRoll({ table, customSetId, completed = false, submitLabel, onResult }: EncounterRollProps) {
   const inputId = useId();
   const fieldKey = `encounter-roll-${table?.id ?? customSetId}`;
@@ -132,11 +142,9 @@ function EncounterRoll({ table, customSetId, completed = false, submitLabel, onR
             if (error) setError('');
           }} aria-invalid={!!error || undefined} aria-describedby={error ? `${inputId}-error` : undefined} />
       </div>
-      <button type="submit" className="btn primary">{submitLabel}</button>
+      <button type="submit" className="btn ghost">{submitLabel}</button>
       {(!table || automaticRollSides(table) !== null) && (
-        <button type="button" className="btn ghost" onClick={() => apply(table ? rollTable(table) : rollDie(20), 'app')}>
-          <IDie /> {dice} 굴리기
-        </button>
+        <RollButton onClick={() => apply(table ? rollTable(table) : rollDie(20), 'app')}>{dice} 굴리기</RollButton>
       )}
       {error && <p className="field-err" id={`${inputId}-error`} role="alert">{error}</p>}
     </form>
@@ -182,7 +190,6 @@ function restoredLineup(seed: EncounterSeed | undefined) {
 export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOverseerKnown, onRevealDomainOverseer, onCreatureChange, onTargetsChange, onBattleEnd, onFlee, fled, finished,
   seed, bestiaryCreatureId, onCloseBestiaryRequest, customSets, customSetId, onCustomSetSelect, onCustomSetsChange, onMasterySheetChange,
   onMasteryJournalChange, currentOutcome, onPreviewBattleEnd, onNewEncounter, belt = [], onOpenBelt }: PlayCombatProps) {
-  const methodId = useId();
   const discovery = useContext(PlayDiscoveryMode);
   const addTargetId = useId();
   const [method, setMethod] = usePlayDraftState<EncounterMethod>('method', initialKind === 'overseer' ? 't-overseer' : 'encounter');
@@ -194,7 +201,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
   const [startOrder, setStartOrder] = usePlayDraftState<Record<string, string>>('start-order', {});
   const toolStrip = useId();
   const selectedCard = useRef<CreatureCombatHandle>(null);
-  const methodInput = useRef<HTMLSelectElement>(null);
+  const methodInput = useRef<HTMLButtonElement>(null);
   const combatHeading = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef<'method' | 'target' | null>(null);
   const tableId = method === 'encounter' ? choice?.table : isEncounterTable(method) ? method : undefined;
@@ -387,24 +394,14 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
         </>
       ) : (
         <div className="play-combat-lookup">
-          <div className="field play-combat-method">
-            <label htmlFor={methodId}>조우 방식</label>
-            <select id={methodId} ref={methodInput} value={method} onChange={(event) => {
-              setMethod(event.target.value as EncounterMethod);
-              setChoice(null);
-              setCustomGap(null);
-            }}>
-              <option value="encounter">일반 조우 · D6로 A/B 결정</option>
-              <option value="t-encounter-a">조우 표 A 직접 선택 · D20</option>
-              <option value="t-encounter-b">조우 표 B 직접 선택 · D20</option>
-              <option value="t-overseer">Overseer · D10</option>
-              <option value="search">생물 이름으로 찾기</option>
-              <option value="custom">사용자 지정 조우표 · D20</option>
-            </select>
-          </div>
+          <ChoiceButtons className="play-combat-method" label="조우 방식" value={method} focusRef={methodInput} onChange={(next) => {
+            setMethod(next);
+            setChoice(null);
+            setCustomGap(null);
+          }} options={ENCOUNTER_METHODS} />
           {method === 'encounter' && (
             <>
-              <EncounterRoll table={TABLE_CHOICE} completed={choice !== null} submitLabel="D6 확인" onResult={(roll) => {
+              <EncounterRoll table={TABLE_CHOICE} completed={choice !== null} submitLabel="확인" onResult={(roll) => {
                 const id = resultRow(TABLE_CHOICE, roll)?.next?.[0]?.id;
                 return id && isEncounterTable(id) ? () => setChoice({ table: id, roll }) : null;
               }} />

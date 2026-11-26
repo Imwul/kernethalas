@@ -81,8 +81,9 @@
 
 .oracle-filters > button[aria-pressed='true'] {
   background: var(--copper-wash);
-  color: var(--copper-ink);
-  border-color: var(--copper);
+  color: var(--ink);
+  border-color: var(--copper-ink);
+  font-weight: 700;
 }
 
 .oracle-count {

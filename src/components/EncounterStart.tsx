@@ -11,6 +11,7 @@ import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
 import { useRecordSkillCritical } from '../lib/skill-growth';
 import { skillBreakdown } from '../lib/play-skill';
 import { XRef } from './bits';
+import { ChoiceButtons } from './ChoiceButtons';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/encounter-start.css';
 
@@ -80,7 +81,6 @@ export function EncounterStart({ creature, onResolved }: {
   /** Called with the turn order once it is settled (and any fear check is done), or null while it is open. */
   onResolved?: (summary: string | null, fold: boolean) => void;
 }) {
-  const id = useId();
   const commit = usePlayRoll();
   const record = useRecordSkillCritical();
   const knownFear = encounterFear(creature?.traits ?? []);
@@ -146,15 +146,13 @@ export function EncounterStart({ creature, onResolved }: {
     <section className="encounter-start" aria-label="조우 시작 계산기">
       <div className="encounter-grid">
         <CheckField label="적 최고 Mind" value={mind} set={setMind} />
-        <div className="field">
-          <label htmlFor={`${id}-mode`}>조우 시작 방식</label>
-          <select id={`${id}-mode`} value={activeMode} disabled={automaticSurprise} onChange={(event) => setMode(event.target.value as StartMode)}>
-            {automaticSurprise && <option value="shadow">Living Shadow · 자동 기습</option>}
-            <option value="initiative">Initiative부터</option>
-            <option value="surprise" disabled={alertActive}>PC가 기습 시도</option>
-            <option value="ambushed" disabled={livingShadow}>적에게 기습당함</option>
-          </select>
-        </div>
+        <ChoiceButtons label="조우 시작 방식" value={activeMode} disabled={automaticSurprise}
+          onChange={(next) => setMode(next as StartMode)} options={[
+            ...(automaticSurprise ? [{ value: 'shadow', label: 'Living Shadow · 자동 기습' }] : []),
+            { value: 'initiative', label: 'Initiative부터' },
+            { value: 'surprise', label: 'PC가 기습 시도', disabled: alertActive },
+            { value: 'ambushed', label: '적에게 기습당함', disabled: livingShadow },
+          ]} />
       </div>
       {creature && <p className="encounter-note">{creature.name} 기본 Mind {creature.mind}. 적이 여럿이면 가장 높은 Mind를 사용하세요.</p>}
       {livingShadow && <p className="encounter-note encounter-perk">Living Shadow Perk · 기습당하지 않습니다.</p>}
@@ -166,14 +164,11 @@ export function EncounterStart({ creature, onResolved }: {
             if (event.target.checked && mode === 'surprise') setMode('initiative');
           }} /> 조우에 Alert 적 있음
         </label>
-        <div className="field">
-          <label htmlFor={`${id}-fear`}>조우의 공포 특성</label>
-          <select id={`${id}-fear`} value={fearLoss} onChange={(event) => setFear(Number(event.target.value))}>
-            <option value={0} disabled={knownFear > 0}>없음</option>
-            <option value={2} disabled={knownFear > 2}>Frightening</option>
-            <option value={4}>Horrifying</option>
-          </select>
-        </div>
+        <ChoiceButtons label="조우의 공포 특성" value={fearLoss} onChange={setFear} options={[
+          { value: 0, label: '없음', disabled: knownFear > 0 },
+          { value: 2, label: 'Frightening', disabled: knownFear > 2 },
+          { value: 4, label: 'Horrifying' },
+        ]} />
       </div>
       {alertActive && <p className="encounter-note"><XRef id="creature-traits">Alert</XRef> 적은 기습할 수 없습니다.</p>}
 

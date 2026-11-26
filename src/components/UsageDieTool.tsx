@@ -4,8 +4,8 @@ import { readOracleValue } from '../lib/oracle';
 import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import { resolveUsageDie, USAGE_DIE_PROFILES, type UsageDie, type UsageDieRule } from '../lib/usage-die';
 import { XRef } from './bits';
-import { IDie } from './icons';
 import '../styles/usage-die.css';
+import { RollButton } from './RollButton';
 
 interface Props {
   rule: UsageDieRule;
@@ -63,11 +63,11 @@ export function UsageDieTool({ rule, onReport, progress, hideTitle = false }: Pr
                 </select>
               </div>
             )}
-            <button className="btn primary" type="button" disabled={sides === null} onClick={() => {
+            <RollButton disabled={sides === null} onClick={() => {
               if (sides !== null) showRoll(rollDie(sides), 'app');
             }}>
-              <IDie /> {die ? `${die} 굴리기` : '굴리기'}
-            </button>
+              {die ? `${die} 굴리기` : '굴리기'}
+            </RollButton>
           </div>
           <form className="usage-die-inputs" data-play-roll noValidate onSubmit={(event) => {
             event.preventDefault();

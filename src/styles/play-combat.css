@@ -43,10 +43,8 @@
 .play-combat-lookup .xref { min-height: 44px; }
 
 .play-combat-lookup .xref { align-items: center; justify-self: start; }
-.play-combat-method,
 .play-combat-search > .field { max-width: 25rem; }
-.play-combat-method select { font-family: var(--f-ui); }
-.play-combat-method select:focus { scroll-margin-block: calc(var(--header-h) + var(--s2)); }
+.play-combat-method button:focus { scroll-margin-block: calc(var(--play-stage-top, var(--header-h)) + var(--s2)); }
 
 .play-combat-roll {
   display: grid;

@@ -109,7 +109,7 @@ export function PlayExhaustion() {
             <button type="button" className="edge-btn edge-minus" aria-pressed={direction === '−'} onClick={() => setDirection('−')}>−<span className="sr-only"> 줄임</span></button>
           </div>
           <label className="field play-exhaustion-reason"><span>이유 (선택)</span>
-            <input value={reason} maxLength={40} onChange={(event) => setReason(event.target.value)} placeholder="예 화산열" /></label>
+            <input value={reason} maxLength={40} onChange={(event) => setReason(event.target.value)} placeholder="예: 화산열" /></label>
         </div>
         <div className="play-exhaustion-amounts" role="group" aria-label="양">
           {AMOUNTS.map((amount) => <button key={amount} type="button" className="btn ghost"

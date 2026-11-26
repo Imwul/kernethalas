@@ -118,7 +118,7 @@
   min-inline-size: 0;
   overflow-wrap: anywhere;
 }
-.play-turn-usage input { flex: none; inline-size: 17px; block-size: 17px; accent-color: var(--copper-ink); }
+.play-turn-usage input { flex: none; inline-size: 17px; block-size: 17px; }
 .play-turn-reactions .xref { align-items: center; min-block-size: 44px; font-variant-numeric: tabular-nums; }
 .play-turn-belt, .play-turn-context ul { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
 .play-turn-context {

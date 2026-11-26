@@ -11,6 +11,7 @@ import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import { TogglePanel } from './TogglePanel';
 import '../styles/loot-journal.css';
+import { RollButton } from './RollButton';
 
 type JournalRollProps = {
   value: number | null;
@@ -68,10 +69,10 @@ export function JournalRoll({ label, value, onValue, resultText, breakdown, fiel
         {sides === 100 && <PlayZeroKey onInput={() => { setTyped('00'); setInvalid(false); }} />}
         <button type="submit" className="btn ghost">확인</button>
         {canRoll && (
-          <button type="button" className="btn ghost" onClick={() => {
+          <RollButton onClick={() => {
             const roll = table ? rollTable(table) : rollDie(sides);
             if (roll !== null) commit(roll, 'app');
-          }}>{dice} 굴리기</button>
+          }}>{dice} 굴리기</RollButton>
         )}
         {invalid && <p id={`${id}-error`} className="field-err" role="alert">1–{sides}{sides === 100 && ' 또는 00'}을 입력하세요.</p>}
       </form>

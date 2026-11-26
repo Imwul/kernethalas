@@ -5,6 +5,7 @@ import { usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-dra
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/loot-journal.css';
+import { RollButton } from './RollButton';
 
 /** Damage Pool roll: one die counts. `choose` lets the player pick it; otherwise the highest die is used. */
 export interface DamagePoolOptions {
@@ -72,7 +73,7 @@ export function PhysicalDiceRoll({ label, dice, value, onValue, resultText, pool
         </div>
         {allowZero && <PlayZeroKey onInput={() => { setTyped('00'); setInvalid(false); }} />}
         <button className="btn ghost" type="submit">확인</button>
-        <button className="btn ghost" type="button" onClick={() => apply(sides.map((side) => rollDie(side)), 'app')}>굴리기</button>
+        <RollButton onClick={() => apply(sides.map((side) => rollDie(side)), 'app')} />
         {invalid && <p className="field-err" role="alert">{sameSize
           ? `1–${sides[0]}${sides[0] === 100 ? ' 또는 00' : ''} 결과를 ${sides.length}개 입력하세요.`
           : '표시된 주사위 순서대로 결과를 공백으로 구분해 입력하세요.'}</p>}

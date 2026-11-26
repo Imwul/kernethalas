@@ -97,7 +97,7 @@
   min-block-size: 44px;
   min-inline-size: 0;
 }
-.damage-pool-option input[type='radio'] { flex: none; inline-size: auto; min-block-size: 0; accent-color: var(--copper-ink); }
+.damage-pool-option input[type='radio'] { flex: none; inline-size: auto; min-block-size: 0; }
 .damage-pool-face b { font-variant-numeric: tabular-nums; }
 .damage-pool-preview { color: var(--ink-2); }
 .damage-pool-tag { color: var(--ink-2); font: 600 12px/1.4 var(--f-ui); }

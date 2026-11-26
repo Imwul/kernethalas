@@ -111,7 +111,7 @@ export function PlayPaperClues({ area, domainId, active, locations, capture, onC
       setFeedback(`${chosenId}에 단서를 저장했습니다.`);
     }}>
       {!active && <label className="field"><span>단서를 남길 지도 번호</span>
-        <input ref={locationInput} value={paperId} maxLength={32} autoComplete="off" placeholder="예 B-07"
+        <input ref={locationInput} value={paperId} maxLength={32} autoComplete="off" placeholder="예: B-07"
           onChange={(event) => { setPaperId(event.target.value); setError(''); }} />
       </label>}
       <label className="field play-clue-text"><span>단서 내용{draft.source !== 'note' ? ` · ${MAP_CLUE_SOURCES[draft.source]}` : ''}</span>

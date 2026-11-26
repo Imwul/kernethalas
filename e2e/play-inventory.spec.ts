@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 async function enterDie(group: Locator, value: string) {
   const input = group.getByRole('textbox', { name: '직접 굴린 값', exact: true });
@@ -35,7 +36,7 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   await closeDrawer(page);
   await go('조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('t-overseer');
+  await choose(combat, '조우 방식', 't-overseer');
   const result = combat.getByRole('textbox', { name: 'D10 결과' });
   await result.fill('5');
   await result.press('Enter');

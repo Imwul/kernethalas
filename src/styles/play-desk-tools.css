@@ -173,7 +173,10 @@
 }
 
 /* Character warnings beside the drawer buttons: tap to open the matching section or tool */
-.play-alerts { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.play-alerts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+/* wide bars: stage tabs | character values and warnings | ledger buttons on the right edge */
+.play-bar > .play-alerts { order: 1; margin-inline-start: auto; }
+.play-bar > .play-tray { order: 2; }
 .play-alert-chip {
   display: inline-flex;
   align-items: center;
@@ -187,6 +190,7 @@
   font: 700 13px/1.3 var(--f-ui);
   white-space: nowrap;
 }
+.play-alert-chip[data-level='info'] { color: var(--ink-2); font: 400 13px/1.3 var(--f-mono); }
 .play-alert-chip[data-level='good'] { border-color: var(--copper-ink); background: var(--copper-wash); color: var(--copper-ink); }
 .play-alert-chip[data-level='warn'] { border-color: var(--ochre); color: var(--ochre); }
 .play-alert-chip[data-level='danger'] { border-color: var(--oxblood); background: var(--oxblood-wash); color: var(--oxblood-ink); }

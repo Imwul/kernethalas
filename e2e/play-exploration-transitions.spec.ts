@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { detectTrap, skillRoll } from './helpers/skill-roll';
+import { choose } from './helpers/choice';
 
 async function physicalRoll(section: Locator, name: string, value: string) {
   const input = section.getByRole('textbox', { name, exact: true });
@@ -34,7 +35,7 @@ test('a trap event opens the same environmental trap form at mobile width', asyn
   await expect(trap.getByRole('textbox', { name: '잠김 여부 D20' })).toHaveCount(0);
   await detectTrap(trap);
   await physicalRoll(trap, '함정 종류 D10', '2');
-  await trap.getByLabel('함정 처리 방법').selectOption('disarm');
+  await choose(trap, '함정 처리 방법', 'disarm');
   await skillRoll(trap, '해제 판정', 'Thievery', 50, 32, 4);
   await expect(trap.getByText('함정 해제 · XP +10', { exact: true })).toBeVisible();
   await page.reload();

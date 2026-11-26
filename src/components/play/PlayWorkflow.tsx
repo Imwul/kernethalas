@@ -57,7 +57,8 @@ function findRollField(root: HTMLElement | null, field: string) {
   const enabled = Array.from(root?.querySelectorAll<HTMLElement>(`${FIELD}:not(:disabled)`) ?? []);
   return enabled.find((element) => element.dataset.playRollField === field)
     ?? enabled.find((element) => element.dataset.playRollLegacyField === field)
-    ?? root?.querySelector<HTMLElement>(`select[data-play-attack-field="${CSS.escape(field)}"]:not(:disabled)`) ?? undefined;
+    ?? root?.querySelector<HTMLElement>(`[data-play-attack-field="${CSS.escape(field)}"] button[aria-pressed="true"]:not(:disabled)`)
+    ?? root?.querySelector<HTMLElement>(`[data-play-attack-field="${CSS.escape(field)}"] button:not(:disabled)`) ?? undefined;
 }
 
 export function focusPlayRoll(stage: Stage, field?: string, onResult?: (focused: boolean) => void) {
@@ -206,7 +207,7 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
 
   return (
     <section className="play-action-bar" aria-label="다음 행동 바로가기" ref={barRef}>
-      <button className="btn ghost play-jump-roll" aria-label={target ? '다음 행동' : '현재 단계로 이동'}
+      <button className="btn play-jump-roll" aria-label={target ? '다음 행동' : '현재 단계로 이동'}
         aria-keyshortcuts="N" title="단축키 N"
         aria-describedby="play-jump-roll-target" type="button" onClick={jump}>
         <span>{target ? '다음 행동' : '현재 단계'}</span>

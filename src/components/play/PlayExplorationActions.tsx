@@ -26,6 +26,8 @@ import { PlayStrip, PlayStripPane, stripPaneId } from './PlayPanels';
 import { SpoilsRoll } from './PlayWrapUp';
 import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../../lib/play-skill';
 import { SkillAdjustments } from './SkillAdjustments';
+import { RollButton } from '../RollButton';
+import { ChoiceButtons } from '../ChoiceButtons';
 
 export type ActionSheetItem = PaperChange;
 type SearchReport = { used: boolean; needsEncounter: boolean; text: string; item: string; gear?: GearEffect };
@@ -414,7 +416,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
                 </select>
               </label>
               {mapExit === 'manual' && <label className="field"><span>출입구 표기</span>
-                <input value={manualExit} maxLength={48} placeholder="예 북쪽 철문" onChange={(event) => {
+                <input value={manualExit} maxLength={48} placeholder="예: 북쪽 철문" onChange={(event) => {
                   setManualExit(event.target.value);
                   setSavedDoorMessage('');
                 }} />
@@ -424,12 +426,9 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
             {previousDoor?.deferred && !resumedDoor && !doorPresent && <button type="button" className="btn ghost"
               onClick={() => startResuming(previousDoor)}>저장한 문 조사 이어가기</button>}
           </section>}
-          {!resumedDoor && !previousDoor?.opened && !savedInvestigation && <label className="field"><span>조사할 대상</span>
-            <select value={door} onChange={(event) => setDoor(event.target.value as typeof door)}>
-              <option value="roll">문 존재부터 굴리기</option>
-              <option value="present">지도에 문 표시됨</option>
-            </select>
-          </label>}
+          {!resumedDoor && !previousDoor?.opened && !savedInvestigation && <ChoiceButtons label="조사할 대상" value={door} onChange={setDoor} options={[
+            { value: 'roll', label: '문 존재부터 굴리기' }, { value: 'present', label: '지도에 문 표시됨' },
+          ]} />}
           {door === 'roll' && (!previousDoor || !previousDoor.opened && !savedInvestigation) && <PlayDraftScope name={`exists-${doorKey}`}>
             <JournalRoll key={doorKey} tableId={DOOR_TABLE.id} label="문이 있는가?" value={doorRoll} onValue={setDoorRoll}
               resultText={doorRoll !== null && doorRoll <= 5 ? '문 있음 · 잠김과 함정을 이어서 확인합니다.' : '문 없음'} />
@@ -648,7 +647,7 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
         <div className="physical-check-actions">
           <PlayZeroKey onInput={() => { setRoll('00'); setInvalid(false); }} />
           <button className="btn ghost" type="submit">판정</button>
-          <button className="btn ghost" type="button" onClick={() => applyCheck(breakdown ? rollDie(100) : null, 'app')}>D100 굴리기</button>
+          <RollButton onClick={() => applyCheck(breakdown ? rollDie(100) : null, 'app')}>D100 굴리기</RollButton>
         </div>
         <SkillAdjustments skill="Scavenge" base={skill} onBase={setSkill} modifiers={modifiers} onModifiers={setModifiers} fixed={fixed} />
         {invalid && <p className="field-err" id={`${id}-scavenge-error`} role="alert">Skill 정수와 1–100 사이의 주사위(또는 00)를 입력하세요.</p>}

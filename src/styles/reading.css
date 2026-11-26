@@ -89,8 +89,8 @@
 .search-filters button[aria-pressed='true'] {
   border-color: var(--copper-ink);
   background: var(--copper-wash);
-  color: var(--copper-ink);
-  font-weight: bold;
+  color: var(--ink);
+  font-weight: 700;
 }
 .situation-finder { container-type: inline-size; }
 .situation-list { border-block-start: 1px solid var(--rule); }
@@ -231,19 +231,8 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 .search-foot [role='status'] { margin-inline-start: auto; }
 .search-keys kbd { margin-inline-start: 5px; }
 .tabbar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.tab-search {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 2px;
-  border: 0;
-  background: transparent;
-  color: var(--faded);
-  font: 12px var(--f-ui);
-}
-/* Search is an action, not a place: keep it neutral so it never reads as the current tab. */
-.tab-search svg { width: 22px; height: 22px; color: var(--copper-ink); }
-.tab-search:active { background: var(--copper-wash); }
+/* the centre tab opens play mode; its die keeps the oxblood accent used for rolling everywhere */
+.tabbar .tab-play svg { color: var(--oxblood-ink); }
 @media (max-width: 560px) {
   .search-dialog { width: 100%; margin: 0 auto; max-height: min(100dvh, var(--search-viewport, 100dvh)); }
   .search-preview { grid-template-columns: minmax(0, 1fr); gap: 2px; }

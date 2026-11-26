@@ -55,7 +55,7 @@
   min-block-size: 44px;
 }
 
-.play-equipment-check input { flex: none; accent-color: var(--copper-ink); }
+.play-equipment-check input { flex: none; }
 .play-carry-table { inline-size: 100%; border-collapse: collapse; table-layout: fixed; }
 .play-carry-table th, .play-carry-table td {
   padding: var(--s1);
@@ -116,4 +116,3 @@
 .play-trade-cart li > strong { text-align: end; }
 .play-trade-actions { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .play-trade-actions:empty { display: none; }
-.play-trade-actions .btn:disabled { opacity: 0.7; cursor: default; }

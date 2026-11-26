@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { chosen } from './helpers/choice';
 
 test('a mobile monster hit carries the critical, weak spot, armor and damage reactions into the breakdown', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -25,7 +26,7 @@ test('a mobile monster hit carries the critical, weak spot, armor and damage rea
 
   await expect(damage.getByRole('checkbox', { name: /머리 명중 적용.*약점/ })).toBeChecked();
   await expect(damage.getByRole('textbox', { name: '대상 부위 Armor' })).toHaveValue('2');
-  await expect(damage.getByRole('combobox', { name: '공격 판정' })).toHaveValue('2');
+  await expect(chosen(damage, '공격 판정')).toHaveAttribute('data-value', '2');
   await damage.getByRole('textbox', { name: '선택 주사위' }).fill('4');
   await damage.getByRole('textbox', { name: '고정 피해 보정' }).fill('1');
   await damage.getByRole('combobox', { name: '피해 유형' }).selectOption('Piercing');
@@ -71,7 +72,7 @@ test('an enemy critical carries the PC hit into Toughness and Health without spe
 
   const damage = card.getByRole('region', { name: 'PC 받는 피해 계산기' });
   await expect(damage.getByRole('checkbox', { name: /머리 명중 적용.*약점/ })).toBeChecked();
-  await expect(damage.getByRole('combobox', { name: '공격 판정' })).toHaveValue('2');
+  await expect(chosen(damage, '공격 판정')).toHaveAttribute('data-value', '2');
   await damage.getByRole('textbox', { name: '선택 주사위' }).fill('4');
   await damage.getByRole('combobox', { name: '피해 유형' }).selectOption('Piercing');
   await damage.getByRole('textbox', { name: '대상 부위 Armor' }).fill('2');

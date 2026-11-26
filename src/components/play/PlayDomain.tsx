@@ -10,6 +10,7 @@ import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
 import { PlayDiscoveryMode } from './PlayDiscovery';
 import { PlayTimeline } from './PlayTimeline';
+import { ChoiceButtons } from '../ChoiceButtons';
 
 interface Props {
   domain: PlayDomainRecord;
@@ -90,15 +91,10 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, overseerK
         <section className="play-domain-options" aria-label="도메인 진행 설정">
           <h3>탐험 진행</h3>
           <div className="play-domain-fields">
-            <label className="field"><span>도메인 방식</span>
-              <select value={progress.mode} disabled={progressStarted} onChange={(event) => {
-                const mode = event.target.value === 'intro' ? 'intro' : 'standard';
-                onUpdate({ progress: { ...progress, mode } });
-              }}>
-                <option value="standard">일반 도메인</option>
-                <option value="intro">도입 도메인 · 종이 지도</option>
-              </select>
-            </label>
+            <ChoiceButtons label="도메인 방식" value={progress.mode} disabled={progressStarted}
+              onChange={(mode) => onUpdate({ progress: { ...progress, mode } })} options={[
+                { value: 'standard', label: '일반 도메인' }, { value: 'intro', label: '도입 도메인 · 종이 지도' },
+              ]} />
             {activeDie && (
               <label className="field"><span>{activeDie === 'lairDie' ? '다음 은신처 주사위' : '다음 출구 주사위'}</span>
                 <select value={progress[activeDie]} onChange={(event) => {

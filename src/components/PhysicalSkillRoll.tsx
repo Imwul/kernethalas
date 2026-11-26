@@ -13,6 +13,7 @@ import { XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import { SkillAdjustments } from './play/SkillAdjustments';
 import '../styles/physical-skill-roll.css';
+import { RollButton } from './RollButton';
 
 const DIFFICULTY = [30, 20, 10, 0, 0, -10, -20, -30];
 const OUTCOMES = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패' } as const;
@@ -133,7 +134,7 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
         <div className="physical-check-actions">
           <PlayZeroKey onInput={() => update({ roll: '00' })} />
           <button type="submit" className="btn ghost">판정</button>
-          {!existingRoll && <button type="button" className="btn ghost" onClick={() => apply(rollDie(100), 'app')}>D100 굴리기</button>}
+          {!existingRoll && <RollButton onClick={() => apply(rollDie(100), 'app')}>D100 굴리기</RollButton>}
           {onClear && confirmed && <button type="button" className="btn ghost" onClick={() => commitRoll(() => {
             setConfirmed(null);
             setDraft({});

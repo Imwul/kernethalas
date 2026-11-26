@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
+import { choose } from './helpers/choice';
 
 const setup = async (page: Page) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -231,7 +232,7 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await page.getByRole('textbox', { name: '장소 이름 (선택)', exact: true }).fill('B-07');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
   await openPane(combat, '라운드');

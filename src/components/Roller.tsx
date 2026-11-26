@@ -6,10 +6,10 @@ import { tableRowSource } from '../lib/overlay';
 import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { CopyButton, XRef } from './bits';
-import { IDie } from './icons';
 import { RoomShapeDiagram, type RoomShapeState } from './RoomShapeDiagram';
 import { rangeText, rowTitle, showLabel } from './TableView';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
+import { RollButton } from './RollButton';
 
 interface Props {
   t: OracleTable;
@@ -70,13 +70,12 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
         </div>
         <div className="oracle-instrument-actions">
           {canRoll && (
-            <button className="btn primary" type="button" onClick={() => {
+            <RollButton onClick={() => {
               const number = rollTable(t);
               if (number !== null) rollValue(number, 'app');
             }}>
-              <IDie />
               {rollLabel ?? (value === null ? '굴리기' : '다시 굴리기')}
-            </button>
+            </RollButton>
           )}
           {value !== null && (
             <button className="btn ghost" type="button" onClick={() => { onValue(null); setManual(''); setInvalid(false); }}>

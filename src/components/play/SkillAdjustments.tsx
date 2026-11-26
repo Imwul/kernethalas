@@ -81,7 +81,7 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
             </label>
             <label className="field"><span>보정값 {index + 1}</span>
               <input value={amount} maxLength={24} disabled={disabled} onChange={(event) => patch(index, { amount: event.target.value })}
-                aria-invalid={!!amount.trim() && encounterInteger(amount) === null || undefined} placeholder="예 −10" />
+                aria-invalid={!!amount.trim() && encounterInteger(amount) === null || undefined} placeholder="예: −10" />
             </label>
             <button type="button" className="btn ghost" aria-label={`보정 ${index + 1} 삭제`} disabled={disabled}
               onClick={() => onModifiers(modifiers.filter((_, at) => at !== index))}>삭제</button>

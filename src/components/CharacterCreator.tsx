@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { entryById } from '../content';
 import { masteryCatalog } from '../content/entries/masteries';
 import {
@@ -15,6 +15,7 @@ import { XRef } from './bits';
 import { JournalRoll } from './LootJournal';
 import { MasteryBrowser } from './MasteryTree';
 import { PhysicalDiceRoll } from './PhysicalDiceRoll';
+import { RollButton } from './RollButton';
 import '../styles/character-creator.css';
 
 const outcomeText = (entry: string) => new Map((entryById.get(entry)?.outcomes ?? []).map(({ label, text }) => [label.replace(/\s*\(.*\)$/, ''), text]));
@@ -51,6 +52,16 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
   const [gearSaved, setGearSaved] = useState(false);
   const [message, setMessage] = useState('');
   const stepTitle = useRef<HTMLHeadingElement>(null);
+  const stepStrip = useRef<HTMLOListElement>(null);
+  // Keeps the current step visible in the strip when it scrolls sideways on narrow screens.
+  useEffect(() => {
+    const strip = stepStrip.current;
+    const current = strip?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!strip || !current || strip.scrollWidth <= strip.clientWidth) return;
+    const box = strip.getBoundingClientRect();
+    const node = current.getBoundingClientRect();
+    strip.scrollTo({ left: strip.scrollLeft + node.left - box.left - (box.width - node.width) / 2 });
+  }, [step]);
   const commit = usePlayRoll();
   const pc = usePlayCharacter();
   const status = stepStatus(draft);
@@ -75,23 +86,23 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
   const attributes = (
     <>
       <label className="field creator-name"><span>이름 (선택)</span>
-        <input value={draft.name} maxLength={40} autoComplete="off" onChange={(event) => patch({ name: event.target.value })} placeholder="예 Erthos" />
+        <input value={draft.name} maxLength={40} autoComplete="off" onChange={(event) => patch({ name: event.target.value })} placeholder="예: Erthos" />
       </label>
+      <div className="creator-step-actions">
+        <RollButton disabled={CREATION_ATTRIBUTES.every(({ id }) => draft.attributes[id])} onClick={() => {
+          const next = { ...draft.attributes };
+          for (const { id, dice } of CREATION_ATTRIBUTES) next[id] ??= rolled(dice);
+          commit(() => patch({ attributes: next }), { label: '속성 모두 굴리기', dice: '—', source: 'app',
+            value: CREATION_ATTRIBUTES.map(({ id }) => `${id} ${next[id]?.total}`).join(' · ') });
+        }}>빈 속성 모두 굴리기</RollButton>
+        <span className="creator-fixed is-inline">Exhaustion <b>0</b> <small>시작값 고정</small></span>
+      </div>
       <div className="creator-dice">
         {CREATION_ATTRIBUTES.map(({ id, dice }) => (
           <PhysicalDiceRoll key={id} label={id} dice={dice} value={draft.attributes[id]}
             onValue={(value) => change((previous) => ({ ...previous, attributes: { ...previous.attributes, [id]: value } }))}
             resultText={(value) => `${id} ${value.total}`} />
         ))}
-        <div className="creator-fixed"><span>Exhaustion</span><b>0</b></div>
-      </div>
-      <div className="creator-step-actions">
-        <button type="button" className="btn ghost" onClick={() => {
-          const next = { ...draft.attributes };
-          for (const { id, dice } of CREATION_ATTRIBUTES) next[id] ??= rolled(dice);
-          commit(() => patch({ attributes: next }), { label: '속성 모두 굴리기', dice: '—', source: 'app',
-            value: CREATION_ATTRIBUTES.map(({ id }) => `${id} ${next[id]?.total}`).join(' · ') });
-        }}>빈 속성 모두 굴리기</button>
       </div>
       <JournalRoll tableId="t-crime" label="죄목 (선택 · 규칙 효과 없음)" value={draft.crime} onValue={(crime) => patch({ crime })}
         resultText={crimeName(draft.crime)} />
@@ -274,13 +285,13 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
           <div className="creator-fixed"><span>Torch</span><b>1</b></div>
         </div>
         <div className="creator-step-actions">
-          <button type="button" className="btn ghost" onClick={() => {
+          <RollButton onClick={() => {
             const supplies = { ...draft.supplies };
             for (const { id, dice } of STARTING_SUPPLIES) supplies[id as SupplyId] ??= rolled(dice);
             const armorRoll = draft.armorPiece !== null && draft.armorGrade !== null ? {} : rollArmor();
             commit(() => patch({ supplies, ...armorRoll }), { label: '시작 장비 굴리기', dice: '—', source: 'app',
               value: STARTING_SUPPLIES.map(({ id, name }) => `${name} ${supplies[id]?.total}`).join(' · ') });
-          }}>빈 장비 주사위 모두 굴리기</button>
+          }}>빈 장비 주사위 모두 굴리기</RollButton>
         </div>
       </>}
     </>
@@ -288,8 +299,9 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
 
   const lines = creationLines(draft);
   const missing = CREATION_STEPS.filter(({ id }) => id !== 'summary' && !status[id]);
+  /** Writes the survivor into the character tab (and the starting gear into the ledger); true once everything landed. */
   const record = async () => {
-    if (!pc || !status.summary || applied || savingGear) return;
+    if (!pc || !status.summary || applied || savingGear) return false;
     const { character, skills: values } = creationRecord(draft);
     const previous = pc.snapshot();
     const items = withGear ? startingGear(draft) : [];
@@ -300,12 +312,17 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
     });
     setGearSaved(false);
     setMessage('');
-    if (!gearSource || !onApplyGear) return;
+    if (!gearSource || !onApplyGear) return true;
     setSavingGear(true);
     const saved = await onApplyGear(items, gearSource).catch(() => false);
     setGearSaved(saved);
     setMessage(saved ? '' : '장비 장부에 넣지 못했습니다. 장비 탭에서 직접 추가하세요.');
     setSavingGear(false);
+    return saved;
+  };
+  // One button records the survivor and moves on; a failed gear grant keeps the player here with the message and undo.
+  const finish = async () => {
+    if (await record()) onDone?.();
   };
   const summary = (
     <>
@@ -313,6 +330,9 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
         <span>남은 단계</span>
         {missing.map(({ id, numeral, label }) => <button key={id} type="button" className="linkbtn" onClick={() => go(id)}>{numeral}. {label}</button>)}
       </div>}
+      {pc && !applied && <label className="field creator-name"><span>이름</span>
+        <input value={draft.name} maxLength={40} autoComplete="off" onChange={(event) => patch({ name: event.target.value })} placeholder="비워 두어도 됩니다" />
+      </label>}
       <dl className="creator-lines" aria-label="종이에 적을 값">
         {lines.map(({ label, text }) => <div key={label}><dt>{label}</dt><dd>{text}</dd></div>)}
       </dl>
@@ -324,11 +344,12 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
         {pc && <>
           {draft.start === 'gear' && onApplyGear && <label className="creator-check"><input type="checkbox" checked={withGear} disabled={!!applied}
             onChange={(event) => setWithGear(event.target.checked)} />시작 장비도 장비 장부에 넣기</label>}
-          <button type="button" className="btn primary" disabled={!status.summary || !!applied} onClick={record}>캐릭터 탭에 채우기</button>
+          {!applied && <button type="button" className="btn primary" disabled={!status.summary || savingGear} onClick={() => void finish()}>
+            {onDone ? doneLabel : '캐릭터 탭에 채우기'}</button>}
         </>}
       </div>
       {pc && !applied && (pc.character.level !== undefined || pc.character.masteries?.length) && status.summary &&
-        <p className="creator-note">지금 캐릭터 탭의 기록(레벨 {pc.character.level ?? '?'})을 새 생존자로 바꿉니다. 바꾼 뒤 바로 되돌릴 수 있습니다.</p>}
+        <p className="creator-note">지금 캐릭터 탭의 기록(레벨 {pc.character.level ?? '?'})을 새 생존자로 바꿉니다. 바꾼 뒤에도 이 화면을 다시 열면 되돌릴 수 있습니다.</p>}
       {applied && pc && <div className="creator-step-actions">
         <p className="creator-done" role="status">캐릭터 탭에 채웠습니다{savingGear ? ' · 시작 장비 저장 중' : gearSaved ? ' · 시작 장비를 장부에 넣었습니다' : ''}.</p>
         <button type="button" className="linkbtn" disabled={savingGear} onClick={async () => {
@@ -342,7 +363,7 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
           setGearSaved(false);
           setMessage('');
         }}>캐릭터 기록 되돌리기</button>
-        {onDone && <button type="button" className="btn ghost" disabled={savingGear} onClick={onDone}>{doneLabel}</button>}
+        {onDone && <button type="button" className="btn primary" disabled={savingGear} onClick={onDone}>{doneLabel}</button>}
       </div>}
       {!pc && <p className="creator-note">플레이 화면의 <Link to="/play">캐릭터 탭</Link>에서 만들면 판정 칸·Mastery 테크트리·장비 장부에 바로 채워집니다.</p>}
       {message && <p className="creator-note" role="status">{message}</p>}
@@ -355,7 +376,8 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
     <section className="creator" aria-label="새 생존자 만들기">
       <div className="creator-head">
         <div className="creator-step-actions">
-          <button type="button" className="btn primary" disabled={!!applied} onClick={auto} title="빈 칸을 채우고 필요하면 무기 기술 배분을 조정합니다">완전 자동 생성</button>
+          <RollButton className={draft === EMPTY_CREATION ? 'primary' : undefined} disabled={!!applied} onClick={auto}
+            title="빈 칸을 채우고 필요하면 무기 기술 배분을 조정합니다">완전 자동 생성</RollButton>
           <button type="button" className="btn ghost" disabled={draft === EMPTY_CREATION || savingGear} onClick={() => {
             setCleared(draft);
             setDraft(EMPTY_CREATION);
@@ -369,7 +391,7 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
           setCleared(null);
         }}>되돌리기</button></p>}
       </div>
-      <ol className="creator-steps" aria-label="생성 단계">
+      <ol className="creator-steps" aria-label="생성 단계" ref={stepStrip}>
         {CREATION_STEPS.map(({ id, numeral, label }) => (
           <li key={id}><button type="button" aria-current={id === step ? 'step' : undefined} data-done={status[id] || undefined} disabled={!!applied && id !== step} onClick={() => go(id)}>
             <span className="creator-step-num" aria-hidden="true">{numeral}</span>{label}{status[id] && <span className="sr-only"> 완료</span>}
@@ -406,7 +428,7 @@ export function GoalCards({ chosen, limit, exclude = [], onToggle }: {
   return (
     <>
       <label className="field creator-goal-search"><span>목표 찾기</span>
-        <input value={goalQuery} onChange={(event) => setGoalQuery(event.target.value)} placeholder="예 Undead, 피해, Perk" /></label>
+        <input value={goalQuery} onChange={(event) => setGoalQuery(event.target.value)} placeholder="예: Undead, 피해, Perk" /></label>
       <div className="creator-cards creator-goals" role="group" aria-label="Personal Goal 목록">
         {goalList.map((goal) => {
           const picked = chosen.includes(goal.name);

@@ -38,7 +38,6 @@
 .play-gear-pending .play-gear-list select { grid-column: 1 / -1; width: 100%; max-width: 24rem; }
 .play-gear-integrity { display: block; color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
 .play-gear-amount { text-align: end; font-variant-numeric: tabular-nums; }
-.play-gear-list .btn:disabled { opacity: .65; }
 .play-gear-history > ol { margin-block-end: 0; padding-inline-start: 1.5rem; }
 .play-gear-history li { margin-block-end: var(--s1); overflow-wrap: anywhere; }
 .play-gear-history li > span { display: block; color: var(--ink-2); }

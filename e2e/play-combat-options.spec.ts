@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openDrawer } from './helpers/play-desk';
+import { choiceGroup, choose, chosen } from './helpers/choice';
 
 async function go(page: Page, stage: string) {
   await page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: stage, exact: true }).click();
@@ -9,7 +10,7 @@ async function selectCreature(page: Page, name: string) {
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await combat.getByRole('combobox', { name: '조우 방식' }).selectOption('search');
+  await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill(name);
   await combat.getByRole('button', { name, exact: true }).click();
   return combat;
@@ -26,9 +27,8 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   const combat = await selectCreature(page, 'Necropede');
   await combat.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = combat.getByRole('region', { name: '공격 판정 해석기' });
-  const defenseMode = attack.getByRole('combobox', { name: '방어 방식' });
   const verdict = attack.getByRole('status', { name: '공격 판정 결과' });
-  await defenseMode.selectOption('unopposed');
+  await choose(attack, '방어 방식', 'unopposed');
   await expect(attack.getByRole('link', { name: '기절' })).toBeVisible();
   await attack.getByRole('textbox', { name: '공격자 수치' }).fill('60');
   await attack.getByText('공격자 기본값·보정', { exact: true }).click();
@@ -46,11 +46,11 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   await expect(verdict).toContainText('Critical Strike');
   await attack.getByRole('button', { name: '공격 교환 확정' }).click();
   await attack.getByRole('button', { name: '다음 공격', exact: true }).click();
-  await expect(defenseMode).toHaveValue('opposed');
+  await expect(chosen(attack, '방어 방식')).toHaveAttribute('data-value', 'opposed');
   await expect(attack.getByRole('textbox', { name: '공격자 수치' })).toHaveValue('60');
   await expect(attack.getByRole('textbox', { name: '보정값 1' })).toHaveCount(0);
 
-  await defenseMode.selectOption('automatic');
+  await choose(attack, '방어 방식', 'automatic');
   await expect(attack.getByRole('link', { name: '의식 없음·수면·마비' })).toBeVisible();
   await expect(attack.getByRole('textbox', { name: /D100/ })).toHaveCount(0);
   await expect(verdict).toContainText('굴림 없이 명중');
@@ -61,8 +61,8 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   await expect(history).toContainText('기본 60 · 공격 기본 +10 · 상태·어둠 −5 = 65');
   await history.getByRole('button', { name: /판정 없음 자동 명중 수정 미리보기$/ }).click();
   await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
-  await expect(defenseMode).toBeFocused();
-  await expect(defenseMode).toHaveValue('automatic');
+  await expect(chosen(attack, '방어 방식')).toBeFocused();
+  await expect(chosen(attack, '방어 방식')).toHaveAttribute('data-value', 'automatic');
 });
 
 test('area saves stay separate and apply full or rounded half damage to named targets', async ({ page }) => {
@@ -81,7 +81,7 @@ test('area saves stay separate and apply full or rounded half damage to named ta
   }
   await expect(pc).toContainText('피해 절반 · 올림');
   await expect(ally).toContainText('행동표의 실패 효과');
-  await card.getByRole('combobox', { name: '피해 주사위', exact: true }).selectOption('shared');
+  await choose(card, '피해 주사위', 'shared');
   await roll(card.getByRole('region', { name: '공유 피해 굴림' }), '직접 굴린 값', '7');
   await expect(pc).toContainText('Arcane 피해 4 (절반 · 올림)');
   await expect(ally).toContainText('Arcane 피해 7');
@@ -89,7 +89,7 @@ test('area saves stay separate and apply full or rounded half damage to named ta
   await expect(pc).toContainText('Arcane 피해 4 (절반 · 올림)');
   await expect(ally).toContainText('Arcane 피해 7');
 
-  await card.getByRole('combobox', { name: '피해 주사위', exact: true }).selectOption('individual');
+  await choose(card, '피해 주사위', 'individual');
   await roll(pc, '직접 굴린 값', '5');
   await roll(ally, '직접 굴린 값', '6');
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
@@ -153,7 +153,7 @@ test('a creature reference opened during play returns to the same named campaign
   await detail.getByRole('link', { name: 'Dreadlord 조우에 추가', exact: true }).click();
   await expect(detail).toHaveCount(0);
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await expect(combat.getByRole('combobox', { name: '조우 방식' })).toBeVisible();
+  await expect(choiceGroup(combat, '조우 방식')).toBeVisible();
   expect(new URL(page.url()).searchParams.get('campaign')).toBe(campaign);
   await combat.getByRole('button', { name: '조우에 추가 확정' }).click();
   await expect(combat.getByRole('heading', { name: 'Dreadlord', exact: true })).toBeVisible();

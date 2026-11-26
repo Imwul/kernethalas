@@ -56,7 +56,6 @@
 .play-timeline-check input[type="checkbox"] {
   flex: none;
   min-height: 0;
-  accent-color: var(--copper-ink);
 }
 @media (max-width: 480px) {
   .play-timeline-facts > div { grid-template-columns: minmax(0, 1fr); }

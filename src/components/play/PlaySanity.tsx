@@ -128,7 +128,7 @@ export function PlaySanity({ onDeath }: { onDeath: (cause: string) => void }) {
         </div>
         {loss && <div className="play-alert" role="group" aria-label="Sanity 손실 처리">
           <label className="field play-exhaustion-reason"><span>이유 (선택)</span>
-            <input value={loss.reason} maxLength={40} placeholder="예 Horrifying" onChange={(event) => setLoss({ ...loss, reason: event.target.value })} /></label>
+            <input value={loss.reason} maxLength={40} placeholder="예: Horrifying" onChange={(event) => setLoss({ ...loss, reason: event.target.value })} /></label>
           {loss.dice && loss.amount === null && <PhysicalDiceRoll key={loss.dice} label="잃을 Sanity" dice={loss.dice}
             onValue={(result) => setLoss({ ...loss, amount: result.total })} resultText={(result) => `Sanity −${result.total}`} />}
           {loss.amount !== null && <>

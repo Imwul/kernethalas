@@ -7,6 +7,9 @@ import { usePlayDraftState } from '../../lib/play-draft';
 import { gearCount, ledgerCarry, type GearItem, type PaperChange } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import '../../styles/play-equipment.css';
+import { ChoiceButtons, type Choice } from '../ChoiceButtons';
+
+const TRADE_DIRECTIONS: readonly Choice<TradeDirection>[] = [{ value: 'buy', label: '구매' }, { value: 'sell', label: '판매' }];
 
 interface EquipmentProps {
   onSheetChange?: (items: PaperChange[]) => void;
@@ -64,12 +67,8 @@ function CarryingCalculator({ inventory }: { inventory?: GearItem[] }) {
           <input type="checkbox" checked={backpack} onChange={(event) => setDraft({ ...draft, backpack: event.target.checked })} />
           <span>Backpack</span>
         </label>
-        <div className="field">
-          <label htmlFor={`${heading}-pouches`}>Pouch 수</label>
-          <select id={`${heading}-pouches`} value={pouches} onChange={(event) => setDraft({ ...draft, pouches: Number(event.target.value) })}>
-            {[0, 1, 2, 3].map((count) => <option key={count} value={count}>{count}개</option>)}
-          </select>
-        </div>
+        <ChoiceButtons label="Pouch 수" value={pouches} onChange={(count) => setDraft({ ...draft, pouches: count })}
+          options={[0, 1, 2, 3].map((count) => ({ value: count, label: `${count}개` }))} />
       </div>
       <table className="play-carry-table" aria-label="보유품과 추가 전리품 수량">
         <thead><tr><th scope="col">종류</th><th scope="col">보유</th><th scope="col">추가</th></tr></thead>
@@ -175,15 +174,8 @@ function MerchantCalculator({ onSheetChange, onJournalChange }: EquipmentProps) 
       <h3 id={heading}>상인 거래</h3>
       <form className="play-trade-form" noValidate onSubmit={add}>
         <div className="play-trade-choices">
-          <div className="field">
-            <label htmlFor={`${heading}-direction`}>거래 방식</label>
-            <select id={`${heading}-direction`} value={direction} onChange={(event) => {
-              const next = event.target.value as TradeDirection;
-              update({ direction: next, choice: next === 'buy' && choice.startsWith('magic:') ? '' : choice });
-            }}>
-              <option value="buy">구매</option><option value="sell">판매</option>
-            </select>
-          </div>
+          <ChoiceButtons label="거래 방식" value={direction} onChange={(next) =>
+            update({ direction: next, choice: next === 'buy' && choice.startsWith('magic:') ? '' : choice })} options={TRADE_DIRECTIONS} />
           <div className="field">
             <label htmlFor={`${heading}-item`}>거래할 품목</label>
             <select id={`${heading}-item`} value={choice} onChange={(event) => update({ choice: event.target.value })}>
