@@ -3,7 +3,7 @@ import { masteryCatalog } from '../../content/entries/masteries';
 import { goalByName, type GearLine } from '../../lib/character-creation';
 import { COUNTED_GOALS } from '../../lib/character-progress';
 import {
-  ACTIVE_GOAL_LIMIT, BASE_MASTERY_LIMIT, CHARACTER_DEFENSES, CHARACTER_WEAPONS, PERKS, XP_TO_LEVEL, usePlayCharacter, type CharacterMastery,
+  ACTIVE_GOAL_LIMIT, BASE_MASTERY_LIMIT, CHARACTER_DEFENSES, CHARACTER_WEAPONS, PERKS, XP_TO_LEVEL, usePlayCharacter, type CharacterMastery, type SurvivorSnapshot,
 } from '../../lib/play-character';
 import { usePlayCampaignId } from '../../lib/play-campaigns';
 import { PlayDraftScope, usePlayDraft, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
@@ -33,6 +33,7 @@ export type CharacterSection = 'sheet' | 'state' | 'mastery' | 'goals';
 export const CHARACTER_SECTION_EVENT = 'kn:character-section';
 /** Asks the combat stage to select a learned ability: detail { masteryId, tier, abilityId }. */
 export const USE_ABILITY_EVENT = 'kn:play-use-ability';
+export type PlayAbilityRequest = { masteryId: string; tier: number; abilityId: string; targetId?: string };
 /** Opens the level-up pane of the rest stage. */
 export const LEVEL_UP_EVENT = 'kn:play-level-up';
 const PERK_NOTES = new Map((entryById.get('perks')?.outcomes ?? []).map(({ label, text }) => [label, text]));
@@ -66,13 +67,14 @@ export function PlayCharacter({ onCreate }: { onCreate?: () => void }) {
 
 export type CharacterWorkspaceView = 'create' | 'sheet';
 
-export function PlayCharacterWorkspace({ onboarding, view, onView, onBack, onFinish, onApplyGear }: {
+export function PlayCharacterWorkspace({ onboarding, view, onView, onBack, onFinish, onApplyGear, onUndoGear }: {
   onboarding: boolean;
   view: CharacterWorkspaceView | null;
   onView: (view: CharacterWorkspaceView) => void;
   onBack: () => void;
   onFinish: () => void;
-  onApplyGear: (lines: GearLine[]) => Promise<boolean>;
+  onApplyGear: (lines: GearLine[], source: string) => Promise<boolean>;
+  onUndoGear: (source: string) => Promise<boolean>;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -91,7 +93,7 @@ export function PlayCharacterWorkspace({ onboarding, view, onView, onBack, onFin
         </button>}
       </header>
       {view === 'create' ? <PlayDraftScope root name="character">
-        <CharacterCreator onApplyGear={onApplyGear} onDone={onFinish} doneLabel={onboarding ? '탐험 시작' : undefined} />
+        <CharacterCreator onApplyGear={onApplyGear} onUndoGear={onUndoGear} onDone={onFinish} doneLabel={onboarding ? '탐험 시작' : undefined} />
       </PlayDraftScope> : view === 'sheet' ? <>
         <PlayCharacter />
         <div className="play-character-workspace-actions"><button type="button" className="btn primary" onClick={onFinish}>탐험 시작</button></div>
@@ -443,10 +445,11 @@ function DeathCheck({ onCreate }: { onCreate: () => void }) {
   const campaignId = usePlayCampaignId();
   const commit = usePlayRoll();
   const [manual, setManual] = useState(false);
-  const [buried, setBuried] = useState<{ entry: FallenSurvivor; character: typeof pc extends null ? never : NonNullable<typeof pc>['character']; presets: Record<string, number> } | null>(null);
+  const [buried, setBuried] = useState<{ entry: FallenSurvivor; survivor: SurvivorSnapshot } | null>(null);
   if (!pc || !play) return null;
   const { character } = pc;
-  const auto = pc.exhaustion !== undefined && pc.exhaustion >= 21 ? 'Exhaustion 21 이상' : pc.madness.dead ? '광기 (결과 1)' : null;
+  const auto = pc.exhaustion !== undefined && pc.exhaustion >= 21 ? 'Exhaustion 21 이상'
+    : pc.madness.dead ? '광기 (결과 1)' : character.rotStage === 8 ? '부패병 8단계' : null;
   const bury = (cause: string) => {
     const entry: FallenSurvivor = {
       id: crypto.randomUUID(), name: character.name ?? '이름 없음', level: character.level ?? 1, cause,
@@ -457,9 +460,9 @@ function DeathCheck({ onCreate }: { onCreate: () => void }) {
     };
     storeGraveyard([entry, ...readGraveyard(campaignId)], campaignId);
     document.dispatchEvent(new Event(GRAVEYARD_EVENT));
-    setBuried({ entry, character, presets: pc.presets });
+    setBuried({ entry, survivor: pc.snapshot() });
     setManual(false);
-    commit(() => pc.restore({}, {}));
+    commit(() => pc.replace({}));
   };
   if (buried) {
     return (
@@ -470,7 +473,7 @@ function DeathCheck({ onCreate }: { onCreate: () => void }) {
           <button type="button" className="linkbtn" onClick={() => {
             storeGraveyard(readGraveyard(campaignId).filter(({ id }) => id !== buried.entry.id), campaignId);
             document.dispatchEvent(new Event(GRAVEYARD_EVENT));
-            commit(() => pc.restore(buried.character, buried.presets));
+            commit(() => pc.restore(buried.survivor));
             setBuried(null);
           }}>되돌리기</button>
         </div>

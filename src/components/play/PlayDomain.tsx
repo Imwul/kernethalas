@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useContext, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { DICE_CHAIN } from '../../lib/dice';
 import { activeDomainDie, DEFAULT_DOMAIN_PROGRESS, stepDomainDie } from '../../lib/domain-progress';
 import {
@@ -8,6 +8,7 @@ import {
 import type { PlayTimelineEntry } from '../../lib/play-timeline';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
+import { PlayDiscoveryMode } from './PlayDiscovery';
 import { PlayTimeline } from './PlayTimeline';
 
 interface Props {
@@ -15,6 +16,8 @@ interface Props {
   domains: PlayDomainRecord[];
   activeEffects: DarknessEvent[];
   defeated: boolean;
+  overseerKnown: boolean;
+  onRevealOverseer: () => void;
   onUpdate: (change: Partial<PlayDomainRecord>) => void;
   onSwitch: (id: number | 'new') => void;
   onDismiss: (id: string) => void;
@@ -40,10 +43,13 @@ function InfluenceInputs({ label, value, onChange }: { label: string; value: Inf
   );
 }
 
-export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate, onSwitch, onDismiss, domainPlaceId,
+export function PlayDomain({ domain, domains, activeEffects, defeated, overseerKnown, onRevealOverseer, onUpdate, onSwitch, onDismiss, domainPlaceId,
   timeline, onTimelineChange }: Props) {
   const [destination, setDestination] = useState<number | 'new' | null>(null);
+  const summary = useRef<HTMLParagraphElement>(null);
+  const discovery = useContext(PlayDiscoveryMode);
   const overseer = domainOverseer(domain.overseerRoll);
+  const concealOverseer = !!overseer && discovery && !overseerKnown;
   const progress = domain.progress ?? DEFAULT_DOMAIN_PROGRESS;
   const activeDie = activeDomainDie(progress);
   const raised = stepDomainDie(progress, -1);
@@ -52,8 +58,8 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate,
   const extraInfluences = activeEffects.filter(({ roll }) => roll >= 81);
   return (
     <section className="play-domain play-domain-body" aria-label="도메인 효과">
-        {(overseer || activeEffects.length > 0) && <p className="play-domain-summary">
-          {overseer && <span lang="en">{overseer.name}</span>}
+        {(overseer || activeEffects.length > 0) && <p className="play-domain-summary" tabIndex={-1} ref={summary}>
+          {overseer && (concealOverseer ? <span>Overseer 미공개</span> : <span lang="en">{overseer.name}</span>)}
           {activeEffects.length > 0 && <span>어둠 {activeEffects.length}개</span>}
         </p>}
         <div className="play-domain-fields">
@@ -121,7 +127,13 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, onUpdate,
         </section>
         <div className="play-domain-rolls">
           <JournalRoll tableId={OVERSEER_TABLE.id} label="Overseer" value={domain.overseerRoll}
-            onValue={(overseerRoll) => onUpdate({ overseerRoll, defeated: false })} />
+            resultText={concealOverseer ? 'Overseer를 정했습니다.' : undefined}
+            onValue={(overseerRoll) => onUpdate({ overseerRoll, defeated: false,
+              ...(overseerRoll !== domain.overseerRoll ? { overseerRevealedRoll: null } : {}) })} />
+          {concealOverseer && <button type="button" className="btn ghost play-explore-action-btn" onClick={() => {
+            onRevealOverseer();
+            requestAnimationFrame(() => summary.current?.focus());
+          }}>Overseer 이름 공개</button>}
           <InfluenceInputs label="Overseer 영향력" value={domain.influence} onChange={(influence) => onUpdate({ influence })} />
         </div>
         {defeated && <p className="play-condition">Overseer 처치 · 이 도메인의 영향력 해제</p>}

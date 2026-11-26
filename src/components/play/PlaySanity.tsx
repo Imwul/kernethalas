@@ -61,6 +61,7 @@ export function PlaySanity({ onDeath }: { onDeath: (cause: string) => void }) {
     if (madness === 9 && bruise !== null) sideEffects.push(`Bludgeoning 피해 ${bruise} (광기 · Armor 무시)`);
     if (madness === 10) sideEffects.push('XP +100 (광기)');
     commit(() => {
+      if (madness === 4 || madness === 7) pc.recordMadnessTiming(madness);
       pc.update({ madness: [...(character.madness ?? []), madness], ...(max !== undefined ? { sanity: max - room.sanity } : {}) });
       if (madness === 8 && skill) {
         const current = Number(pc.skill(skill));

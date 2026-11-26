@@ -1,0 +1,28 @@
+.play-session-card {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--s2);
+  margin-block: var(--s2) var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--copper);
+  background: var(--paper);
+  font: 14px/1.5 var(--f-ui);
+  overflow-wrap: anywhere;
+}
+.play-session-heading, .play-session-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+}
+.play-session-heading h2 { margin: 0; font: 400 24px/1.2 var(--f-ko-display); }
+.play-session-card p { margin: 0; }
+.play-session-card .btn { min-block-size: 44px; max-inline-size: 100%; }
+.play-session-heading > div { min-inline-size: 0; }
+.play-session-heading p { color: var(--ink-2); }
+.play-session-form { display: grid; min-inline-size: 0; gap: var(--s2); max-inline-size: 36rem; }
+.play-session-form textarea { display: block; inline-size: 100%; min-inline-size: 0; }
+.play-session-facts { margin: 0; padding-inline-start: 1.2rem; }
+.play-session-reminder { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); padding-block: var(--s2); }
+.play-session-reminder p { flex: 1 1 12rem; min-inline-size: 0; }

@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { rulings } from '../content';
 import { useLocation } from '../lib/router';
-import { Cite, VChip, XRef } from '../components/bits';
-import { RulingMatrix } from '../components/RulingMatrix';
+import { VChip } from '../components/bits';
+import { RulingBody } from '../components/RulingBody';
 
 export function Rulings() {
   const { hash } = useLocation();
@@ -25,35 +25,7 @@ export function Rulings() {
               <VChip v={r.verification} />
             </summary>
             <div className="qbody">
-              <p className="ans" style={{ margin: 0 }}>
-                {r.answer}
-              </p>
-              {r.matrix && <RulingMatrix matrix={r.matrix} compare={r.id === 'q-both-fail'} />}
-              {r.conditions && (
-                <div>
-                  <span className="kicker">적용 조건 · 비교</span>
-                  <ul className="bullets">
-                    {r.conditions.map((c, j) => (
-                      <li key={j}>{c}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {r.exceptions && (
-                <div>
-                  <span className="kicker">예외</span>
-                  <ul className="bullets">
-                    {r.exceptions.map((c, j) => (
-                      <li key={j}>{c}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px' }}>
-                {r.refs.map((id) => <XRef key={id} id={id} showKind />)}
-                {r.tables?.map((id) => <XRef key={id} id={id} showKind />)}
-              </div>
-              <Cite source={r.source} />
+              <RulingBody ruling={r} />
             </div>
           </details>
         ))}

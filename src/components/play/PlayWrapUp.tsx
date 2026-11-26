@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useId, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from 'react';
 import { tableById, titleOf } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import { creatureSpoilsTables } from '../../lib/creature-combat';
 import { journalRow } from '../../lib/loot-journal';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftState } from '../../lib/play-draft';
+import { usePlayCharacter } from '../../lib/play-character';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { usePlayOngoingEffects } from '../../lib/play-effects';
-import { gearCount, type GearEffect, type GearItem, type PaperChange } from '../../lib/play-inventory';
+import { gearCount, gearKey, type GearEffect, type GearItem, type PaperChange } from '../../lib/play-inventory';
+import { BREATHER_LIGHT_COST, EMPTY_SUPPLIES, afterLightCost, lightRemaining, readPlayLight, type PlaySupplies } from '../../lib/play-light';
+import { playAction } from '../../lib/play-roll-history';
 import { usePendingSkillGrowth } from '../../lib/skill-growth';
 import { XRef } from '../bits';
-import { CampCalculator, type CampReport } from '../CampCalculator';
+import { CampCalculator, campSuccessRange, type CampReport } from '../CampCalculator';
 import { JournalRoll, LootJournal } from '../LootJournal';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
 import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
 import { armorRollChanges, PlayFightArmor, type ArmorRolls } from './PlayFightArmor';
-import { PlaySurvival, type SurvivalPane, type SurvivalReport } from './PlaySurvival';
+import { PlayLight } from './PlayLight';
+import { PlayDiscoveryMode } from './PlayDiscovery';
+import { PlaySurvival, ROT_REST_EVENT, type SurvivalPane, type SurvivalReport } from './PlaySurvival';
 import '../../styles/play-wrapup.css';
 
 interface Props {
@@ -24,6 +29,10 @@ interface Props {
   victoryLabels?: readonly string[];
   victoryXp?: number;
   inventory?: GearItem[];
+  supplies?: PlaySupplies;
+  nextRoomLightCost?: number;
+  onContinue?: () => void;
+  onOpenGear?: () => void;
   onBattleJournalChange?: (text: string) => void;
   onJournalChange: (text: string) => void;
   onSheetChange?: (items: PaperChange[]) => void;
@@ -78,7 +87,7 @@ function sourcesForBattle(ids: string, battleId: string, labels: string) {
     const tables = creatureSpoilsTables(creature).map((tableId) => ({
       tableId, id: `${battleId}:loot:${creature.id}:${index}:${tableId}`, owner: combatants.length > 1 ? label : '',
     }));
-    return { label, id: `${creature.id}:${index}`, tables };
+    return { label, id: `${creature.id}:${index}`, tables, overseer: creature.group === 'overseer' };
   });
   return creatureGroups;
 }
@@ -87,7 +96,7 @@ const manualSlots: LootSlot[] = MANUAL_SOURCES.map((tableId) => ({ tableId, id: 
 
 export function PlayWrapUp({
   creature, combatEnded, battleId = 'battle', victoryCreatures, victoryLabels, victoryXp, onBattleJournalChange, onJournalChange, onSheetChange,
-  inventory = [],
+  inventory = [], supplies = EMPTY_SUPPLIES, nextRoomLightCost = 1, onContinue, onOpenGear,
   onCampEncounter, campEncounterResolved, campDarkness, campAttunementBlocked,
   afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush,
   extraPanes = [], handleRef,
@@ -95,6 +104,8 @@ export function PlayWrapUp({
   const paneId = useId();
   const pendingGrowth = usePendingSkillGrowth();
   const draft = usePlayDraft();
+  const pc = usePlayCharacter();
+  const commit = usePlayRoll();
   const ongoing = usePlayOngoingEffects();
   const [pane, setPane] = usePlayDraftState<Pane>('pane', 'loot');
   const [survivalPane, setSurvivalPane] = usePlayDraftState<SurvivalPane>('survival-pane', 'treatment');
@@ -165,6 +176,7 @@ export function PlayWrapUp({
     });
   }, [setLootReports]);
 
+  const remainingLight = lightRemaining(draft ? readPlayLight(draft.slots) : null, supplies.lightEntries);
   const breather = breatherRoll !== null ? `Toughness +${breatherRoll + 2}, Health +1, Exhaustion −2` : '';
   const lowered = keepTension ? breatherTension : breatherTension === 8 ? 6 : breatherTension === 6 ? 4 : lowTension;
   const extraCheck = !!breather && (afterBreatherCheck || breatherCheck !== null);
@@ -187,7 +199,7 @@ export function PlayWrapUp({
     combatLoot ? `전리품 ${combatLoot}` : '',
   ].filter(Boolean).join(' · ');
   const sharedLine = [
-    breather ? `숨 고르기 ${breather}, 광원 −5` : '',
+    breather ? `숨 고르기 ${breather}, 광원 −${BREATHER_LIGHT_COST}` : '',
     darknessRow ? `숨 고르기 후 어둠 D100 ${darknessRoll} · ${darknessRow.ko}` : '',
     ...darknessItems.map(({ text }) => text),
     camp.summary,
@@ -202,7 +214,7 @@ export function PlayWrapUp({
       { id: 'breather:toughness', text: `Toughness +${breatherRoll + 2} (숨 고르기)` },
       { id: 'breather:health', text: 'Health +1 (숨 고르기)' },
       { id: 'breather:exhaustion', text: 'Exhaustion −2 (숨 고르기)' },
-      { id: 'breather:light', text: '광원 −5 (숨 고르기)', gear: gearCount('광원', -5) },
+      { id: 'breather:light', text: `광원 −${BREATHER_LIGHT_COST} (숨 고르기)`, gear: gearCount('광원', -BREATHER_LIGHT_COST) },
     );
     if (combatEnded) {
       if (recovery !== null) result.push({ id: `${battleId}:toughness`, text: `Toughness +${recovery} (전투 종료)` });
@@ -238,7 +250,7 @@ export function PlayWrapUp({
     }
   }, [combatEnded, setRecovery, armorReport, setArmorReport, armorRolls, setArmorRolls, battleId, clearScope]);
   useEffect(() => {
-    if (victoryIds) return;
+    if (combatEnded || victoryIds) return;
     if (Object.keys(sanity).length) setSanity({});
     const removed = Object.keys(lootReports).filter((id) => id.startsWith(`${battleId}:loot:`));
     if (!removed.length) return;
@@ -248,7 +260,7 @@ export function PlayWrapUp({
       removed.forEach((id) => delete remaining[id]);
       return remaining;
     });
-  }, [victoryIds, battleId, lootReports, clearScope, setLootReports, sanity, setSanity]);
+  }, [combatEnded, victoryIds, battleId, lootReports, clearScope, setLootReports, sanity, setSanity]);
 
   const applyDarkness = (value: number | null) => {
     if (darknessRoll !== value) {
@@ -267,6 +279,22 @@ export function PlayWrapUp({
     setSurvivalPane(next);
     setPane('survival');
   };
+  const openRestRot = (rest: 'breather' | 'camp') => {
+    openSurvival('rot');
+    document.dispatchEvent(new CustomEvent(ROT_REST_EVENT, { detail: rest }));
+  };
+  const rationPlan = camp.preview?.ration === 'missing' ? 'Ration 없음 · 성공 시 회복 절반'
+    : camp.preview?.ration === 'cooked' ? '요리한 Ration 1개 사용'
+      : `Ration 1개 사용${!camp.summary && supplies.ration === 0 ? ' · 장부 부족' : ''}`;
+  const campMaterials = Object.entries(camp.preview?.spent ?? {}).flatMap(([name, amount]) => {
+    if (name === 'Ration' || amount === 0) return [];
+    const entries = inventory.filter((item) => item.integrity !== 'broken' && gearKey(item.name) === gearKey(name));
+    const known = entries.reduce((total, item) => total + item.count, 0);
+    const shortage = !camp.summary && entries.length > 0 && known < amount ? ` (장부 ${amount - known}개 부족)` : '';
+    return [`${name} ${amount}개${shortage}`];
+  }).join(' · ');
+  const breatherDie = lowered === null ? `D${breatherTension} · 하락 후 주사위 확인`
+    : keepTension ? `D${lowered} 유지` : `D${breatherTension} → D${lowered}`;
   return (
     <section className="play-wrapup" aria-label="휴식과 전리품 정리">
       {combatEnded && <section className="play-fight-checklist" aria-label="전투 종료 처리 목록">
@@ -281,6 +309,31 @@ export function PlayWrapUp({
           {!!victoryXp && <div><dt>승리 보상</dt><dd><button type="button" className="linkbtn" onClick={() => goToPane('loot')}>XP +{victoryXp} · 전리품</button></dd></div>}
         </dl>
       </section>}
+      <section className="play-travel-choices" aria-label="계속 탐험과 휴식 비용 비교">
+        <div className="play-travel-choice">
+          <strong>계속 탐험</strong>
+          <p>다음 방 · {afterLightCost(remainingLight, nextRoomLightCost)}</p>
+          <p>다음 장소에서 긴장 D{nextTension ?? breatherTension} 판정</p>
+          {onContinue && <button type="button" className="linkbtn" onClick={onContinue}>탐험 계속 준비</button>}
+        </div>
+        <div className="play-travel-choice">
+          <strong>숨 고르기</strong>
+          <p>{breatherRoll === null ? afterLightCost(remainingLight, BREATHER_LIGHT_COST) : `광원 ${BREATHER_LIGHT_COST} 소모 기록됨`}</p>
+          <p>{pc?.exhaustion === undefined || breatherRoll !== null ? 'Exhaustion −2'
+            : `Exhaustion ${pc.exhaustion} → ${Math.max(0, pc.exhaustion - 2)}`} · 긴장 {breatherDie}</p>
+          {afterBreatherCheck && <p>하락 후 긴장 주사위 추가 판정</p>}
+        </div>
+        <div className="play-travel-choice">
+          <strong>야영</strong>
+          {camp.preview ? <>
+            <p>{rationPlan}{supplies.ration !== null && ` · 현재 식량 ${supplies.ration}개`}</p>
+            {campMaterials && <p>소모 · {campMaterials}</p>}
+            <p>성공 D20 {campSuccessRange(camp.preview.threshold)} · 실패 시 조우</p>
+            {camp.preview.activityExhaustion !== 0 && <p>활동 Exhaustion {camp.preview.activityExhaustion > 0
+              ? `+${camp.preview.activityExhaustion}` : `−${Math.abs(camp.preview.activityExhaustion)}`}</p>}
+          </> : <p>야영 활동의 수량과 보정을 확인하세요.</p>}
+        </div>
+      </section>
       <div className="seg play-wrap-nav" role="group" aria-label="정리할 항목">
         {combatEnded && <button type="button" aria-controls={`${paneId}-recovery`} aria-pressed={active === 'recovery'} onClick={() => setPane('recovery')}>전투 종료</button>}
         <button type="button" aria-controls={`${paneId}-loot`} aria-pressed={active === 'loot'} onClick={() => setPane('loot')}>전리품</button>
@@ -298,8 +351,11 @@ export function PlayWrapUp({
         <PlaySpoils groups={groups} onReport={updateLoot} />
       </div>
       <div className="play-wrap-slot" id={`${paneId}-breather`} hidden={active !== 'breather'}>
+        <PlayLight supplies={supplies} onOpenGear={onOpenGear} />
+        {breatherRoll === null && remainingLight !== null && remainingLight < BREATHER_LIGHT_COST &&
+          <p className="field-err" role="status">광원 {BREATHER_LIGHT_COST - remainingLight} 부족 · 숨 고르기 후 광원이 남지 않습니다.</p>}
         <JournalRoll die="D10" label="숨 고르기 회복" value={breatherRoll} onValue={setBreather} resultText={breather} />
-        <p className="play-wrap-note">광원 5 소모, 긴장 주사위 한 단계 하락.</p>
+        <p className="play-wrap-note">광원 {BREATHER_LIGHT_COST} 소모, 긴장 주사위 한 단계 하락.</p>
         <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest</XRef> 능력을 다시 쓸 수 있습니다.</p>
         {breatherRestId && <button type="button" className="btn ghost play-wrap-clear" disabled={draft?.slots.confirmedBreather === breatherRestId}
           onClick={() => ongoing.confirmRest('rest', breatherRestId)}>{draft?.slots.confirmedBreather === breatherRestId ? '숨 고르기 완료됨' : '숨 고르기 완료 확인'}</button>}
@@ -347,7 +403,7 @@ export function PlayWrapUp({
           </>
         )}
         <div className="play-wrap-links"><XRef id="take-a-breather">숨 고르기 규칙</XRef>
-          <button className="btn ghost" type="button" onClick={() => openSurvival('rot')}>부패병 판정</button>
+          <button className="btn ghost" type="button" onClick={() => openRestRot('breather')}>부패병 판정</button>
         </div>
       </div>
       <div className="play-wrap-slot" id={`${paneId}-camp`} hidden={active !== 'camp'}>
@@ -361,10 +417,11 @@ export function PlayWrapUp({
           attunementBlocked={campAttunementBlocked} inventory={inventory} onReport={setCamp} />
         <p className="play-wrap-note"><XRef id="once-per-rest">Once per Rest와 Once per Camp Rest</XRef> 능력의 사용 가능 여부를 확인하세요.</p>
         {campRestId && <button type="button" className="btn ghost play-wrap-clear" disabled={draft?.slots.confirmedCamp === campRestId}
-          onClick={() => ongoing.confirmRest('camp', campRestId)}>{draft?.slots.confirmedCamp === campRestId ? '야영 완료됨' : '야영 완료 확인'}</button>}
+          onClick={() => commit(() => ongoing.confirmRest('camp', campRestId), playAction('야영 완료'))}>
+          {draft?.slots.confirmedCamp === campRestId ? '야영 완료됨' : '야영 완료 확인'}</button>}
         <div className="play-wrap-links">
           <button className="btn ghost" type="button" onClick={() => openSurvival('growth')}>야영 기술 성장</button>
-          <button className="btn ghost" type="button" onClick={() => openSurvival('rot')}>부패병 판정</button>
+          <button className="btn ghost" type="button" onClick={() => openRestRot('camp')}>부패병 판정</button>
         </div>
       </div>
       <div className="play-wrap-slot" id={`${paneId}-survival`} hidden={active !== 'survival'}>
@@ -395,6 +452,7 @@ export function PlayWrapUp({
 
 function PlaySpoils({ groups, onReport }: { groups: ReturnType<typeof sourcesForBattle>; onReport: (id: string, report: LootReport) => void }) {
   const [choice, setChoice] = usePlayDraftState<Source | null>('loot-source', null);
+  const discovery = useContext(PlayDiscoveryMode);
   const hasDefeated = groups.length > 0;
   const source = choice && (choice !== 'creature' || hasDefeated) ? choice : hasDefeated ? 'creature' : 't-spoils';
   const manual = manualSlots.find(({ tableId }) => tableId === source);
@@ -408,14 +466,33 @@ function PlaySpoils({ groups, onReport }: { groups: ReturnType<typeof sourcesFor
         </select>
       </label>
       {manual && <SpoilsSlot key={manual.id} slot={manual} onReport={onReport} />}
-      {source === 'creature' && groups.map(({ label, id, tables }) => (
+      {source === 'creature' && groups.map(({ label, id, tables, overseer }) => (
         <section className="play-spoils-chain" key={id} aria-label={`${label} 처치 보상`}>
           {groups.length > 1 && <h3 className="play-spoils-heading">{label}</h3>}
           {tables.length === 0 ? <p className="play-wrap-note">이 생물의 처치 보상에 굴림 표가 없습니다.</p>
-            : tables.map((slot) => <SpoilsSlot key={slot.id} slot={slot} onReport={onReport} />)}
+            : discovery && overseer ? <HiddenSpoils tables={tables} onReport={onReport} />
+              : tables.map((slot) => <SpoilsSlot key={slot.id} slot={slot} onReport={onReport} />)}
         </section>
       ))}
     </section>
+  );
+}
+
+function HiddenSpoils({ tables, onReport }: { tables: LootSlot[]; onReport: (id: string, report: LootReport) => void }) {
+  const draft = usePlayDraft();
+  const scope = usePlayDraftScope();
+  const [revealed, setRevealed] = usePlayDraftState<boolean | null>(`spoils-revealed:${tables[0].id}`, null);
+  const hasResult = tables.some(({ id }) => typeof draft?.slots[`${scope}${encodeURIComponent(id)}/roll`] === 'number');
+  const open = revealed ?? hasResult;
+  return (
+    <details className="fold play-spoils-discovery" open={open} onToggle={(event) => {
+      if (event.target === event.currentTarget && event.currentTarget.open !== open) setRevealed(event.currentTarget.open);
+    }}>
+      <summary>처치 보상 확인</summary>
+      <div className="play-spoils-chain">
+        {tables.map((slot) => <SpoilsSlot key={slot.id} slot={slot} onReport={onReport} />)}
+      </div>
+    </details>
   );
 }
 

@@ -1,5 +1,30 @@
 export type LockTarget = 'door' | 'container' | 'environment';
 export type Detection = '' | 'success' | 'failure';
+export type LockOutcome = Exclude<Detection, ''>;
+export type TrapMethod = '' | 'disarm' | 'bypass' | 'trigger';
+
+export interface TrapInvestigationProgress {
+  kind: number | null;
+  method: TrapMethod;
+  result: LockOutcome | null;
+  avoided: LockOutcome | null;
+}
+
+export interface DoorInvestigation {
+  detection: Detection;
+  touched: boolean;
+  trapRoll: number | null;
+  lockRoll: number | null;
+  trapResolved: boolean;
+  trap: TrapInvestigationProgress | null;
+  pickFailures: number;
+  forceFailures: number;
+}
+
+export const EMPTY_DOOR_INVESTIGATION: DoorInvestigation = {
+  detection: '', touched: false, trapRoll: null, lockRoll: null, trapResolved: false, trap: null,
+  pickFailures: 0, forceFailures: 0,
+};
 
 export const LOCK_THRESHOLDS = { door: 12, container: 10 } as const;
 export const TRAP_THRESHOLD = 7;

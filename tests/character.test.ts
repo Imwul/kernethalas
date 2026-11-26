@@ -9,6 +9,7 @@ import { conditionsInText } from '../src/lib/play-effects';
 import { masteryCatalog } from '../src/content/entries/masteries';
 import { MASTERY_BRIEFS } from '../src/content/mastery-briefs';
 import { masteryMix } from '../src/components/MasteryTree';
+import { saveGearItem, undoStartingGear } from '../src/lib/play-inventory';
 
 describe('character creation', () => {
   test('skill allotment follows p.19', () => {
@@ -50,6 +51,16 @@ describe('character creation', () => {
     }
   });
 
+  test('partial weapon allotments can be completed and Club defaults to Dodge', () => {
+    const allot = fillAllotment({ 'Bladed Weapons': 30, 'Bludgeoning Weapons': 30, 'Shafted Weapons': 30,
+      'Unarmed Combat & Fist Weapons': 20, Medicine: 20 });
+    expect(allotmentComplete(allot)).toBe(true);
+    expect(allot.Medicine).toBe(20);
+    const draft = { ...EMPTY_CREATION, allot: { 'Bladed Weapons': 60, 'Bludgeoning Weapons': 40, Dodge: 10 } as const };
+    expect(creationRecord({ ...draft, weapon: 'Club' }).character.defense).toBe('Dodge');
+    expect(creationRecord({ ...draft, weapon: 'Longsword' }).character.defense).toBe('Bladed Weapons');
+  });
+
   test('starting armor and gear come from the Random Armor tables', () => {
     expect(startingArmor(1, 65)).toMatchObject({ name: 'Mail', integrity: 'D8' });
     expect(startingArmor(9, 90)).toMatchObject({ name: 'Wall Shield', heavy: true });
@@ -72,6 +83,19 @@ describe('character creation', () => {
     expect(goalTarget('누적 5,000₵ 획득')).toBe(5000);
     expect(goalTarget('Overseer 처치')).toBe(1);
     expect(PERSONAL_GOALS.length).toBeGreaterThan(30);
+  });
+
+  test('undoing a gear grant preserves unrelated entries and rejects dependent changes', () => {
+    const torch = { id: 'torch', name: 'Torch', count: 2, weight: 'light', location: 'pack' } as const;
+    const ration = { ...torch, id: 'ration', name: 'Ration' };
+    const start = startingGearToLedger({ items: [torch], entries: [] }, [torch], 'creation:123');
+    if (!('ledger' in start)) throw new Error(start.error);
+    const edit = saveGearItem(start.ledger, ration, '새 식량');
+    if (!('ledger' in edit)) throw new Error(edit.error);
+    expect(undoStartingGear(edit.ledger, 'creation:123')).toEqual({ ledger: { items: [torch, ration], entries: edit.ledger.entries.slice(1) } });
+    const use = saveGearItem(edit.ledger, { ...torch, count: 3 }, '횃불 사용');
+    if (!('ledger' in use)) throw new Error(use.error);
+    expect(undoStartingGear(use.ledger, 'creation:123')).toHaveProperty('error');
   });
 });
 
@@ -120,6 +144,17 @@ describe('sanity, madness, goals and conditions', () => {
   test('Madness results stack', () => {
     expect(madnessEffects([2, 6, 6, 7, 4])).toMatchObject({ rollPenalty: 1, resolve: 20, xpLoss: 10, extraSanityLoss: 1, dead: false });
     expect(madnessEffects([1]).dead).toBe(true);
+  });
+
+  test('new Madness penalties apply only after the corresponding roll', () => {
+    const room = roomProgress([{ id: 'a', text: 'XP +100' }, { id: 'b', text: 'Sanity −2' },
+      { id: 'c', text: 'XP +50' }, { id: 'd', text: 'Sanity −2' }], 0, {
+      xpLoss: 10, extraSanityLoss: 1, madnessTiming: [{ result: 7, previousLines: ['a'] }, { result: 4, previousLines: ['b'] }],
+    });
+    expect(room).toMatchObject({ xp: 140, sanity: -5 });
+    const character = { level: 1, goals: [{ name: 'Beast Hunter', progress: -1 }] };
+    expect(isPlayCharacter(character)).toBe(true);
+    expect(foldRoomProgress(character, room).goals).toEqual([{ name: 'Beast Hunter', progress: 0 }]);
   });
 
   test('goal counts come from defeated creature types, Lore Books and darkness', () => {

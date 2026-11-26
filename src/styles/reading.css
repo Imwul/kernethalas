@@ -175,8 +175,8 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 .search-empty { padding: 16px; }
 .search-dice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); padding: 10px 14px; border-bottom: 1px solid var(--rule-soft); background: var(--paper); }
 .search-dice .btn { min-height: 44px; }
-.search-dice output { display: inline-flex; align-items: baseline; gap: var(--s2); font: 14px/1.4 var(--f-mono); color: var(--ink-2); }
-.search-dice output b { font: 600 24px/1 var(--f-mono); color: var(--ink); }
+.search-dice output { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--s2); min-width: 0; font: 14px/1.4 var(--f-mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.search-dice .readout { padding-block: .06em .12em; }
 .search-empty p { margin: 0 0 8px; }
 .search-empty button { min-height: 44px; }
 .search-group { margin: 0; padding: 10px 14px 2px; color: var(--ink-2); font: 13px var(--f-ui); }
@@ -227,8 +227,8 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 }
 .search-roll:hover { border-color: var(--copper-ink); color: var(--copper-ink); }
 .search-roll .ic { width: 16px; height: 16px; }
-.search-foot { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; font: 13px var(--f-ui); color: var(--ink-2); }
-.search-foot > :last-child { margin-inline-start: auto; }
+.search-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px 12px; font: 13px var(--f-ui); color: var(--ink-2); }
+.search-foot [role='status'] { margin-inline-start: auto; }
 .search-keys kbd { margin-inline-start: 5px; }
 .tabbar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .tab-search {
@@ -295,7 +295,7 @@ html:has(.search-dialog[open], .reference-panel:modal) { overflow: hidden; scrol
 }
 .reference-panel-heading h2 { font: clamp(23px, 5vw, 32px)/1.2 var(--f-ko-display); }
 .reference-panel-heading h2:focus { outline: none; }
-.reference-panel-tools { display: flex; align-items: center; gap: 4px; }
+.reference-panel-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .ref-full { display: inline-flex; align-items: center; min-height: 44px; margin-inline-end: auto; font: 14px var(--f-ui); }
 .reference-panel-scroll { grid-row: 3; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 14px 16px 24px; }
 .reference-panel-scroll[hidden] { display: none; }

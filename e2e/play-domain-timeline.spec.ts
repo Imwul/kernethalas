@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openDrawer, openPane } from './helpers/play-desk';
+import { closeDrawer, openDrawer, openPane } from './helpers/play-desk';
 
 const WIDTH = Number(process.env.KN_TIMELINE_WIDTH ?? 320);
 
@@ -63,6 +63,11 @@ test('domain timeline archives the journal and copies only unchecked portions', 
   await expect(timeline).toContainText('종이에 옮기지 않은 항목이 없습니다.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(WIDTH);
 
+  await closeDrawer(page);
+  await stages(page).getByRole('button', { name: '저널', exact: true }).click();
+  await journal.getByRole('textbox', { name: '장소 이름 (선택)' }).fill('도메인 경계의 묘실');
+  await journal.getByRole('textbox', { name: '덧붙일 메모 (선택)' }).fill('첫째 도메인의 지도에 별표');
+  await openDrawer(page, '도메인');
   const domain = page.getByRole('region', { name: '도메인 효과' });
   await domain.getByRole('button', { name: '새 도메인', exact: true }).click();
   await domain.getByRole('button', { name: 'D8로 새 도메인 시작', exact: true }).click();
@@ -76,6 +81,8 @@ test('domain timeline archives the journal and copies only unchecked portions', 
   await timeline.getByText('닫힌 납골당', { exact: true }).click();
   await expect(journalCheck).toBeChecked();
   await expect(exhaustion).toBeChecked();
+  await timeline.locator('summary').filter({ hasText: '도메인 경계의 묘실' }).click();
+  await expect(timeline.getByText('첫째 도메인의 지도에 별표', { exact: true })).toBeVisible();
 });
 
 test('return places show tags and saved exit marks before a safe direct revisit', async ({ page }) => {

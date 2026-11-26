@@ -1,14 +1,19 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import { tableById } from '../content';
 import { rollDie } from '../lib/dice';
-import { forceOpeningBonus, lockpickDifficulty, LOCK_THRESHOLDS, trapInvestigation, type Detection, type LockTarget } from '../lib/lock-trap';
+import { forceOpeningBonus, lockpickDifficulty, LOCK_THRESHOLDS, trapInvestigation,
+  type Detection, type DoorInvestigation, type LockOutcome as Outcome, type LockTarget, type TrapInvestigationProgress, type TrapMethod } from '../lib/lock-trap';
 import { readOracleValue } from '../lib/oracle';
+import { usePlayCharacter } from '../lib/play-character';
+import { pcCheckModifiers } from '../lib/play-check-modifiers';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
+import { matchingGear, type GearLedger } from '../lib/play-inventory';
+import { skillBreakdown } from '../lib/play-skill';
 import { XRef } from './bits';
 import { PerkNote } from './PerkNote';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
-import { TensionTool, type TensionResult } from './TensionTool';
+import { TensionTool, type TensionDie, type TensionResult } from './TensionTool';
 import { PlayDieHint } from './play/PlayDieHints';
 import '../styles/lock-trap.css';
 
@@ -16,8 +21,6 @@ import '../styles/lock-trap.css';
 const TOOLKIT_BONUS = 5;
 
 const TARGETS = { door: '문', container: '용기', environment: '환경 함정' } as const;
-type Outcome = 'success' | 'failure';
-type TrapMethod = '' | 'disarm' | 'bypass' | 'trigger';
 
 export interface PlayLockReport {
   text: string;
@@ -25,16 +28,22 @@ export interface PlayLockReport {
   lockpicks: number;
   xp: number;
   pendingTension: boolean;
+  investigation: DoorInvestigation;
 }
 
-interface OpeningResult { opened: boolean; lockpicks: number; pendingTension: boolean }
-const EMPTY_OPENING_RESULT: OpeningResult = { opened: false, lockpicks: 0, pendingTension: false };
+interface OpeningResult { opened: boolean; pickFailures: number; forceFailures: number; pendingTension: boolean }
+const EMPTY_OPENING_RESULT: OpeningResult = { opened: false, pickFailures: 0, forceFailures: 0, pendingTension: false };
+type TrapReport = { text: string; xp: number; progress: TrapInvestigationProgress | null };
+const EMPTY_TRAP_REPORT: TrapReport = { text: '', xp: 0, progress: null };
 
 interface EmbeddedLock {
   target: LockTarget;
   onReport: (result: PlayLockReport) => void;
   renderTension: (attempt: string) => ReactNode;
   tensionReady: (attempt: string) => boolean;
+  nextTension?: TensionDie;
+  resume?: DoorInvestigation;
+  gearLedger?: GearLedger;
 }
 
 export function LockTrapTool({ embedded }: { embedded?: EmbeddedLock } = {}) {
@@ -60,16 +69,18 @@ export function LockTrapTool({ embedded }: { embedded?: EmbeddedLock } = {}) {
 }
 
 function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: EmbeddedLock }) {
-  const [detection, setDetection] = usePlayDraftState<Detection>('lock-detection', '');
-  const [touched, setTouched] = usePlayDraftState('lock-touched', false);
-  const [trapRaw, setTrapRaw] = usePlayDraftState('lock-trap-roll', '');
-  const [lockRaw, setLockRaw] = usePlayDraftState('lock-locked-roll', '');
-  const [disarmed, setDisarmed] = usePlayDraftState('lock-disarmed', false);
+  const resume = embedded?.resume;
+  const [detection, setDetection] = usePlayDraftState<Detection>('lock-detection', resume?.detection ?? '');
+  const [touched, setTouched] = usePlayDraftState('lock-touched', resume?.touched ?? false);
+  const [trapRaw, setTrapRaw] = usePlayDraftState('lock-trap-roll', resume?.trapRoll == null ? '' : String(resume.trapRoll));
+  const [lockRaw, setLockRaw] = usePlayDraftState('lock-locked-roll', resume?.lockRoll == null ? '' : String(resume.lockRoll));
+  const [disarmed, setDisarmed] = usePlayDraftState('lock-disarmed', resume?.trapResolved ?? false);
   const [openedUnlocked, setOpenedUnlocked] = usePlayDraftState('lock-opened-unlocked', false);
   const [investigation, setInvestigation] = usePlayDraftState('lock-investigation', 0);
   const [locks, setLocks] = usePlayDraftState('lock-check-revision', 0);
-  const [trapReport, setTrapReport] = useState({ text: '', xp: 0 });
-  const [openingReport, setOpeningReport] = useState(EMPTY_OPENING_RESULT);
+  const [trapReport, setTrapReport] = useState<TrapReport>(resume
+    ? { text: resume.trapResolved ? '함정 처리 완료' : '', xp: 0, progress: resume.trap } : EMPTY_TRAP_REPORT);
+  const [openingReport, setOpeningReport] = useState<OpeningResult | null>(null);
   const trapInput = useRef<HTMLInputElement>(null);
   const trapDie = readOracleValue(trapRaw.trim(), 10);
   const lockDie = readOracleValue(lockRaw.trim(), 20);
@@ -79,20 +90,28 @@ function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: Emb
   const canOpen = trap === 'clear' || disarmed;
   const unlocked = !environment && canOpen && locked === false;
   const reportCallback = embedded?.onReport;
-  const opened = unlocked && openedUnlocked || canOpen && locked === true && openingReport.opened;
-  const opening = canOpen && locked === true ? openingReport : EMPTY_OPENING_RESULT;
-  const { lockpicks, pendingTension } = opening;
+  const opened = unlocked && openedUnlocked || canOpen && locked === true && !!openingReport?.opened;
+  const openingPending = canOpen && locked === true && openingReport === null;
+  const opening = canOpen && locked === true && openingReport ? openingReport : EMPTY_OPENING_RESULT;
+  const { pickFailures, forceFailures, pendingTension } = opening;
+  const lockpicks = Math.max(0, pickFailures - (resume?.pickFailures ?? 0));
   const xp = ((trap === 'spotted' || trap === 'triggered') ? trapReport.xp : 0) + (opened && locked ? 10 : 0);
   const text = [
     trap === 'spotted' || trap === 'triggered' ? trapReport.text || (trap === 'spotted' ? '함정 발견' : '함정 발동') : trap === 'clear' ? '함정 없음' : '',
     opened ? `${TARGETS[target]} 개방` : locked === true ? `${TARGETS[target]} 잠김` : locked === false ? `${TARGETS[target]} 잠기지 않음` : '',
   ].filter(Boolean).join(' · ');
-  useEffect(() => { reportCallback?.({ text, opened, lockpicks, xp, pendingTension }); }, [reportCallback, text, opened, lockpicks, xp, pendingTension]);
+  useEffect(() => {
+    if (openingPending) return;
+    reportCallback?.({ text, opened, lockpicks, xp, pendingTension, investigation: {
+      detection, touched, trapRoll: trapDie, lockRoll: lockDie, trapResolved: disarmed,
+      trap: trapReport.progress, pickFailures, forceFailures,
+    } });
+  }, [reportCallback, text, opened, lockpicks, xp, pendingTension, openingPending, detection, touched, trapDie, lockDie, disarmed, trapReport.progress, pickFailures, forceFailures]);
 
   const resetResponses = () => {
     setInvestigation((previous) => previous + 1);
-    setTrapReport({ text: '', xp: 0 });
-    setOpeningReport(EMPTY_OPENING_RESULT);
+    setTrapReport(EMPTY_TRAP_REPORT);
+    setOpeningReport(null);
     setOpenedUnlocked(false);
   };
   const applyDetection = (value: Detection) => {
@@ -109,8 +128,10 @@ function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: Emb
         <h3>조사</h3>
         {environment && <p>이벤트 등으로 환경 함정이 있는 장소에서 조사합니다.</p>}
         <div className="lock-trap-fields">
-          <RollCheck label="탐지" skill="Perception" randomDifficulty onResult={applyDetection} />
-          <div className="lock-trap-links"><XRef id="t-difficulty">탐지 난이도 D8</XRef></div>
+          {resume?.detection ? <p className="lock-trap-note">저장한 탐지 판정 · {resume.detection === 'success' ? '성공' : '실패'}</p> : <>
+            <RollCheck label="탐지" skill="Perception" randomDifficulty onResult={applyDetection} />
+            <div className="lock-trap-links"><XRef id="t-difficulty">탐지 난이도 D8</XRef></div>
+          </>}
           {trap === 'choose' && (
             <div className="lock-trap-wide lock-trap-choices">
               <p>대상을 그대로 두거나 건드려 함정 여부를 확인할 수 있습니다.</p>
@@ -120,19 +141,20 @@ function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: Emb
               }}>대상 건드리기</button>
             </div>
           )}
-          {!environment && (detection === 'success' || touched) && (
+          {!environment && (detection === 'success' || touched) && (resume?.trapRoll != null ?
+            <p className="lock-trap-note">저장한 함정 여부 D10 · {resume.trapRoll}</p> : (
             <TrapRoll label="함정 여부 D10" sides={10} value={trapRaw} inputRef={trapInput} confirm={!!embedded} onChange={(value) => {
               setTrapRaw(value);
               setDisarmed(false);
               resetResponses();
             }} />
-          )}
-          {!environment && <TrapRoll label="잠김 여부 D20" sides={20} value={lockRaw} confirm={!!embedded} onChange={(raw) => {
+          ))}
+          {!environment && (resume?.lockRoll != null ? <p className="lock-trap-note">저장한 잠김 여부 D20 · {resume.lockRoll}</p> : <TrapRoll label="잠김 여부 D20" sides={20} value={lockRaw} confirm={!!embedded} onChange={(raw) => {
             setLockRaw(raw);
             setLocks((previous) => previous + 1);
             setOpenedUnlocked(false);
-            setOpeningReport(EMPTY_OPENING_RESULT);
-          }} />}
+            setOpeningReport(null);
+          }} />)}
         </div>
         <p className="lock-trap-status" role="status">
           {trap === 'clear' && <span>함정 없음</span>}
@@ -141,10 +163,11 @@ function LockTrapCase({ target, embedded }: { target: LockTarget; embedded?: Emb
           {locked !== null && <span>{TARGETS[target]} {locked ? '잠김' : '잠기지 않음'}</span>}
         </p>
       </section>
-      {(trap === 'spotted' || trap === 'triggered') && (
+      {resume?.trapResolved && <p className="lock-trap-note">앞서 확인한 함정 처리를 마쳤습니다.</p>}
+      {!resume?.trapResolved && (trap === 'spotted' || trap === 'triggered') && (
         <PlayDraftScope name={`trap-${investigation}`}>
           <TrapResponse key={`${trap}:${investigation}`} environment={environment} known={trap === 'spotted'} confirm={!!embedded}
-            onDisarmed={setDisarmed} onReport={embedded ? setTrapReport : undefined} />
+            resume={resume?.trap} onDisarmed={setDisarmed} onReport={embedded ? setTrapReport : undefined} />
         </PlayDraftScope>
       )}
       {!environment && canOpen && locked === true && <PlayDraftScope name={`opening-${investigation}-${locks}`}>
@@ -207,18 +230,19 @@ function TrapRoll({ label, sides, value, inputRef, onChange, confirm = false }: 
   );
 }
 
-function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
+function TrapResponse({ environment, known, onDisarmed, onReport, confirm, resume }: {
   environment: boolean;
   known: boolean;
   onDisarmed: (resolved: boolean) => void;
-  onReport?: (result: { text: string; xp: number }) => void;
+  onReport?: (result: TrapReport) => void;
   confirm: boolean;
+  resume?: TrapInvestigationProgress | null;
 }) {
   const id = useId();
-  const [kind, setKind] = usePlayDraftState('kind', '');
-  const [method, setMethod] = usePlayDraftState<TrapMethod>('method', '');
-  const [result, setResult] = usePlayDraftState<Outcome | null>('result', null);
-  const [avoided, setAvoided] = usePlayDraftState<Outcome | null>('avoided', null);
+  const [kind, setKind] = usePlayDraftState('kind', resume?.kind == null ? '' : String(resume.kind));
+  const [method, setMethod] = usePlayDraftState<TrapMethod>('method', resume?.method ?? '');
+  const [result, setResult] = usePlayDraftState<Outcome | null>('result', resume?.result ?? null);
+  const [avoided, setAvoided] = usePlayDraftState<Outcome | null>('avoided', resume?.avoided ?? null);
   const [attempt, setAttempt] = usePlayDraftState('check-attempt', 0);
   const roll = readOracleValue(kind.trim(), 10);
   const row = tableById.get('t-traps')?.rows.find((item) => item.min === roll);
@@ -227,7 +251,7 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
   const text = xp > 0 ? '함정 해제'
     : result === 'success' && method === 'bypass' ? '함정 우회'
       : avoided && row ? `함정 ${avoided === 'success' ? '회피 성공' : `회피 실패 · ${row.ko}`}` : '';
-  useEffect(() => { onReport?.({ text, xp }); }, [onReport, text, xp]);
+  useEffect(() => { onReport?.({ text, xp, progress: { kind: roll, method, result, avoided } }); }, [onReport, text, xp, roll, method, result, avoided]);
   const clearChoice = () => {
     setAttempt((previous) => previous + 1);
     setResult(null);
@@ -247,11 +271,11 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
     <section className="lock-trap-step" aria-label="함정 처리">
       <h3>함정 처리</h3>
       <div className="lock-trap-fields">
-        <TrapRoll label="함정 종류 D10" sides={10} value={kind} confirm={confirm} onChange={(value) => {
+        {resume?.kind != null ? <p className="lock-trap-note">저장한 함정 종류 D10 · {resume.kind}</p> : <TrapRoll label="함정 종류 D10" sides={10} value={kind} confirm={confirm} onChange={(value) => {
           setKind(value);
           setMethod('');
           clearChoice();
-        }} />
+        }} />}
         <div className="lock-trap-links"><XRef id="t-traps">함정 표 열기</XRef></div>
       </div>
       {row && (
@@ -260,7 +284,7 @@ function TrapResponse({ environment, known, onDisarmed, onReport, confirm }: {
           {known && (
             <div className="field lock-trap-select">
               <label htmlFor={`${id}-method`}>함정 처리 방법</label>
-              <select id={`${id}-method`} value={method} onChange={(event) => {
+              <select id={`${id}-method`} value={method} disabled={resume?.result != null} onChange={(event) => {
                 setMethod(event.target.value as TrapMethod);
                 clearChoice();
               }}>
@@ -331,8 +355,8 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   const id = useId();
   const [method, setMethod] = usePlayDraftState('method', 'pick');
   const [opened, setOpened] = usePlayDraftState('opened', false);
-  const [pickFailures, setPickFailures] = usePlayDraftState('pick-failures', 0);
-  const [forceFailures, setForceFailures] = usePlayDraftState('force-failures', 0);
+  const [pickFailures, setPickFailures] = usePlayDraftState('pick-failures', embedded?.resume?.pickFailures ?? 0);
+  const [forceFailures, setForceFailures] = usePlayDraftState('force-failures', embedded?.resume?.forceFailures ?? 0);
   const [crowbar, setCrowbar] = usePlayDraftState('crowbar', false);
   const [forceResult, setForceResult] = usePlayDraftState<Outcome | null>('force-result', null);
   const [standaloneTension, setStandaloneTension] = usePlayDraftState<Record<number, TensionResult>>('force-tension', {});
@@ -342,9 +366,10 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   const tension = standaloneTension[forceFailures] ?? null;
   const tensionReady = !forceResult || (embedded ? embedded.tensionReady(attempt) : tension !== null);
   const openedReport = opened && tensionReady;
+  const completedForceFailures = forceFailures + (forceResult === 'failure' && tensionReady ? 1 : 0);
   useEffect(() => {
-    onReport?.({ opened: openedReport, lockpicks: pickFailures, pendingTension: !tensionReady });
-  }, [onReport, openedReport, pickFailures, tensionReady]);
+    onReport?.({ opened: openedReport, pickFailures, forceFailures: completedForceFailures, pendingTension: !tensionReady });
+  }, [onReport, openedReport, pickFailures, completedForceFailures, tensionReady]);
   const applyPick = (value: Outcome) => {
     if (value === 'success') setOpened(true);
     else setPickFailures((previous) => previous + 1);
@@ -363,6 +388,9 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
       {!embedded && openedReport && container && (
         <div className="lock-trap-links"><XRef id="t-deep-search">깊은 수색으로 찾은 용기 보상</XRef></div>
       )}
+      {embedded && !container && !opened && (!forceResult || tensionReady) && <OpeningComparison
+        pickBonus={lockpickDifficulty(pickFailures)} forceBonus={forceOpeningBonus(completedForceFailures, crowbar)}
+        crowbar={crowbar} nextTension={embedded.nextTension} ledger={embedded.gearLedger} />}
       {!opened && !forceResult && (
         <div className="field lock-trap-select">
           <label htmlFor={`${id}-lock`}>개방 방법</label>
@@ -407,6 +435,31 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
           )}
         </section>
       )}
+    </section>
+  );
+}
+
+function OpeningComparison({ ledger, pickBonus, forceBonus, crowbar, nextTension }: {
+  ledger?: GearLedger; pickBonus: number; forceBonus: number; crowbar: boolean; nextTension?: TensionDie;
+}) {
+  const pc = usePlayCharacter();
+  const score = (skill: 'Thievery' | 'Athletics', bonus: number) => {
+    const rules = pcCheckModifiers(pc, skill);
+    const value = skillBreakdown(pc?.skill(skill) ?? '', [], [{ label: '개방 보정', value: bonus }, ...rules.fixed]);
+    return `${skill}${bonus ? ` +${bonus}` : ''} · ${value ? `기준 ${value.total}` : '종이 시트 수치 입력'}${rules.edge === 'disadvantage' ? ' · 불리' : ''}`;
+  };
+  const stock = (name: string) => {
+    const known = ledger ? matchingGear(ledger, name) : [];
+    return known.length ? `${name} 장부 ${known.reduce((total, item) => total + item.count, 0)}개` : `${name} 장부 미기록`;
+  };
+  return (
+    <section className="lock-opening-comparison" aria-label="잠긴 문 선택지 비교">
+      <dl>
+        <div><dt>자물쇠 따기</dt><dd>{score('Thievery', pickBonus)}</dd><dd>{stock('Lockpick')} · 필요 1개 · 실패 시 파손</dd></div>
+        <div><dt>강제 개방</dt><dd>{score('Athletics', forceBonus)}</dd><dd>시도마다 긴장 주사위{nextTension ? ` D${nextTension}` : ''} · 실패 후 +20</dd>
+          {!crowbar && <dd>{stock('Crowbar')} · 사용하면 +10</dd>}</div>
+        <div><dt>나중에 열기</dt><dd>현재 조사 기록을 저장 · 추가 굴림 없음</dd></div>
+      </dl>
     </section>
   );
 }

@@ -130,6 +130,10 @@
   .play-context .play-action-bar-tools { flex-wrap: nowrap; }
 }
 
+@media (max-width: 1110px) {
+  :root[data-route='play'] .footer { margin-block-end: 5.5rem; }
+}
+
 @media (max-width: 767px) {
   .play-context .play-action-bar { inset-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
   .play-desk input[data-play-dice] { scroll-margin-block-end: calc(var(--tabbar-h) + 80px); }

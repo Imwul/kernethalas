@@ -213,7 +213,7 @@ export function App() {
         onBack={() => dismiss()}
         onClose={() => dismiss(true)}
         onNavigate={() => setStack([])}
-        onResult={(key, value) => setStack((previous) => previous.map((frame) => frame.key === key ? { ...frame, result: value ?? undefined } : frame))}
+        onViewChange={(key, change) => setStack((previous) => previous.map((frame) => frame.key === key ? { ...frame, ...change } : frame))}
       />
     </div>
     </ReferenceContext.Provider>

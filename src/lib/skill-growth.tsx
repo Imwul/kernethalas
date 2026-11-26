@@ -13,7 +13,7 @@ export const GROWTH_SKILLS = [
   'Shafted Weapons', 'Unarmed Combat & Fist Weapons',
 ] as const;
 
-type GrowthSkill = typeof GROWTH_SKILLS[number];
+export type GrowthSkill = typeof GROWTH_SKILLS[number];
 const EMPTY: readonly GrowthSkill[] = [];
 const byName = new Map(GROWTH_SKILLS.map((skill) => [skill.toLowerCase(), skill]));
 byName.set('scavenging', 'Scavenge');

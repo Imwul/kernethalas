@@ -28,6 +28,14 @@
 
 .camp-grid :is(input, select):not([type='checkbox']) { min-height: 44px; }
 
+.camp-treatments {
+  margin: 12px 0 0;
+  padding: 8px 0 0;
+  border: 0;
+}
+
+.camp-treatments p { flex-basis: 100%; }
+
 .camp-options,
 .camp-links {
   display: flex;

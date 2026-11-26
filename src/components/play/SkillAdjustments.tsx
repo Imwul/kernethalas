@@ -9,7 +9,8 @@ import '../../styles/play-skill.css';
 
 const EMPTY: Record<string, number> = {};
 
-export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, fixed, disabled, label }: {
+export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, fixed, disabled, label,
+  onLoadPreset = onBase, canSavePreset = true }: {
   skill?: string;
   base: string;
   onBase: (value: string) => void;
@@ -18,6 +19,8 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
   fixed?: SkillTerm[];
   disabled?: boolean;
   label?: string;
+  onLoadPreset?: (value: string) => void;
+  canSavePreset?: boolean;
 }) {
   const play = usePlayDraft();
   const panel = useId();
@@ -59,10 +62,11 @@ export function SkillAdjustments({ skill, base, onBase, modifiers, onModifiers, 
           </select>
         </label>}
         <div className="play-skill-buttons">
-          {saved !== undefined && saved !== original && <button type="button" className="btn ghost" disabled={disabled} onClick={() => onBase(String(saved))}>
+          {saved !== undefined && (saved !== original || !canSavePreset) &&
+            <button type="button" className="btn ghost" disabled={disabled} onClick={() => onLoadPreset(String(saved))}>
             {selected} {saved} 불러오기
           </button>}
-          <button type="button" className="btn ghost" disabled={disabled || !selected || original === null || original < 0 || saved === original}
+          <button type="button" className="btn ghost" disabled={disabled || !canSavePreset || !selected || original === null || original < 0 || saved === original}
             onClick={() => { if (original !== null) setPreset(original); }}>현재 수치를 기본값으로 저장</button>
           {saved !== undefined && <button type="button" className="linkbtn" disabled={disabled} onClick={() => setPreset(undefined)}>저장한 기본값 지우기</button>}
         </div>

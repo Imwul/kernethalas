@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { EdgeToggle } from './EdgeToggle';
 import { d100FromValue, resolveCheck, rollDie, type CheckOutcome, type CheckResult, type Edge } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { exhaustionDisadvantage } from '../lib/character-progress';
+import { pcCheckModifiers } from '../lib/play-check-modifiers';
 import { usePlayCharacter } from '../lib/play-character';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
@@ -63,27 +63,23 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   const recordCritical = useRecordSkillCritical();
   const [confirmed, setConfirmed] = usePlayDraftState<{ inputs: Inputs; result: CheckResult } | null>(slot, null);
   const field = usePlayRollField(slot, label, 'D100', !!confirmed, true);
-  const [draft, setDraft] = useState<Partial<Inputs>>({});
+  const [draft, setDraft] = usePlayDraftState<Partial<Inputs>>(`skill-pending:${slot}`, {});
   const [invalid, setInvalid] = useState(false);
   const pc = usePlayCharacter();
   const own = context !== 'npc' ? pc : null;
   const chooseWeapon = context !== 'npc' && skill.includes('무기 Skill');
-  // Exhaustion 16–20 gives Disadvantage on every check (p.90); Scholar and Trap Buster give Advantage (p.63).
-  // Each is the default until the player picks otherwise; when both apply the book gives no rule, so nothing is preset.
-  const exhausted = !!own && exhaustionDisadvantage(own.exhaustion);
-  const perk = !own ? null : skill === 'Reason' && own.hasPerk('Scholar') ? 'Scholar'
-    : skill === 'Thievery' && /함정|trap/i.test(label) && own.hasPerk('Trap Buster') ? 'Trap Buster' : null;
-  const presetEdge = exhausted && perk ? null : exhausted ? 'disadvantage' as const : perk ? 'advantage' as const : null;
-  // Madness 6 makes Resolve checks Demanding (−10) per result (p.91).
-  const madnessResolve = own && skill === 'Resolve' ? own.madness.resolve : 0;
-  const inputs = { ...EMPTY, ...(presetEdge ? { edge: presetEdge } : {}),
+  const perk = skill === 'Reason' && own?.hasPerk('Scholar') ? 'Scholar'
+    : skill === 'Thievery' && /함정|trap/i.test(label) && own?.hasPerk('Trap Buster') ? 'Trap Buster' : undefined;
+  const weapon = draft.weapon ?? confirmed?.inputs.weapon ?? own?.character.weapon;
+  const rules = pcCheckModifiers(own, chooseWeapon ? weapon ?? skill : skill, perk);
+  const inputs = { ...EMPTY,
     ...(chooseWeapon && own?.character.weapon ? { weapon: own.character.weapon } : {}),
-    skill: initialSkill, ...confirmed?.inputs, roll: '', ...draft };
+    skill: initialSkill, ...confirmed?.inputs, edge: rules.edge, roll: '', ...draft };
   // Until the player types here, an empty value falls back to the Character tab.
   if (!inputs.skill && draft.skill === undefined && !confirmed && own) inputs.skill = own.skill(chooseWeapon ? inputs.weapon : skill);
   const difficultyDie = readOracleValue(inputs.difficulty.trim(), 8);
   const difficulty = randomDifficulty && difficultyDie !== null ? DIFFICULTY[difficultyDie - 1] ?? 0 : 0;
-  const fixed = [{ label: '규칙 보정', value: modifier }, { label: '난이도 D8', value: difficulty }, { label: '광기', value: -madnessResolve }];
+  const fixed = [{ label: '규칙 보정', value: modifier }, { label: '난이도 D8', value: difficulty }, ...rules.fixed];
   const breakdown = skillBreakdown(inputs.skill, inputs.modifiers, fixed);
   const update = (patch: Partial<Inputs>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -116,18 +112,16 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
         apply(readOracleValue(inputs.roll.trim(), 100), 'manual');
       }}>
         <label className="field"><span>{skill} 수치</span>
-          <input value={inputs.skill} inputMode="text" placeholder="예: 45" onChange={(event) => update({ skill: event.target.value })} />
+          <input value={inputs.skill} inputMode="text" maxLength={64} placeholder="예: 45" onChange={(event) => update({ skill: event.target.value })} />
         </label>
         {randomDifficulty && <div className="field"><label htmlFor={`${id}-difficulty`}>난이도 D8</label>
           <PlayDieHint dice="D8" sides={8} />
-          <input id={`${id}-difficulty`} value={inputs.difficulty} inputMode="numeric" placeholder="1–8" onChange={(event) => update({ difficulty: event.target.value })} />
+          <input id={`${id}-difficulty`} value={inputs.difficulty} inputMode="numeric" maxLength={8} placeholder="1–8" onChange={(event) => update({ difficulty: event.target.value })} />
         </div>}
         <EdgeToggle value={inputs.edge} onChange={(edge) => update({ edge })} />
-        {(exhausted || perk) && <p className="physical-check-exhausted">{[exhausted && `Exhaustion ${own!.exhaustion} · 모든 판정 불리`,
-          perk && `${perk} · 유리`, exhausted && perk && '둘 다 해당 · 직접 고르세요'].filter(Boolean).join(' / ')}</p>}
-        {madnessResolve > 0 && <p className="physical-check-exhausted">광기 · Resolve −{madnessResolve}</p>}
+        {rules.notes.length > 0 && <p className="physical-check-exhausted">{rules.notes.join(' / ')}</p>}
         <div className="field"><label htmlFor={`${id}-roll`}>직접 굴린 D100</label><PlayDieHint dice="D100" sides={100} />
-          <input id={`${id}-roll`} value={inputs.roll} inputMode="numeric" {...field} placeholder="1–100" aria-invalid={invalid || undefined}
+          <input id={`${id}-roll`} value={inputs.roll} inputMode="numeric" maxLength={8} {...field} placeholder="1–100" aria-invalid={invalid || undefined}
             onChange={(event) => update({ roll: event.target.value })} />
         </div>
         {chooseWeapon && <label className="field physical-check-weapon"><span>사용한 무기 Skill</span>

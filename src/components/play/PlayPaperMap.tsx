@@ -1,8 +1,12 @@
-import { useId, useState } from 'react';
+import { useCallback, useId, useImperativeHandle, useMemo, useState, type Ref } from 'react';
 import type { EncounterPlace } from '../../content/tables/exploration';
-import { PAPER_MAP_TAGS, paperMapKey, type PaperMapLocation, type PaperMapTag } from '../../lib/paper-map';
+import { PAPER_MAP_TAGS, paperMapKey, returnPlaceTags, type PaperMapLocation, type PaperMapTag } from '../../lib/paper-map';
+import { mapClueCounts, type MapClueCapture } from '../../lib/paper-map-clues';
 import { ROOM_EXIT_MARKS } from '../RoomShapeDiagram';
+import { PlayClueBrief, PlayPaperClues } from './PlayPaperClues';
 import { PlayStrip, PlayStripPane } from './PlayPanels';
+
+export type PlayPaperMapHandle = { pinClue: (clue: MapClueCapture) => void };
 
 interface Props {
   area: EncounterPlace | null;
@@ -10,38 +14,52 @@ interface Props {
   locations: PaperMapLocation[];
   active?: PaperMapLocation;
   canRevisit: boolean;
+  revisiting: boolean;
+  ref?: Ref<PlayPaperMapHandle>;
   onSave: (record: PaperMapLocation) => void;
-  onRevisit: (record: PaperMapLocation) => void;
+  onRevisit: (record: PaperMapLocation, exit?: string) => void;
 }
 
-export function PlayPaperMap({ area, domainId, locations, active, canRevisit, onSave, onRevisit }: Props) {
+export function PlayPaperMap({ area, domainId, locations, active, canRevisit, revisiting, ref, onSave, onRevisit }: Props) {
   const noteId = useId();
   const [paperId, setPaperId] = useState(active?.paperId ?? '');
   const [note, setNote] = useState(active?.note ?? '');
   const [tags, setTags] = useState<PaperMapTag[]>(active?.tags ?? []);
   const [selected, setSelected] = useState(paperMapKey(active?.paperId ?? ''));
   const [feedback, setFeedback] = useState('');
-  const [pane, setPane] = useState<'memo' | 'return' | null>(null);
+  const [pane, setPane] = useState<'memo' | 'return' | 'clues' | null>(null);
+  const [capture, setCapture] = useState<MapClueCapture | null>(null);
+  const onCaptureHandled = useCallback(() => setCapture(null), []);
   const stripId = useId();
-  const entries = locations.filter((record) => record.domainId === domainId);
-  const returnCount = entries.filter(({ tags: marked }) => marked.length > 0).length;
+  const entries = useMemo(() => locations.filter((record) => record.domainId === domainId), [locations, domainId]);
+  const counts = useMemo(() => mapClueCounts(entries), [entries]);
+  const returnPlaces = useMemo(() => entries.map((record) => ({ record, tags: returnPlaceTags(record), clues: counts.get(paperMapKey(record.paperId)) ?? 0 }))
+    .filter(({ tags, clues }) => tags.length || clues), [entries, counts]);
+  const clueCount = active ? counts.get(paperMapKey(active.paperId)) : undefined;
   const saved = entries.find((record) => paperMapKey(record.paperId) === selected);
 
-  const revisit = (record: PaperMapLocation) => {
+  useImperativeHandle(ref, () => ({ pinClue(clue) { setPane('clues'); setCapture(clue); } }), []);
+
+  const revisit = (record: PaperMapLocation, exit?: string) => {
     if (!canRevisit) return;
     setPaperId(record.paperId);
     setNote(record.note);
     setTags(record.tags);
     setSelected(paperMapKey(record.paperId));
-    onRevisit(record);
+    onRevisit(record, exit);
     setFeedback(`${record.paperId} 메모를 불러왔습니다.`);
   };
 
   return (
     <div className="play-paper-map">
+      {revisiting && active && pane !== 'clues' && <PlayClueBrief active={active} locations={entries} onOpen={() => {
+        setPane('clues');
+        requestAnimationFrame(() => document.getElementById(`${stripId}-clues`)?.querySelector<HTMLElement>('.play-clue-list')?.focus());
+      }} />}
       <PlayStrip label="종이 지도" prefix={stripId} value={pane} onChange={setPane} items={[
         { id: 'memo', label: active ? `종이 지도 메모 · ${active.paperId}` : '종이 지도 메모' },
-        ...(entries.length > 0 ? [{ id: 'return' as const, label: '돌아갈 곳', badge: returnCount }] : []),
+        { id: 'clues', label: '단서', badge: clueCount || undefined },
+        ...(entries.length > 0 ? [{ id: 'return' as const, label: '돌아갈 곳', badge: returnPlaces.length }] : []),
       ]} />
       <PlayStripPane prefix={stripId} id="memo" open={pane === 'memo'}>
         <section className="play-explore-action-body" aria-label="종이 지도 장소 색인">
@@ -103,49 +121,69 @@ export function PlayPaperMap({ area, domainId, locations, active, canRevisit, on
           {feedback && <p className="play-explore-note" role="status">{feedback}</p>}
         </section>
       </PlayStripPane>
+      <PlayStripPane prefix={stripId} id="clues" open={pane === 'clues'}>
+        <PlayPaperClues key={active?.paperId ?? ''} area={area} domainId={domainId} active={active} locations={entries}
+          capture={capture} onCaptureHandled={onCaptureHandled} onSave={(record) => {
+            if (!active) {
+              setPaperId(record.paperId);
+              setNote(record.note);
+              setTags(record.tags);
+              setSelected(paperMapKey(record.paperId));
+            }
+            onSave(record);
+          }} />
+      </PlayStripPane>
       {entries.length > 0 && <PlayStripPane prefix={stripId} id="return" open={pane === 'return'}>
-        <PlayReturnPlaces entries={entries} canRevisit={canRevisit} onRevisit={revisit} />
+        <PlayReturnPlaces candidates={returnPlaces} canRevisit={canRevisit} onRevisit={revisit} />
       </PlayStripPane>}
     </div>
   );
 }
 
-function SavedDoorReports({ location }: { location: PaperMapLocation }) {
+function SavedDoorReports({ location, canRevisit, onResume }: {
+  location: PaperMapLocation; canRevisit?: boolean; onResume?: (exit: string) => void;
+}) {
   return (
     <ul className="play-map-door-reports" aria-label="출입구별 문과 함정 기록">
-      {location.doors?.map(({ exit, text, opened }) => (
-        <li key={paperMapKey(exit)} data-opened={opened || undefined}><strong>{exit}</strong><span>{text}</span></li>
+      {location.doors?.map(({ exit, text, opened, deferred }) => (
+        <li key={paperMapKey(exit)} data-opened={opened || undefined}>
+          <strong>{exit}</strong><span>{text}{deferred && ' · 개방 보류'}</span>
+          {deferred && onResume && <button type="button" className="btn ghost" disabled={!canRevisit}
+            aria-label={`${location.paperId} ${exit} 조사 이어가기`} onClick={() => onResume(exit)}>조사 이어가기</button>}
+        </li>
       ))}
     </ul>
   );
 }
 
-function PlayReturnPlaces({ entries, canRevisit, onRevisit }: {
-  entries: PaperMapLocation[];
+function PlayReturnPlaces({ candidates, canRevisit, onRevisit }: {
+  candidates: { record: PaperMapLocation; tags: PaperMapTag[]; clues: number }[];
   canRevisit: boolean;
-  onRevisit: (location: PaperMapLocation) => void;
+  onRevisit: (location: PaperMapLocation, exit?: string) => void;
 }) {
-  const [filter, setFilter] = useState<PaperMapTag | 'all'>('all');
+  const [filter, setFilter] = useState<PaperMapTag | 'all' | 'clues'>('all');
   const [announced, setAnnounced] = useState('');
-  const candidates = entries.filter(({ tags }) => tags.length > 0);
-  const shown = candidates.filter(({ tags }) => filter === 'all' || tags.includes(filter));
+  const hasClues = candidates.some(({ clues }) => clues > 0);
+  const activeFilter = filter === 'clues' && !hasClues ? 'all' : filter;
+  const shown = candidates.filter(({ tags, clues }) => activeFilter === 'all' || (activeFilter === 'clues' ? clues > 0 : tags.includes(activeFilter)));
+  const filters = ['all', ...PAPER_MAP_TAGS, ...(hasClues ? ['clues' as const] : [])] as const;
 
   return (
       <section className="play-return-places play-explore-action-body" aria-label="돌아갈 곳 목록">
         {candidates.length > 0 && (
           <div className="seg play-return-filters" role="group" aria-label="돌아갈 곳 필터">
-            {(['all', ...PAPER_MAP_TAGS] as const).map((tag) => (
-              <button type="button" key={tag} aria-pressed={filter === tag} onClick={() => setFilter(tag)}>
-                {tag === 'all' ? '전체' : tag}
+            {filters.map((tag) => (
+              <button type="button" key={tag} aria-pressed={activeFilter === tag} onClick={() => setFilter(tag)}>
+                {tag === 'all' ? '전체' : tag === 'clues' ? '단서' : tag}
               </button>
             ))}
           </div>
         )}
         {!canRevisit && candidates.length > 0 && <p className="play-explore-note">이번 장소를 마치고 새 장소에서 재방문을 선택하세요.</p>}
         {shown.length === 0 ? <p className="play-explore-note">{candidates.length ? '이 표시에 해당하는 장소가 없습니다.'
-          : '종이 지도 메모에 잠긴 문, 미개봉 용기, 미탐색 출입구를 표시할 수 있습니다.'}</p> : (
+          : '잠긴 문, 미개봉 용기, 미탐색 출입구, 단서를 저장한 장소가 여기에 나타납니다.'}</p> : (
           <ul className="play-return-list">
-            {shown.map((record) => {
+            {shown.map(({ record, tags, clues }) => {
               const tile = record.tile;
               const exits = [
                 ...(tile?.entrance != null ? [`입구 ${tile.entrance + 1}번`] : []),
@@ -158,11 +196,15 @@ function PlayReturnPlaces({ entries, canRevisit, onRevisit }: {
                       <strong>{record.paperId}</strong><span>{record.area === 'room' ? '방' : '통로'}</span>
                     </div>
                     <ul className="play-return-tags" aria-label="장소 표시">
-                      {record.tags.map((tag) => <li key={tag}>{tag}</li>)}
+                      {tags.map((tag) => <li key={tag}>{tag}</li>)}
+                      {clues > 0 && <li>단서 {clues}개</li>}
                     </ul>
                     {exits.length > 0 && <p className="play-explore-note">{exits.join(' · ')}</p>}
                     {record.note && <p className="play-return-note">{record.note}</p>}
-                    {record.doors?.length ? <SavedDoorReports location={record} /> : null}
+                    {record.doors?.length ? <SavedDoorReports location={record} canRevisit={canRevisit} onResume={(exit) => {
+                      onRevisit(record, exit);
+                      setAnnounced(`${record.paperId} · ${exit} 재방문을 선택했습니다. 입장 판정 뒤 조사를 이어갑니다.`);
+                    }} /> : null}
                   </div>
                   <button type="button" className="btn ghost" aria-label={`${record.paperId} 재방문`} disabled={!canRevisit}
                     onClick={() => {

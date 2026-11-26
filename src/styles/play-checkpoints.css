@@ -40,6 +40,23 @@
   background: var(--paper);
 }
 .play-checkpoint-review :is(h3, p), .play-checkpoints-body > p { margin: 0; }
+.play-checkpoint-comparison {
+  inline-size: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font: 14px/1.45 var(--f-ui);
+}
+.play-checkpoint-comparison :is(th, td) {
+  padding: var(--s1);
+  border-block-end: 1px solid var(--rule-soft);
+  overflow-wrap: anywhere;
+  text-align: start;
+  vertical-align: top;
+}
+.play-checkpoint-comparison thead th:first-child { inline-size: 30%; }
+.play-checkpoint-comparison thead { background: var(--bone-2); }
+.play-checkpoint-comparison-note { color: var(--ink-2); font: 14px/1.5 var(--f-ui); }
+.play-checkpoint-fork { padding-block: var(--s1); }
 
 @media (max-width: 600px) {
   .play-checkpoint-form, .play-checkpoint-row { grid-template-columns: minmax(0, 1fr); }

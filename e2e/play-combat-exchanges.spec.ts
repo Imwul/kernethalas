@@ -44,7 +44,7 @@ test('an attack exchange records the pair once and keeps skills for the next att
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  const record = history.getByRole('button', { name: /공격 교환 · PC → Necropede(?: 1)? D100 × 2 공격 00 \/ 방어 31/ });
+  const record = history.getByRole('button', { name: /공격 교환 · PC → Necropede(?: 1)? D100 × 2 공격 00 \/ 방어 31.*수정 미리보기$/ });
   await expect(record).toHaveCount(1);
   await record.click();
   await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
@@ -80,7 +80,7 @@ test('correcting a confirmed pair also rewinds its dependent hit-location roll',
 
   await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  await history.getByRole('button', { name: /공격 교환 · PC → Necropede D100 × 2 공격 12 \/ 방어 90/ }).click();
+  await history.getByRole('button', { name: /공격 교환 · PC → Necropede D100 × 2 공격 12 \/ 방어 90.*수정 미리보기$/ }).click();
   await expect(history.getByRole('group', { name: '굴림 수정 미리보기' })).toContainText('D20 1 다시 확인');
   await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
   await expect(attack.getByRole('textbox', { name: '공격자 D100', exact: true })).toBeFocused();
@@ -119,6 +119,17 @@ test('marked defeats drive creature spoils and unmarked targets can still be fou
 test('only targets still in combat return after retreat', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
+  const explore = page.getByRole('region', { name: '장소 탐험', exact: true });
+  await explore.getByRole('button', { name: '방', exact: true }).click();
+  await openPane(explore, '종이 지도 메모');
+  const map = explore.getByRole('region', { name: '종이 지도 장소 색인', exact: true });
+  await map.getByRole('textbox', { name: '종이 지도 번호', exact: true }).fill('A-12');
+  await map.getByRole('button', { name: '장소 메모 저장', exact: true }).click();
+  const light = explore.getByRole('region', { name: '입장할 때 쓸 광원', exact: true });
+  await openPane(light, '광원 기록');
+  await light.getByRole('textbox', { name: '현재 광원 잔량', exact: true }).fill('8');
+  await light.getByRole('button', { name: '잔량 저장', exact: true }).click();
+  await roll(explore, '긴장 주사위 굴린 값', '3');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await selectCreature(combat, 'Necropede');
@@ -129,10 +140,73 @@ test('only targets still in combat return after retreat', async ({ page }) => {
   await flee.getByRole('textbox', { name: 'Dodge 수치' }).fill('50');
   await roll(flee, '직접 굴린 D100', '39');
   await flee.getByRole('button', { name: '후퇴하고 적 편성 기록' }).click();
+  const journal = page.getByRole('region', { name: '이번 장소 기록', exact: true });
+  await journal.getByRole('button', { name: '다음 장소', exact: true }).click();
+  await go(page, '저널');
+  const name = journal.getByRole('textbox', { name: '장소 이름 (선택)', exact: true });
+  await name.fill('다른 현재 방 B');
   await go(page, '탐험');
-  await page.getByRole('button', { name: /재진입$/ }).click();
+  await page.getByRole('button', { name: 'A-12 재진입', exact: true }).click();
+  await page.reload();
+  await expect(explore.getByText('A-12 재진입', { exact: false })).toBeVisible();
+  await expect(explore.getByRole('button', { name: /^종이 지도 메모 · A-12/ })).toBeVisible();
+  const returning = explore.getByRole('button', { name: '남아 있던 적과 조우', exact: true });
+  await expect(returning).toHaveCount(0);
+  await go(page, '조우·전투');
+  await expect(combat).toHaveCount(0);
+  await page.getByRole('button', { name: '재진입 입장 판정으로', exact: true }).click();
+  await expect(light).toContainText('광원 7 → 6');
+  await roll(explore, '긴장 주사위 굴린 값', '3');
+  await expect(light).toContainText('현재 광원 6');
+  await expect(explore.getByRole('region', { name: '조우 판정', exact: true })).toHaveCount(0);
+  await returning.click();
   await expect(combat.getByRole('heading', { name: 'Infernal Archon', exact: true })).toBeVisible();
   await expect(combat.getByRole('combobox', { name: 'Necropede 상태' })).toHaveCount(0);
+  await go(page, '저널');
+  await expect(name).toHaveValue('A-12');
+  await go(page, '조우·전투');
+  await openPane(combat, '도주');
+  await flee.getByRole('textbox', { name: 'Dodge 수치' }).fill('50');
+  await roll(flee, '직접 굴린 D100', '39');
+  await flee.getByRole('button', { name: '후퇴하고 적 편성 기록' }).click();
+  await go(page, '탐험');
+  await expect(returning).toHaveCount(0);
+  await expect(explore.getByRole('group', { name: '탐험 후속 행동' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'A-12 재진입', exact: true })).toBeVisible();
+});
+
+test('a legacy retreat waits for a separate Darkness ambush and keeps both encounters unique', async ({ page }) => {
+  await page.addInitScript(() => {
+    const key = 'kn-play-room-v1';
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, JSON.stringify({ slots: { initialTension: 4, domains: [{
+      id: 1, name: '', overseerRoll: null, defeated: false, influence: { roll: null, damageRoll: null }, extra: {}, darkness: [],
+      retreats: [{ id: 'old-retreat', place: '예전 묘실', kind: 'encounter', creatureIds: ['cr-infernal-archon'] }],
+    }] }, undo: [], history: [] }));
+  });
+  await page.goto('/play');
+  const explore = page.getByRole('region', { name: '장소 탐험', exact: true });
+  const combat = page.getByRole('region', { name: '조우와 전투 도구', exact: true });
+  const returning = explore.getByRole('button', { name: '남아 있던 적과 조우', exact: true });
+  const ambush = explore.getByRole('button', { name: '매복 조우로', exact: true });
+  await page.getByRole('button', { name: '예전 묘실 재진입', exact: true }).click();
+  await roll(explore, '긴장 주사위 굴린 값', '1');
+  await roll(explore.getByRole('region', { name: '짙어지는 어둠', exact: true }), '직접 굴린 값', '37');
+  await expect(returning).toHaveCount(0);
+  await ambush.click();
+  await selectCreature(combat, 'Necropede');
+  const victory = combat.getByRole('button', { name: '승리 후 전투 마치기', exact: true });
+  await victory.click();
+  await go(page, '탐험');
+  await expect(ambush).toHaveCount(0);
+  await returning.click();
+  await expect(combat.getByRole('heading', { name: 'Infernal Archon', exact: true })).toBeVisible();
+  await victory.click();
+  await go(page, '탐험');
+  await expect(ambush).toHaveCount(0);
+  await expect(returning).toHaveCount(0);
+  await expect(explore.getByRole('button', { name: '저널로', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '예전 묘실 재진입', exact: true })).toHaveCount(0);
 });
 
 test('Overseer summons respect the active limit and Shadow Reapers have a separate checklist', async ({ page }) => {

@@ -1,9 +1,9 @@
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { tableById } from '../content';
 import { automaticRollSides, rollTable } from '../lib/oracle';
 import { parseDice, roll, type RollResult } from '../lib/dice';
 import { search, docs, KIND_LABEL, SEARCH_FILTERS, querySuggestions, searchTerms, type Doc, type SearchFilter } from '../lib/search';
-import { nav, useNav } from '../lib/store';
+import { BENCH_FULL_MESSAGE, nav, OPEN_MAX, useNav } from '../lib/store';
 import { IClose, IDie, ISearch } from './icons';
 
 interface Props {
@@ -27,10 +27,12 @@ function Highlight({ value, terms }: { value: string; terms: string[] }) {
 
 export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onClose }: Props) {
   const [selected, setSelected] = useState(0);
+  const [benchBlocked, setBenchBlocked] = useState(false);
+  const listId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
-  const { recent, pins } = useNav();
+  const { open: benchOpen, recent, pins } = useNav();
 
   useLayoutEffect(() => {
     const element = dialog.current;
@@ -64,23 +66,39 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
 
   const changeQuery = (value: string) => {
     setSelected(0);
+    setBenchBlocked(false);
     onQuery(value);
     list.current?.scrollTo({ top: 0 });
   };
   const move = (distance: number) => {
+    if (!results.length) return;
     const next = Math.max(0, Math.min(active + distance, results.length - 1));
     setSelected(next);
     list.current?.querySelector(`[data-result="${next}"]`)?.scrollIntoView({ block: 'nearest' });
   };
-  const addToDesk = (id: string) => { nav.open(id); onClose(); };
+  const close = () => {
+    setBenchBlocked(false);
+    onClose();
+  };
+  const preview = (id: string, value?: number) => {
+    setBenchBlocked(false);
+    onPreview(id, value);
+  };
+  const addToDesk = (id: string) => {
+    if (!nav.open(id)) {
+      setBenchBlocked(true);
+      return;
+    }
+    close();
+  };
 
   return (
     <dialog
       ref={dialog}
       className="search-dialog"
       aria-label="규칙 검색"
-      onCancel={(event) => { event.preventDefault(); onClose(); }}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      onCancel={(event) => { event.preventDefault(); close(); }}
+      onClick={(event) => { if (event.target === event.currentTarget) close(); }}
     >
       <div className="search-content">
         <div className="search-input">
@@ -93,11 +111,12 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
             placeholder="Prone, 방어구, 양쪽 다 실패…"
             aria-label="검색어"
             aria-controls="search-results"
+            aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === 'Escape') {
                 event.preventDefault();
-                onClose();
+                close();
               } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault();
                 move(event.key === 'ArrowDown' ? 1 : -1);
@@ -105,15 +124,15 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
                 event.preventDefault();
                 const { id } = results[active].doc;
                 if (event.shiftKey) addToDesk(id);
-                else onPreview(id);
+                else preview(id);
               }
             }}
           />
-          <button className="iconbtn" onClick={onClose} aria-label="검색 닫기"><IClose /></button>
+          <button className="iconbtn" onClick={close} aria-label="검색 닫기"><IClose /></button>
         </div>
         <div className="search-filters" role="group" aria-label="검색 유형">
           {SEARCH_FILTERS.map(({ id, label }) => (
-            <button key={id} type="button" aria-pressed={filter === id} onClick={() => { setSelected(0); onFilter(id); list.current?.scrollTo({ top: 0 }); }}>
+            <button key={id} type="button" aria-pressed={filter === id} onClick={() => { setSelected(0); setBenchBlocked(false); onFilter(id); list.current?.scrollTo({ top: 0 }); }}>
               {label}
             </button>
           ))}
@@ -137,7 +156,7 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
               <Fragment key={doc.id}>
                 {group && group !== results[index - 1]?.group && <h3 className="search-group">{group}</h3>}
                 <div className="search-result" data-result={index} data-active={index === active}>
-                  <button className="search-preview" onClick={() => onPreview(doc.id)} onFocus={() => setSelected(index)}>
+                  <button id={`${listId}-${index}`} className="search-preview" onClick={() => preview(doc.id)} onFocus={() => setSelected(index)}>
                     <span className="search-kind">{KIND_LABEL[doc.kind]}</span>
                     <span className="search-match">
                       <strong><Highlight value={doc.ko} terms={terms} /></strong>
@@ -148,7 +167,7 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
                   {rollable && (
                     <button className="search-roll" aria-label={`${doc.ko} ${table.dice} 굴리기`} onClick={() => {
                       const value = rollTable(table);
-                      if (value !== null) onPreview(doc.id, value);
+                      if (value !== null) preview(doc.id, value);
                     }}><IDie /> {table.dice} 굴리기</button>
                   )}
                 </div>
@@ -159,6 +178,7 @@ export function Palette({ open, query, filter, onQuery, onFilter, onPreview, onC
         <div className="search-foot">
           <span className="search-keys"><kbd>↑</kbd> <kbd>↓</kbd> 이동 <kbd>Enter</kbd> 참고 패널 <kbd>Shift</kbd> + <kbd>Enter</kbd> 작업대</span>
           <span role="status">{query.trim() ? `표시 결과 ${results.length}건` : `검색 가능 ${docs.length}건`}</span>
+          {benchBlocked && benchOpen.length >= OPEN_MAX && <span className="bench-open-feedback" role="alert">{BENCH_FULL_MESSAGE}</span>}
         </div>
       </div>
     </dialog>
@@ -179,7 +199,7 @@ function QuickDice({ query }: { query: string }) {
         <IDie /> {label} 굴리기
       </button>
       <output aria-live="polite">
-        {shown && <><b>{shown.total}</b>
+        {shown && <><span className="readout">{shown.total}</span>
           {(shown.dice.length > 1 || shown.mod !== 0) && <span>{shown.dice.join(' + ')}{shown.mod ? ` ${shown.mod > 0 ? '+' : '−'} ${Math.abs(shown.mod)}` : ''}</span>}</>}
       </output>
     </div>

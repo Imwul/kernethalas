@@ -1,3 +1,7 @@
+import { RETREAT_AMBUSH_ID, RETREAT_BATTLE_ID } from './play-domain';
+
+import { isCombatDamageSlot } from './combat-damage-records';
+
 export type PlaySlots = Record<string, unknown>;
 export type SlotValue = [unknown] | [];
 export type RollChange = { slot: string; before: SlotValue; after: SlotValue };
@@ -8,6 +12,7 @@ export type PlayRollDetails = {
   source: 'manual' | 'app';
   field?: string;
   breakdown?: string;
+  action?: true;
 };
 export type PlayRollEntry = PlayRollDetails & {
   id: string;
@@ -27,6 +32,11 @@ const ENCOUNTER = `${EXPLORE}encounter-roll`;
 const TENSION = `${EXPLORE}entry-tension`;
 const DARKNESS = `${EXPLORE}entry-darkness`;
 const SHAPE = `${EXPLORE}shape-roll`;
+const ENTRY_LIGHT_RESOLVE = `${EXPLORE}entry-light-resolve`;
+
+export function playAction(label: string): PlayRollDetails {
+  return { label, dice: '', value: '', source: 'manual', action: true };
+}
 
 export function playRollStage(value: unknown): PlayRollEntry['stage'] {
   return typeof value === 'string' && STAGES.has(value) ? value as PlayRollEntry['stage'] : 'explore';
@@ -52,6 +62,7 @@ function isRollEntry(value: unknown): value is PlayRollEntry {
     && typeof entry.dice === 'string' && typeof entry.value === 'string' && STAGES.has(entry.stage)
     && (entry.field === undefined || typeof entry.field === 'string')
     && (entry.breakdown === undefined || typeof entry.breakdown === 'string' && entry.breakdown.length <= 1800)
+    && (entry.action === undefined || entry.action === true)
     && (entry.source === 'manual' || entry.source === 'app')
     && Array.isArray(entry.cleared) && entry.cleared.every((prefix) => safePlaySlot(prefix) && prefix.endsWith('/'))
     && (entry.requires === undefined || Array.isArray(entry.requires) && entry.requires.every(safePlaySlot))
@@ -82,15 +93,18 @@ function battleParents(id: string) {
   if (source.startsWith('action-darkness')) return [...intro, `${EXPLORE}action-tension`];
   if (source.startsWith('camp-')) return ['wrap/camp-plan'];
   if (source === 'breather') return ['wrap/breather-darkness-roll'];
+  if (source === RETREAT_BATTLE_ID || source === RETREAT_AMBUSH_ID) return [TENSION, DARKNESS];
   if (source === 'overseer') return [TENSION];
   if (battle === 'place' || intro.length) return [...intro, ENCOUNTER, DARKNESS];
   return [];
 }
 
-function parents({ scope, changes }: PlayRollEntry) {
+function parents({ scope, changes, field }: PlayRollEntry) {
   const slots = changes.map(({ slot }) => slot);
   if (scope.startsWith(EXPLORE)) {
-    if (slots.includes(TENSION)) return [SHAPE];
+    if (slots.includes('lingering-recorded')) return [SHAPE, 'ongoingEffects'];
+    if (slots.includes(TENSION)) return [SHAPE, ENTRY_LIGHT_RESOLVE];
+    if (slots.includes(ENTRY_LIGHT_RESOLVE)) return [SHAPE];
     if (slots.includes(DARKNESS)) return [TENSION];
     if (slots.includes(ENCOUNTER)) return [SHAPE, TENSION, DARKNESS];
     if (slots.includes(EVENT)) return [ENCOUNTER];
@@ -117,17 +131,27 @@ function parents({ scope, changes }: PlayRollEntry) {
   }
   if (scope.startsWith('combat/')) {
     const result = battleParents(scope.split('/')[1] ?? '');
+    if (/^combat\/[^/]+\/combat-tools-[^/]+\//.test(scope)) result.push('ongoingEffects');
     const target = scope.match(/^combat\/[^/]+\/target-[^/]+\//)?.[0];
     if (target) {
       if (scope.startsWith(`${target}action-follow-up-`)) result.push(`${target}creature-action`);
-      const areaTarget = scope.slice(target.length).match(/^action-follow-up-\d+\/area-targets-\d+\/\d+\//)?.[0];
+      const areaTarget = scope.slice(target.length).match(/^action-follow-up-\d+\/area-targets-\d+\/\d+\/(?:role-\d+\/)?/)?.[0];
       if (areaTarget && /^(?:rolls|extra)-\d+\//.test(scope.slice(target.length + areaTarget.length))) {
         result.push(`${target}${areaTarget}resisted`);
       }
       if (slots.includes(`${target}creature-hit`)) result.push(`${target}attack-confirmed-pc`);
       if (slots.includes(`${target}creature-pc-hit`)) result.push(`${target}attack-confirmed-enemy`);
+      const attackSide = field?.slice(target.length).match(/^attack-follow-up:(pc|enemy):/)?.[1];
+      if (attackSide) result.push(`${target}attack-confirmed-${attackSide}`);
+      for (const slot of slots.filter(isCombatDamageSlot)) {
+        const pc = slot.slice(target.length).startsWith('damage-record:pc:');
+        result.push(`${target}attack-confirmed-${pc ? 'enemy' : 'pc'}`, `${target}${pc ? 'creature-pc-hit' : 'creature-hit'}`);
+      }
     }
     return result;
+  }
+  if (scope === 'wrap/' && (slots.includes('confirmedCamp') || slots.includes('wrap/camp-sanity-die'))) {
+    return ['wrap/camp-plan'];
   }
   return [];
 }
@@ -186,7 +210,9 @@ export function planRollCorrection(slots: PlaySlots, history: PlayRollEntry[], i
     if (battleScope) {
       const battleId = battleScope.replace(/%3A/gi, ':');
       const battle = battles?.[battleId];
-      if (battle?.outcome) conflicts.add('종료한 전투 기록');
+      if (battle?.outcome && !(entry.action && entry.changes.length && entry.changes.every(({ slot }) => isCombatDamageSlot(slot)))) {
+        conflicts.add('종료한 전투 기록');
+      }
     }
     for (const { slot, before, after } of entry.changes) {
       const current = getSlot(next, slot);

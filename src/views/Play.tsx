@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { tableById } from '../content';
 import { creatureById, type CreatureRecord } from '../content/entries/creatures';
 import { CopyButton, XRef } from '../components/bits';
@@ -11,47 +11,56 @@ import { PlayCheckpoints } from '../components/play/PlayCheckpoints';
 import { useCampaignDesk } from '../components/play/PlayCampaign';
 import { DrawerTabLabel, PLAY_DRAWER_EVENT, PLAY_DRAWER_ID, PlayDrawer, type DrawerTab } from '../components/play/PlayDrawer';
 import { PlayPopover } from '../components/play/PlayPanels';
-import { PlayCombat, type EncounterSeed } from '../components/play/PlayCombat';
+import { PlayCombat, type CombatOutcomePreview, type EncounterSeed, type FinishedCombatOutcome } from '../components/play/PlayCombat';
+import { PlayDiscoveryMode } from '../components/play/PlayDiscovery';
 import { PlayDomain } from '../components/play/PlayDomain';
 import { PlayEquipment } from '../components/play/PlayEquipment';
 import { PlayExploration, type ExplorationReport } from '../components/play/PlayExploration';
 import { ExplorationActionLinks, type ExplorationActionsHandle } from '../components/play/PlayExplorationActions';
 import { PlayFocusMode } from '../components/play/PlayFocus';
 import { PlayInventory, useGearLedger } from '../components/play/PlayInventory';
+import { PlayIntroDomain, type IntroStart } from '../components/play/PlayIntroDomain';
 import { PlayOngoingEffects } from '../components/play/PlayOngoingEffects';
 import { findPaperCorrections, paperReceiptKey, PlayPaperCorrections, type PaperReceipt } from '../components/play/PlayPaperCorrections';
 import { PlayPendingRolls } from '../components/play/PlayPendingRolls';
 import { PlayPinnedTool } from '../components/play/PlayPinnedTool';
+import { PlaySessionPanel } from '../components/play/PlaySession';
 import { PlayWrapUp, type WrapUpHandle } from '../components/play/PlayWrapUp';
 import { useKeepAwakePreference, useScreenWakeLock, wakeLockSupported } from '../lib/wake-lock';
-import { focusPlayRoll, PlayActionBar, PlayRollHistory, usePhysicalFirst, usePlayPreference } from '../components/play/PlayWorkflow';
+import { focusNextPlayAction, focusPlayRoll, PlayActionBar, PlayRollHistory, readPlaySessionPoint, usePhysicalFirst, usePlayPreference } from '../components/play/PlayWorkflow';
 import { BESTIARY_CREATURE_PARAM } from '../lib/bestiary-encounter';
+import { formatCombatDamage, readCombatDamageRecords } from '../lib/combat-damage-records';
+import { creatureSpoilsTables } from '../lib/creature-combat';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
 import { introEncounterCreature, nameDomainDiscoveries, newDomainProgress } from '../lib/domain-progress';
 import { PlayDraftProvider, PlayDraftScope, usePlayDraft, usePlayDraftState } from '../lib/play-draft';
 import { usePlayCampaignId } from '../lib/play-campaigns';
 import type { PlayCheckpointData } from '../lib/play-checkpoints';
-import { LINGERING_CONDITIONS, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT, readPlayOngoing } from '../lib/play-effects';
+import { LINGERING_CONDITIONS, LINGERING_ENTRY_SLOT, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT, readPlayOngoing } from '../lib/play-effects';
 import { PAPER_MAP_SLOT, paperMapKey, type PaperMapLocation } from '../lib/paper-map';
 import { PLAY_PENDING_ROLLS_SLOT, type PendingPlayRoll } from '../lib/play-pending-rolls';
-import { playRollStage, type PlayRollEntry } from '../lib/play-roll-history';
+import { playAction, playRollStage, type PlayRollEntry } from '../lib/play-roll-history';
+import { carrySessionIntent, EMPTY_SESSION, isPlaySession, PLAY_SESSION_SLOT, SESSION_INTENT_LIMIT, shortSessionText,
+  type PlaySession, type SessionPause } from '../lib/play-session';
 import { appendPlayTimeline, createPlayTimelineEntry, PLAY_TIMELINE_SLOT, type PlayTimelineEntry } from '../lib/play-timeline';
 import {
   activeDarkness, darknessDetails, domainOverseer, influenceText, newPlayDomain, tensionSides,
+  RETREAT_AMBUSH_ID, RETREAT_BATTLE_ID, RETREAT_RETURN_SLOT,
   type DarknessEvent, type PlayDomainRecord, type RetreatedEncounter, type TensionSides,
 } from '../lib/play-domain';
-import { isQuickUseEntry, type PaperChange } from '../lib/play-inventory';
+import { gearKey, isQuickUseEntry, undoStartingGear, type PaperChange } from '../lib/play-inventory';
+import { carryPlayLight, lightRemaining, PLAY_LIGHT_SLOT, playSupplies, readPlayLight } from '../lib/play-light';
 import { hasRestoreUndo } from '../lib/site-backup';
 import { SKILL_PRESETS_SLOT } from '../lib/play-skill';
 import {
-  CharacterRoomContext, PLAY_CHARACTER_SLOT, XP_TO_LEVEL, currentProgress, foldRoomProgress, isPlayCharacter, madnessEffects,
-  type PlayCharacter as PlayCharacterRecord,
+  CharacterRoomContext, MADNESS_TIMING_SLOT, PLAY_CHARACTER_SLOT, SURVIVOR_BASELINE_SLOT, XP_TO_LEVEL,
+  currentProgress, foldRoomProgress, isPlayCharacter, madnessEffects, type MadnessTiming,
+  type PlayCharacter as PlayCharacterRecord, type SurvivorBaseline,
 } from '../lib/play-character';
 import { goalCounts, roomProgress } from '../lib/character-progress';
 import { startingGearToLedger, type GearLine } from '../lib/character-creation';
 import { CHARACTER_LOG_SLOT } from '../components/play/PlayExhaustion';
 import { ExhaustionHealNote } from '../components/play/ExhaustionHealNote';
-import { LINGERING_ENTRY_SLOT, LingeringEntryAlert } from '../components/play/PlayLingering';
 import { StatusIcon, type StatusKind } from '../components/StatusIcon';
 import { navigate, useLocation } from '../lib/router';
 import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
@@ -81,6 +90,7 @@ type Battle = {
   primaryId: string | null;
   creatureIds: string[];
   defeatedTargets?: DefeatedTarget[];
+  victoryXp?: number;
   outcome: BattleOutcome | null;
 };
 const BASE_BATTLE: Battle = { kind: 'encounter', primaryId: null, creatureIds: [], outcome: null };
@@ -110,11 +120,13 @@ function advanceDiceFocus(event: KeyboardEvent<HTMLDivElement>) {
       || !input.matches('[data-play-dice]') || !input.form?.hasAttribute('data-play-roll')) return;
   const section = input.closest('.play-stage, .play-domain-body');
   if (!section) return;
+  const fields = Array.from(section.querySelectorAll<HTMLInputElement>('input[data-play-dice]'));
+  const preceding = new Set(fields.slice(0, fields.indexOf(input) + 1));
   requestAnimationFrame(() => {
-    if (document.activeElement !== input || input.getAttribute('aria-invalid') === 'true') return;
+    const focused = document.activeElement;
+    if (input.getAttribute('aria-invalid') === 'true' || (focused !== input && (input.isConnected || focused !== document.body))) return;
     const inputs = Array.from(section.querySelectorAll<HTMLInputElement>('input[data-play-dice]'));
-    const next = inputs.slice(inputs.indexOf(input) + 1)
-      .find((field) => !field.disabled && field.getClientRects().length > 0);
+    const next = inputs.find((field) => !preceding.has(field) && !field.disabled && field.getClientRects().length > 0);
     next?.focus();
   });
 }
@@ -150,8 +162,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const requestedCreature = search.get(BESTIARY_CREATURE_PARAM);
   const bestiaryCreature = requestedCreature && creatureById.has(requestedCreature) ? requestedCreature : null;
   const gear = useGearLedger();
-  const applyStartingGear = (lines: GearLine[]) =>
-    gear.change((ledger) => startingGearToLedger(ledger, lines, `creation:${crypto.randomUUID()}`));
+  const applyStartingGear = (lines: GearLine[], source: string) => gear.change((ledger) => startingGearToLedger(ledger, lines, source));
+  const undoGearGrant = (source: string) => gear.change((ledger) => undoStartingGear(ledger, source));
   const pendingGrowth = usePendingSkillGrowth();
   const skillCriticalHistory = useSkillCriticalHistory();
   const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
@@ -161,10 +173,18 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const ongoing = readPlayOngoing(draft.slots);
   const [timeline, setTimeline] = usePlayDraftState<PlayTimelineEntry[]>(PLAY_TIMELINE_SLOT, []);
   const [physicalFirst, togglePhysicalFirst] = usePhysicalFirst();
+  const [discovery, toggleDiscovery] = usePlayPreference('kn-play-discovery');
+  const [storedSession, setSession] = usePlayDraftState<PlaySession>(PLAY_SESSION_SLOT, EMPTY_SESSION);
+  const session = isPlaySession(storedSession) ? storedSession : EMPTY_SESSION;
+  const [sessionEditing, setSessionEditing] = useState(false);
+  const sessionId = useId();
+  const sessionButton = useRef<HTMLButtonElement>(null);
+  const lastRollField = useRef<Partial<Record<StageId, string>>>({});
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
   const [exploration, setExploration] = useState<ExplorationReport | null>(null);
   const [battles, setBattles] = usePlayDraftState<Record<string, Battle>>('battles', {});
+  const [retreatReturnId] = usePlayDraftState<string | null>(RETREAT_RETURN_SLOT, null);
   const [combatId, setCombatId] = usePlayDraftState('combat', 'place');
   const [wrapId, setWrapId] = usePlayDraftState('wrap', 'place');
   const [targetNames, setTargetNames] = usePlayDraftState<Record<string, string[]>>('targetNames', {});
@@ -183,6 +203,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [journalCopiedText, setJournalCopiedText] = usePlayDraftState('journalCopiedText', '');
   const [placeName, setPlaceName] = usePlayDraftState('placeName', '');
   const [note, setNote] = usePlayDraftState('note', '');
+  const [introStart, setIntroStart] = usePlayDraftState<IntroStart | null>('introStart', null);
   const [nextTension, setNextTension] = usePlayDraftState('nextTension', '');
   const [initialTension] = usePlayDraftState<TensionSides>('initialTension', 8);
   const [breatherTension, setBreatherTension] = useState<TensionSides | null>(null);
@@ -199,6 +220,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [dismissed, setDismissed] = usePlayDraftState<string[]>('dismissedDarkness', []);
   const [customSets, setCustomSets] = useState(() => readEncounterLibrary(campaignId));
   const [drawer, setDrawer] = useState<DrawerId | null>(() => hasRestoreUndo() ? 'save' : null);
+  const [drawerModal, setDrawerModal] = useState(() => window.innerWidth < DOCKED_DRAWER_WIDTH);
   const [needsBackup, setNeedsBackup] = useState(false);
   const { selector: campaignSelector, needsCharacterSetup, finishCharacterSetup } = useCampaignDesk();
   const [characterView, setCharacterView] = usePlayDraftState<CharacterWorkspaceView | null>('characterWorkspace', null);
@@ -216,6 +238,18 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     (battle) => battle.defeatedTargets?.some(({ creatureId }) => creatureId === overseer.id)
       ?? (battle.outcome === 'victory' && battle.creatureIds.includes(overseer.id)),
   );
+  const overseerKnown = !!overseer && (defeated || domain.overseerRevealedRoll === domain.overseerRoll
+    || !!domain.retreats?.some(({ creatureIds }) => creatureIds.includes(overseer.id)));
+  const { commitRoll: commitDomainAction } = draft;
+  const revealOverseer = useCallback(() => {
+    const roll = domain.overseerRoll;
+    if (roll === null || domain.overseerRevealedRoll === roll) return;
+    commitDomainAction(() => setDomains((previous) => {
+      const current = previous.find(({ id }) => id === domain.id);
+      if (!current || current.overseerRoll !== roll || current.overseerRevealedRoll === roll) return previous;
+      return previous.map((record) => record === current ? { ...record, overseerRevealedRoll: roll } : record);
+    }), playAction('Overseer 이름 공개'));
+  }, [commitDomainAction, domain.id, domain.overseerRoll, domain.overseerRevealedRoll, setDomains]);
   const previousEffects = activeDarkness(domain.darkness, dismissed);
   const roomDarkness = [
     ...[darkness].flatMap((roll) => roll === null ? [] : [{ id: `${roomNumber}-entry-${roll}`, roll }]),
@@ -234,6 +268,11 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   ].filter(Boolean);
 
   const combat = battles[combatId] ?? BASE_BATTLE;
+  const returnRetreat = domain.retreats?.find(({ id }) => id === retreatReturnId);
+  const returnBattle = battles[RETREAT_BATTLE_ID];
+  const returnAmbush = battles[RETREAT_AMBUSH_ID]?.outcome ?? null;
+  const returnVisit = !!returnRetreat || !!retreatReturnId && returnBattle?.retreatId === retreatReturnId;
+  const retreatDestinations = domain.retreats?.filter(({ id }) => id !== retreatReturnId || !!returnBattle?.outcome || returnAmbush === 'fled') ?? [];
   const wrapBattle = battles[wrapId];
   const completedBattles = Object.entries(battles).filter(([, battle]) => battle.outcome && battle.outcome !== 'fled');
   const finishedSources = Object.entries(battles).flatMap(([id, battle]) => battle.outcome ? [id.split(':').at(-1)!] : []);
@@ -243,8 +282,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const roster = defeatedIds?.flatMap((id) => creatureById.get(id) ?? []);
   const victoryLabels = wrapBattle?.defeatedTargets?.map(({ label }) => label) ?? targetNames[wrapId];
   const overseersDefeated = roster?.filter(({ group }) => group === 'overseer').length ?? 0;
-  const victoryXp = overseersDefeated ? 200 * overseersDefeated
-    : wrapBattle?.outcome === 'victory' && wrapBattle.creatureIds.some((id) => creatureById.get(id)?.group === 'creature') ? 50 : undefined;
+  const victoryXp = wrapBattle?.victoryXp ?? (overseersDefeated ? 200 * overseersDefeated
+    : wrapBattle?.outcome === 'victory' && wrapBattle.creatureIds.some((id) => creatureById.get(id)?.group === 'creature') ? 50 : undefined);
   const battleLabel = (id: string, battle: Battle) => {
     const names = targetNames[id] ?? battle.creatureIds.flatMap((creatureId) => creatureById.get(creatureId)?.name ?? []);
     return names.join(', ') || (battle.primaryId ? creatureById.get(battle.primaryId)?.name : undefined) || '조우';
@@ -338,11 +377,13 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     if (!node || !root || typeof ResizeObserver === 'undefined') return;
     const actions = root.querySelector<HTMLElement>('.play-action-bar');
     const observer = new ResizeObserver(() => {
+      setDrawerModal(root.clientWidth < DOCKED_DRAWER_WIDTH);
       root.style.setProperty('--play-bar-h', `${node.offsetHeight}px`);
       // The next-action bar is fixed to the bottom on narrow desks; sticky footers sit above it.
       if (actions) root.style.setProperty('--play-action-h', `${actions.offsetHeight}px`);
     });
     observer.observe(node);
+    observer.observe(root);
     if (actions) observer.observe(actions);
     return () => observer.disconnect();
   }, []);
@@ -397,20 +438,56 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const updateDomain = (change: Partial<PlayDomainRecord>) => {
     setDomains((previous) => previous.map((record) => record.id === domain.id ? { ...record, ...change } : record));
   };
-  const endBattle = (creature: CreatureRecord, outcome: 'victory' | 'ended', creatures?: CreatureRecord[], defeatedTargets?: DefeatedTarget[]) => {
-    changeBattle((prior) => ({ ...prior, primaryId: creature.id, outcome, creatureIds: (creatures ?? [creature]).map(({ id }) => id), defeatedTargets }));
-    if (outcome === 'victory' && combat.retreatId) {
-      updateDomain({ retreats: (domain.retreats ?? []).filter(({ id }) => id !== combat.retreatId) });
-    }
+  const battleRewards = (outcome: BattleOutcome | null, creatureIds: string[], defeatedTargets?: DefeatedTarget[],
+    savedXp?: number, includeInfluences = true) => {
+    const kills = defeatedTargets?.map(({ creatureId }) => creatureId) ?? (outcome === 'victory' ? creatureIds : []);
+    const creatures = kills.flatMap((id) => creatureById.get(id) ?? []);
+    const bosses = creatures.filter(({ group }) => group === 'overseer').length;
+    const regular = creatures.filter(({ group }) => group === 'creature').length;
+    const extraInfluences = includeInfluences && !defeated ? effects.filter(({ id, roll }) => roll >= 81 && !!domain.extra[id]?.roll).length : 0;
+    return { creatures, xp: savedXp ?? (bosses ? bosses * 200 : outcome === 'victory' && regular ? 50 : 0) + regular * extraInfluences * 10,
+      lootRolls: creatures.reduce((total, entry) => total + creatureSpoilsTables(entry).length, 0), sanityRolls: bosses };
+  };
+  const previewBattleEnd = (outcome: FinishedCombatOutcome, creatures: CreatureRecord[], defeatedTargets?: DefeatedTarget[]): CombatOutcomePreview => {
+    const before = battleRewards(combat.outcome, combat.creatureIds, combat.defeatedTargets, combat.victoryXp, false);
+    const after = battleRewards(outcome, creatures.map(({ id }) => id), defeatedTargets);
+    const expected = new Set(after.creatures.flatMap((creature, index) => [
+      ...creatureSpoilsTables(creature).map((tableId) => `${combatId}:loot:${creature.id}:${index}:${tableId}`),
+      ...(creature.group === 'overseer' ? [`${combatId}:sanity:${creature.id}:${index}`] : []),
+    ]));
+    const affected = (battleSheet[combatId] ?? []).filter(({ id }) =>
+      id === `${combatId}:xp` ? before.xp !== after.xp
+        : (id.startsWith(`${combatId}:loot:`) || id.startsWith(`${combatId}:sanity:`)) && !expected.has(id))
+      .map((item) => ({
+        text: item.text,
+        posted: applied.some((receipt) => paperReceiptKey(receipt) === paperReceiptKey(item))
+          || gear.ledger.entries.some(({ source }) => source === `${roomLedgerId}/${item.id}`),
+      }));
+    return { before, after, affected };
+  };
+  const endBattle = (creature: CreatureRecord, outcome: FinishedCombatOutcome, creatures: CreatureRecord[], defeatedTargets?: DefeatedTarget[], edit = false) => {
+    if (combat.outcome === 'fled' || !!combat.outcome !== edit || combat.outcome === outcome) return;
+    const creatureIds = creatures.map(({ id }) => id);
+    const { xp } = battleRewards(outcome, creatureIds, defeatedTargets);
+    const save = () => {
+      changeBattle((prior) => ({ ...prior, primaryId: creature.id, outcome, creatureIds, defeatedTargets, victoryXp: xp }));
+      if (outcome === 'victory' && combat.retreatId) {
+        updateDomain({ retreats: (domain.retreats ?? []).filter(({ id }) => id !== combat.retreatId) });
+      }
+    };
+    if (edit) draft.commitRoll(save, playAction(`전투 결과 수정 · ${outcome === 'victory' ? '승리' : '전투 종료'}`), `combat/${encodeURIComponent(combatId)}/`);
+    else save();
     setWrapId(combatId);
     goTo('wrapup');
   };
   const flee = (creatures: CreatureRecord[], participants = creatures) => {
     const id = combat.retreatId ?? `${roomNumber}-${combatId}`;
     const prior = domain.retreats?.find((retreat) => retreat.id === id);
-    const place = placeName.trim() || prior?.place || `장소 ${roomNumber}`;
+    const place = placeName.trim() || paperId || prior?.place || `장소 ${roomNumber}`;
     const creatureIds = creatures.map((creature) => creature.id);
-    const retreat = { id, place, creatureIds, kind: combat.kind };
+    const area = exploration?.area ?? prior?.origin?.area;
+    const origin = { area, paperId: paperId ?? prior?.origin?.paperId };
+    const retreat = { id, place, creatureIds, kind: combat.kind, origin };
     updateDomain({ retreats: [...(domain.retreats ?? []).filter((item) => item.id !== id), ...(creatureIds.length ? [retreat] : [])] });
     changeBattle((battle) => ({ ...battle, outcome: 'fled', creatureIds: participants.map(({ id }) => id), retreatId: id }));
     if (!placeName.trim()) setPlaceName(place);
@@ -418,13 +495,19 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   };
   const reenter = (retreat: RetreatedEncounter) => {
     const pending = Object.entries(battles).find(([, battle]) => battle.retreatId === retreat.id && !battle.outcome);
-    const id = pending?.[0] ?? `reentry-${Object.keys(battles).length + 1}`;
-    if (!pending) setBattles((previous) => ({ ...previous, [id]: {
+    if (pending) {
+      setCombatId(pending[0]);
+      goTo('combat');
+      return;
+    }
+    resetRoom(storeDomain(true), domain.id, carryTension, { retreat });
+  };
+  const openReturnBattle = (retreat: RetreatedEncounter) => {
+    if (!returnBattle) setBattles((previous) => ({ ...previous, [RETREAT_BATTLE_ID]: {
       ...BASE_BATTLE, kind: retreat.kind, retreatId: retreat.id,
       seed: { creatureIds: retreat.creatureIds, description: '재진입 · 적 Health 전부 회복' },
     } }));
-    if (!placeName.trim()) setPlaceName(retreat.place);
-    setCombatId(id);
+    setCombatId(RETREAT_BATTLE_ID);
     goTo('combat');
   };
   const openTrader = () => {
@@ -459,6 +542,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const carryTension = confirmedTension ?? initialTension;
   const resetReports = () => {
     stagePositions.current = {};
+    lastRollField.current = {};
+    setSessionEditing(false);
     setRevision((previous) => previous + 1);
     setConfirmReset(false);
     setExploration(null);
@@ -474,16 +559,28 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     setBreatherDarkness(null);
     setBreatherTension(null);
   };
-  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides, nextTimeline = timeline, carry = true) => {
+  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides,
+    { discard = false, retreat }: { discard?: boolean; retreat?: RetreatedEncounter } = {}) => {
     // Moving on folds this place's XP and Exhaustion into the character; clearing the place drops them.
+    const carry = !discard;
     const saved = draft.slots[PLAY_CHARACTER_SLOT];
     const character = isPlayCharacter(saved) && carry ? foldRoomProgress(saved, progress) : saved;
+    const light = carry ? carryPlayLight(draft.slots, sheet) : readPlayLight(draft.slots);
+    const nextTimeline = carry ? archiveCurrentPlace() : timeline;
     draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
       roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth,
       [PAPER_MAP_SLOT]: paperMap, [PLAY_TIMELINE_SLOT]: nextTimeline, [PLAY_EFFECTS_SLOT]: ongoing,
       [PLAY_PENDING_ROLLS_SLOT]: pendingRolls, [SKILL_PRESETS_SLOT]: draft.slots[SKILL_PRESETS_SLOT] ?? {},
+      [PLAY_LIGHT_SLOT]: light && { remaining: light.remaining, included: [] },
+      [PLAY_SESSION_SLOT]: carrySessionIntent(session),
       [LINGERING_ENTRY_SLOT]: carry ? ongoing.conditions : draft.slots[LINGERING_ENTRY_SLOT] ?? [],
-      ...(character ? { [PLAY_CHARACTER_SLOT]: character } : {}) });
+      ...(character ? { [PLAY_CHARACTER_SLOT]: character } : {}),
+      ...(retreat ? {
+        [RETREAT_RETURN_SLOT]: retreat.id, placeName: retreat.place, 'explore/revisit': true,
+        'explore/place-choice': retreat.origin?.area ?? 'room',
+        ...(retreat.origin?.paperId ? { 'explore/paper-map-key': paperMapKey(retreat.origin.paperId) } : {}),
+      } : {}) });
+    closeOverlayDrawer();
     resetReports();
     focusStage('explore');
   };
@@ -492,6 +589,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     saveCustomSets(encounters);
     draft.replaceRoom(slots, history);
     resetReports();
+    closeOverlayDrawer();
     focusStage(playRollStage(slots.active));
     return true;
   };
@@ -506,7 +604,9 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     if (id === 'new') {
       const addition = newPlayDomain(Math.max(...domains.map((record) => record.id)) + 1);
       resetRoom([...saved, { ...addition, progress: newDomainProgress(String(roomNumber + 1)) }], addition.id, 8);
-    } else if (saved.some((target) => target.id === id && target.progress?.mode !== 'intro')) resetRoom(saved, id, carryTension);
+    } else if (saved.some((target) => target.id === id && target.progress?.mode !== 'intro')) {
+      resetRoom(saved, id, carryTension);
+    }
   };
 
   const fightFacts = Object.entries(battles).flatMap(([id, battle]) => {
@@ -520,6 +620,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     ...completedBattles.flatMap(([id]) => battleLines[id] || []),
     wrapSummary.trim(),
   ].filter(Boolean);
+  const damageRows: PaperChange[] = readCombatDamageRecords(draft.slots).map((record) => ({ id: `damage:${record.id}`, text: formatCombatDamage(record) }));
   const facts = [
     { label: '장소', value: [placeName.trim(), exploration?.shape ?? exploration?.place].filter(Boolean).join(' · ') },
     { label: '환경 묘사', value: exploration?.description },
@@ -527,6 +628,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     { label: '이벤트', value: exploration?.event },
     { label: '조우', value: exploration?.encounter && !fightFacts.length ? ENCOUNTER_LABELS[exploration.encounter] : null },
     { label: '적', value: fightFacts.join(' / ') },
+    { label: '전투 피해', value: damageRows.map(({ text }) => text).join(' / ') },
     { label: '능력', value: Object.values(masteryReports).filter(Boolean).join(' / ') },
     { label: '상태·유지', value: ongoingChanges.map(({ text }) => text).join(' / ') },
     { label: '탐험 행동', value: exploration?.actions },
@@ -542,26 +644,43 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const characterLogSlot = draft.slots[CHARACTER_LOG_SLOT];
   const characterLog: PaperChange[] = Array.isArray(characterLogSlot) ? characterLogSlot.filter((item): item is PaperChange =>
     !!item && typeof item === 'object' && typeof item.id === 'string' && typeof item.text === 'string') : [];
-  const sheet = [
+  const sheet: PaperChange[] = [
+    ...(introStart && domain.progress?.mode === 'intro' ? [
+      { id: 'intro-start:damage', text: `피해 ${introStart.damage} (도입 도메인 시작)` },
+      { id: 'intro-start:sanity', text: `Sanity −${introStart.sanity} (도입 도메인 시작)` },
+      { id: 'intro-start:exhaustion', text: 'Exhaustion +1 (도입 도메인 시작)' },
+    ] : []),
     ...(exploration?.sheet ?? []),
     ...completedBattles.flatMap(([id]) => battleSheet[id] ?? []),
     ...sheetShared,
     ...equipmentSheet,
     ...advancementSheet,
     ...ongoingChanges,
+    ...damageRows,
     ...Object.entries(masterySheet).flatMap(([id, items]) => items.map((item) => ({ ...item, id: `${id}:${item.id}` }))),
     ...characterLog,
   ];
-  const pcRecord = draft.slots[PLAY_CHARACTER_SLOT];
-  const pcMadness = madnessEffects(isPlayCharacter(pcRecord) ? pcRecord.madness : []);
+  const savedCharacter = draft.slots[PLAY_CHARACTER_SLOT];
+  const pcRecord = isPlayCharacter(savedCharacter) ? savedCharacter : undefined;
+  const pcMadness = madnessEffects(pcRecord?.madness);
   const defeatedForGoals = Object.values(battles).flatMap((battle) => battle.defeatedTargets ?? []).flatMap(({ creatureId }) => {
     const creature = creatureById.get(creatureId);
     return creature ? [{ types: creature.types, overseer: creature.group === 'overseer' }] : [];
   });
-  const progress = roomProgress(sheet, xpSpent, { xpLoss: pcMadness.xpLoss, extraSanityLoss: pcMadness.extraSanityLoss,
-    goals: goalCounts({ defeated: defeatedForGoals, sheet,
-      darkness: (darkness !== null ? 1 : 0) + actionDarkness.length + (breatherDarkness !== null ? 1 : 0) }) });
-  const pcNow = isPlayCharacter(pcRecord) ? currentProgress(pcRecord, progress) : null;
+  const baselineGoals = goalCounts({ defeated: defeatedForGoals, sheet,
+    darkness: (darkness !== null ? 1 : 0) + actionDarkness.length + (breatherDarkness !== null ? 1 : 0) });
+  const priorSurvivor = (draft.slots[SURVIVOR_BASELINE_SLOT] as SurvivorBaseline | undefined) ?? undefined;
+  const olderLines = new Set(priorSurvivor?.lineIds);
+  const progress = {
+    ...roomProgress(sheet.filter(({ id }) => !olderLines.has(id)), Math.max(0, xpSpent - (priorSurvivor?.xpSpent ?? 0)), {
+      xpLoss: pcMadness.xpLoss, extraSanityLoss: pcMadness.extraSanityLoss,
+      goals: Object.fromEntries(Object.entries(baselineGoals).map(([key, value]) => [key, Math.max(0, value - (priorSurvivor?.goals[key] ?? 0))])),
+      madnessTiming: draft.slots[MADNESS_TIMING_SLOT] as MadnessTiming[] | undefined,
+    }),
+    baseline: { lineIds: [...new Set(sheet.map(({ id }) => id))], xpSpent, goals: baselineGoals },
+    priorSurvivor,
+  };
+  const pcNow = pcRecord ? currentProgress(pcRecord, progress) : null;
   type Alert = { id: string; label: string; level: string; icon: StatusKind; onClick: () => void };
   const characterAlerts: Alert[] = [
     ...ongoing.conditions.map((id) => {
@@ -570,7 +689,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       return { id, label: `${label}${level}`, level: 'danger', icon: id, onClick: () => openDrawer('ongoing') };
     }),
     ...(!pcNow ? [] : [
-      ...((pcNow.exhaustion ?? 0) >= 21 || pcMadness.dead
+      ...((pcNow.exhaustion ?? 0) >= 21 || pcMadness.dead || pcRecord?.rotStage === 8
         ? [{ id: 'dead', label: '사망 확인', level: 'danger', icon: 'death' as const, onClick: () => openCharacterSection('state') }] : []),
       ...(pcNow.sanity === 0 ? [{ id: 'madness', label: 'Sanity 0 · 광기', level: 'danger', icon: 'madness' as const, onClick: () => openCharacterSection('state') }] : []),
       ...(pcNow.exhaustion !== undefined && pcNow.exhaustion >= 11 && pcNow.exhaustion <= 20
@@ -579,16 +698,44 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       ...(pcNow.xp !== undefined && pcNow.xp >= XP_TO_LEVEL ? [{ id: 'level', label: '레벨업 가능', level: 'good', icon: 'level' as const, onClick: goToLevelUp }] : []),
     ]),
   ];
-  const gearChanges = sheet.filter((item) => item.gear);
+  const supplies = playSupplies(gear.ledger, sheet, roomLedgerId);
+  const tracksLight = readPlayLight(draft.slots) !== null;
   const postedGear = roomLedgerId ? gear.ledger.entries.flatMap((entry) => {
     const prefix = `${roomLedgerId}/`;
     return entry.source?.startsWith(prefix) && !isQuickUseEntry(entry, roomLedgerId)
       ? [{ id: entry.source.slice(prefix.length), text: entry.reason }] : [];
   }) : [];
+  const postedGearIds = new Set(postedGear.map(({ id }) => id));
+  const gearChanges = sheet.filter(({ id, gear: item }) => item && (!tracksLight || item.kind !== 'count'
+    || gearKey(item.name) !== '광원' || postedGearIds.has(id)));
   const paperCommitted = applied.length > 0 || postedGear.length > 0;
   const paperId = paperMap.find((record) => record.domainId === domainId && paperMapKey(record.paperId) === draft.slots['explore/paper-map-key'])?.paperId;
   const appliedKeys = applied.map(paperReceiptKey);
   const unapplied = sheet.filter(({ id, text }) => !appliedKeys.includes(`${id}:${text}`)).length;
+  const pause = session.pause?.roomId === roomLedgerId ? session.pause : null;
+  const sessionVisible = !showCharacterWorkspace && (sessionEditing || !!pause || !!session.nextIntent);
+  const sessionPlace = [domain.name.trim() || `도메인 ${domain.id}`, placeName.trim() || (!paperId ? `장소 ${roomNumber}` : ''),
+    paperId && `지도 ${paperId}`].filter(Boolean).join(' · ');
+  const lastRoll = draft.history.filter((entry) => !entry.action).at(-1);
+  const confirmedFact = facts.find(({ label }) =>
+    label === (active === 'combat' ? '적' : active === 'wrapup' ? '휴식·전리품' : '탐험 행동')) ?? facts.find(({ label }) => label === '이벤트');
+  const sessionFacts = [confirmedFact?.value && `${confirmedFact.label} · ${confirmedFact.value}`,
+    lastRoll && `${lastRoll.label} · ${lastRoll.dice} ${lastRoll.value}`].flatMap((line) => line ? [shortSessionText(line, 148)] : []);
+  const savePause = (intent: string) => {
+    if (!roomLedgerId) return;
+    setSession({ pause: { roomId: roomLedgerId, at: Date.now(), place: shortSessionText(sessionPlace, 100),
+      intent: shortSessionText(intent, SESSION_INTENT_LIMIT), facts: sessionFacts, point: readPlaySessionPoint(active, lastRollField.current[active]) } });
+    setSessionEditing(false);
+  };
+  const resumeSession = ({ point }: SessionPause) => {
+    setSession(carrySessionIntent(session));
+    if (point.field) goToRecordedField(point, (focused) => { if (!focused) focusNextPlayAction(point.stage); });
+    else {
+      closeOverlayDrawer();
+      selectStage(point.stage);
+      requestAnimationFrame(() => focusNextPlayAction(point.stage));
+    }
+  };
   useEffect(() => {
     if (!applied.some((item) => typeof item === 'string')) return;
     const legacy = new Map(sheet.map(({ id, text }) => [paperReceiptKey({ id, text }), { id, text }]));
@@ -604,7 +751,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       ...(current ? [{ id: current.id, text: current.text }] : []),
     ]);
   };
-  const nextLocation = () => {
+  const archiveCurrentPlace = () => {
     const corrections = findPaperCorrections(sheet, applied);
     const pendingCorrections = corrections.map(({ receipt, current }) => ({
       id: `correction:${paperReceiptKey(receipt)}`, text: `정정 · ${receipt.text} → ${current?.text ?? '취소'}`,
@@ -617,8 +764,9 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       id: roomLedgerId, domainId: domain.id, roomNumber, title: placeName.trim() || paperId || '', paperId, facts,
       sheet: [...archivedSheet, ...pendingCorrections, ...pendingGear], applied: appliedKeys, journalCopied: journalCopiedText === journal,
     });
-    resetRoom(storeDomain(true), domain.id, carryTension, appendPlayTimeline(timeline, entry));
+    return appendPlayTimeline(timeline, entry);
   };
+  const nextLocation = () => resetRoom(storeDomain(true), domain.id, carryTension);
 
   const stageHeading = (id: StageId) => (
     // The stage tabs already name the stage; the heading stays for screen readers and as the focus target.
@@ -650,45 +798,59 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
         }} /> },
     { id: 'domain', label: '도메인', title: domain.name.trim() || `도메인 ${domain.id}`, badge: effects.length || undefined,
       content: <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
+        overseerKnown={overseerKnown} onRevealOverseer={revealOverseer}
         onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
         timeline={timeline} onTimelineChange={setTimeline} /> },
     { id: 'save', label: '저장', title: '플레이 저장·이어하기', flag: needsBackup ? '백업 필요' : undefined,
       content: <PlayCheckpoints data={{ slots: draft.slots, gear: gear.ledger, encounters: customSets, history: draft.history }}
         place={placeName.trim() || paperId || `장소 ${roomNumber}`} stage={stage.label} onRestore={restoreCheckpoint}
+        currentLight={lightRemaining(readPlayLight(draft.slots), supplies.lightEntries)}
         onNeedsBackup={setNeedsBackup} /> },
     { id: 'tool', label: '도구', title: '고정 도구', content: <PlayPinnedTool /> },
   ];
 
   return (
     <CharacterRoomContext.Provider value={progress}>
+    <PlayDiscoveryMode.Provider value={discovery}>
     <div className="play-desk" ref={desk} data-physical-first={physicalFirst || undefined} data-drawer={drawer ?? undefined}
       data-character-workspace={showCharacterWorkspace || undefined}
-      onKeyDownCapture={advanceDiceFocus}>
+      onKeyDownCapture={advanceDiceFocus} onFocusCapture={({ target }) => {
+        if (target instanceof HTMLInputElement && target.dataset.playRollField && target.closest('.play-stage')) {
+          lastRollField.current[active] = target.dataset.playRollField;
+        }
+      }}>
       <header className="play-header">
         <h1>플레이 모드</h1>
         {campaignSelector}
         <div className="play-header-actions">
           <PlayPopover className="play-view-menu" label="보기 설정" bodyLabel="보기 설정" align="end"
-            trigger={<>보기{(physicalFirst || focusMode || keepAwake) && <span className="play-tray-badge">
-              {[physicalFirst, focusMode, keepAwake].filter(Boolean).length}</span>}</>}>
+            trigger={<>보기{(physicalFirst || focusMode || keepAwake || discovery) && <span className="play-tray-badge">
+              {[physicalFirst, focusMode, keepAwake, discovery].filter(Boolean).length}</span>}</>}>
             <div className="play-header-toggles">
               <button className="play-toggle" type="button" aria-pressed={physicalFirst} onClick={togglePhysicalFirst}>실물 입력 우선</button>
               <button className="play-toggle" type="button" aria-pressed={focusMode} onClick={toggleFocusMode}>집중 보기</button>
+              <button className="play-toggle" type="button" aria-pressed={discovery} onClick={toggleDiscovery}>발견 모드</button>
               {wakeLockSupported() && <button className="play-toggle" type="button" aria-pressed={keepAwake}
                 title={keepAwake && !screenAwake ? '브라우저가 화면 켜 두기를 허용하지 않았습니다.' : undefined}
                 onClick={toggleKeepAwake}>화면 켜 두기</button>}
             </div>
           </PlayPopover>
+          {!showCharacterWorkspace && <button className="btn ghost" type="button" ref={sessionButton} aria-expanded={sessionEditing || !!pause}
+            aria-controls={sessionVisible ? sessionId : undefined} onClick={() => setSessionEditing(true)}>오늘 여기까지</button>}
           {!showCharacterWorkspace && <button className="btn ghost play-reset-toggle" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
             onClick={() => setConfirmReset((open) => !open)}>이번 장소 지우기</button>}
         </div>
       </header>
+      {sessionVisible && <PlaySessionPanel id={sessionId} editing={sessionEditing} pause={pause} nextIntent={session.nextIntent} place={sessionPlace} facts={sessionFacts}
+        onPause={savePause} onResume={resumeSession} onEdit={() => setSessionEditing(true)}
+        onComplete={() => { setSession(EMPTY_SESSION); requestAnimationFrame(() => sessionButton.current?.focus({ preventScroll: true })); }}
+        onClose={() => { setSessionEditing(false); sessionButton.current?.focus({ preventScroll: true }); }} />}
       {showCharacterWorkspace && <PlayCharacterWorkspace onboarding={needsCharacterSetup} view={characterView}
-        onView={setCharacterView} onBack={backFromCharacterWorkspace} onFinish={finishCharacterWorkspace} onApplyGear={applyStartingGear} />}
+        onView={setCharacterView} onBack={backFromCharacterWorkspace} onFinish={finishCharacterWorkspace} onApplyGear={applyStartingGear} onUndoGear={undoGearGrant} />}
       {confirmReset && (
         <div className="play-reset" id="play-reset" role="group" aria-label="새 장소 확인">
           <p>이번 장소의 입력과 굴림 결과를 저널에 남기지 않고 지웁니다. 기록을 남기고 넘어가려면 저널의 다음 장소를 누르세요.</p>
-          <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(false), domain.id, initialTension, timeline, false)}>지우고 새로 시작</button>
+          <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(false), domain.id, initialTension, { discard: true })}>지우고 새로 시작</button>
           <button className="btn ghost" type="button" onClick={() => setConfirmReset(false)}>취소</button>
         </div>
       )}
@@ -720,12 +882,14 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           <section className="play-stage" id="play-stage-explore" aria-labelledby="play-explore" hidden={active !== 'explore'}>
             {stageHeading('explore')}
             <EffectNotice effects={effects} types={EXPLORE_EFFECTS} />
-            <LingeringEntryAlert />
-            {!!domain.retreats?.length && (
+            {domain.progress?.mode === 'intro' && <PlayDraftScope name="intro-domain">
+              <PlayIntroDomain opening={domain.id === 1 && roomNumber === 1} recorded={introStart} onRecord={setIntroStart} />
+            </PlayDraftScope>}
+            {retreatDestinations.length > 0 && (
               <section className="play-reentries" aria-label="후퇴했던 장소">
                 <h3>후퇴했던 장소</h3>
                 <ul>
-                  {domain.retreats.map((retreat) => <li key={retreat.id}>
+                  {retreatDestinations.map((retreat) => <li key={retreat.id}>
                     <div><strong>{retreat.place}</strong><p>{retreat.creatureIds.map((id) => creatureById.get(id)?.name).filter(Boolean).join(' · ')}</p></div>
                     <button className="btn ghost" type="button" onClick={() => reenter(retreat)} aria-label={`${retreat.place} 재진입`}>재진입</button>
                   </li>)}
@@ -735,29 +899,44 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
             <PlayDraftScope name="explore">
               <PlayExploration key={revision} actionsRef={explorationActions} onReport={setExploration} onCombat={startCombat} onWrapUp={() => goTo('wrapup')} onJournal={() => goTo('journal')}
                 finishedSources={finishedSources} initialTension={initialTension} lightCost={previousEffects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
+                supplies={supplies} gearLedger={gear.ledger} onOpenGear={openInventory}
                 onDarknessChange={setDarkness} onActionDarknessChange={setActionDarkness}
                 darknessEffectCount={previousEffects.length} onTrader={openTrader}
                 domainProgress={domain.progress} onDomainProgress={(progress) => updateDomain({ progress })}
                 domainPlaceId={String(roomNumber)} domainPlaceName={placeName} domainDefeated={defeated}
                 paperMapDomain={domainId} paperMap={paperMap} onPaperMapChange={setPaperMap}
                 domainDestinations={domains.filter((target) => target.id !== domain.id && target.progress?.mode !== 'intro')}
+                retreatArrival={returnVisit ? {
+                  place: returnRetreat?.place ?? placeName, areaKnown: !!returnRetreat?.origin?.area || !!returnBattle,
+                  kind: returnRetreat?.kind ?? returnBattle?.kind ?? 'encounter', ambush: returnAmbush,
+                  started: !!returnBattle, outcome: returnBattle?.outcome ?? null,
+                  onCombat: () => { if (returnRetreat) openReturnBattle(returnRetreat); },
+                } : undefined}
                 onLeaveDomain={switchDomain} />
             </PlayDraftScope>
           </section>
           <section className="play-stage" id="play-stage-combat" aria-labelledby="play-combat" hidden={active !== 'combat'}>
             {stageHeading('combat')}
             <EffectNotice effects={effects} types={COMBAT_EFFECTS} influence={influence} />
-            <PlayDraftScope name="combat">
+            {returnRetreat && !battles[combatId] ? <div className="play-explore-next">
+              <p>{returnRetreat.place}에 들어가는 판정을 마치면 남아 있던 적과 조우할 수 있습니다.</p>
+              <button type="button" className="btn primary" onClick={() => goTo('explore')}>재진입 입장 판정으로</button>
+            </div> : <PlayDraftScope name="combat">
               <PlayDraftScope name={combatId}>
                 <PlayCombat key={`${revision}:${combatId}`} initialKind={combat.kind} domainOverseer={overseer ?? null}
+                  domainOverseerKnown={overseerKnown} onRevealDomainOverseer={revealOverseer}
                   customSets={customSets} customSetId={domain.encounterSetId}
                   onCustomSetSelect={(encounterSetId) => updateDomain({ encounterSetId })} onCustomSetsChange={saveCustomSets}
                   seed={combat.seed} fled={combat.outcome === 'fled'} finished={!!combat.outcome} onFlee={flee}
+                  currentOutcome={combat.outcome === 'victory' || combat.outcome === 'ended' ? combat.outcome : undefined}
+                  onPreviewBattleEnd={previewBattleEnd}
+                  onNewEncounter={() => startCombat('encounter', `manual-${crypto.randomUUID()}`)}
                   bestiaryCreatureId={bestiaryCreature} onCloseBestiaryRequest={closeBestiaryRequest}
+                  belt={gear.ledger.items.filter(({ count, location }) => location === 'belt' && count > 0)} onOpenBelt={openInventory}
                   onMasterySheetChange={reportMasterySheet} onMasteryJournalChange={reportMasteryLine}
                   onCreatureChange={chooseCreature} onTargetsChange={reportTargets} onBattleEnd={endBattle} />
               </PlayDraftScope>
-            </PlayDraftScope>
+            </PlayDraftScope>}
           </section>
           <section className="play-stage" id="play-stage-wrapup" aria-labelledby="play-wrapup" hidden={active !== 'wrapup'}>
             {stageHeading('wrapup')}
@@ -773,6 +952,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
             <PlayDraftScope name="wrap">
               <PlayWrapUp key={revision} handleRef={wrapUp} creature={roster?.[0] ?? null} victoryCreatures={roster}
                 inventory={gear.ledger.items}
+                supplies={supplies} nextRoomLightCost={effects.some(({ roll }) => roll === 69 || roll === 70) ? 2 : 1}
+                onContinue={() => goTo('journal')} onOpenGear={openInventory}
                 victoryLabels={victoryLabels} victoryXp={victoryXp}
                 battleId={wrapId} combatEnded={!!wrapBattle?.outcome && wrapBattle.outcome !== 'fled'}
                 onCampEncounter={startCampEncounter} campEncounterResolved={campEncounterResolved}
@@ -856,7 +1037,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
         </div>
         <aside className="play-context" aria-label="플레이 중 참고">
           <PlayActionBar stage={active} onHistory={goToRollHistory} />
-          <PlayDrawer tabs={drawerTabs} active={drawer} onSelect={(id) => openDrawer(id)} onClose={() => {
+          <PlayDrawer tabs={drawerTabs} active={showCharacterWorkspace ? null : drawer} modal={drawerModal} onSelect={(id) => openDrawer(id)} onClose={() => {
             const opener = drawer && document.querySelector<HTMLElement>(`.play-tray-item[aria-expanded="true"]`);
             setDrawer(null);
             requestAnimationFrame(() => (opener?.getClientRects().length ? opener : document.querySelector<HTMLElement>('.play-tray-all'))?.focus({ preventScroll: true }));
@@ -876,6 +1057,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
         </aside>
       </div>
     </div>
+    </PlayDiscoveryMode.Provider>
     </CharacterRoomContext.Provider>
   );
 }

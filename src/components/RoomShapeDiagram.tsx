@@ -41,7 +41,7 @@ export function RoomShapeDiagram({ roll, state }: { roll: number; state?: RoomSh
   const room = { ...profile, x: center.x - profile.width / 2, y: center.y - profile.height / 2 };
   const turn = Math.floor(roll / 3) % 8;
   const paths = Array.from({ length: exits }, (_, i) => {
-    const spread = exits === 2 && roll % 2 ? 2 : 8 / exits;
+    const spread = exits === 2 && roll !== 1 && roll % 2 ? 2 : 8 / exits;
     const position = (Math.floor(i * spread) + turn) % 8;
     if (place === 'corridor') return { from: center, to: corridorEnds[position] };
     const port = roomPorts[position];

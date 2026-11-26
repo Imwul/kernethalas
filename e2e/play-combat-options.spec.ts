@@ -57,8 +57,8 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   await attack.getByRole('button', { name: '적 명중 부위 보기' }).click();
   await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  await expect(history.getByRole('button', { name: /D100 공격 33 · 능동 방어 불가/ })).toBeVisible();
-  await expect(history).toContainText('기본 60 · 상태·어둠 −5 = 55');
+  await expect(history.getByRole('button', { name: /D100 공격 33 · 능동 방어 불가.*수정 미리보기$/ })).toBeVisible();
+  await expect(history).toContainText('기본 60 · 공격 기본 +10 · 상태·어둠 −5 = 65');
   await history.getByRole('button', { name: /판정 없음 자동 명중 수정 미리보기$/ }).click();
   await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
   await expect(defenseMode).toBeFocused();

@@ -9,8 +9,8 @@ import { calculateDirectDamage, ignoresArmor, listedDamageReactions, type Damage
 import { pooledDie, resolveAttack, type CheckResult, type RollResult } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { abilityRoll, describeMasteryAbility, readMasteryInteger, type MasteryAbility } from '../../lib/mastery-play';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
-import { USE_ABILITY_EVENT } from './PlayCharacter';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { USE_ABILITY_EVENT, type PlayAbilityRequest } from './PlayCharacter';
 import { ExhaustionHealNote } from './ExhaustionHealNote';
 import { abilityRestLimit, usePlayOngoingEffects } from '../../lib/play-effects';
 import { gearCount, type PaperChange } from '../../lib/play-inventory';
@@ -381,9 +381,14 @@ export function PlayMastery({ targets = NO_TARGETS, onSheetChange, onJournalChan
   onSheetChange?: (items: PaperChange[]) => void;
   onJournalChange?: (line: string) => void;
 }) {
+  const draft = usePlayDraft();
+  const scope = usePlayDraftScope();
+  const write = draft?.write;
+  const generation = draft?.generation;
   const [masteryId, setMasteryId] = usePlayDraftState('mastery', '');
   const [tier, setTier] = usePlayDraftState('tier', '');
   const [abilityId, setAbilityId] = usePlayDraftState('ability', '');
+  const [origin, setOrigin] = usePlayDraftState<'sheet' | 'paper' | null>('ability-origin', null);
   const [records, setRecords] = usePlayDraftState<CastRecord[]>('mastery-records', []);
   const report = useMemo(() => ({
     journal: records.map(({ summary }) => summary).join(' / '),
@@ -393,39 +398,55 @@ export function PlayMastery({ targets = NO_TARGETS, onSheetChange, onJournalChan
 
   const mastery = masteryCatalog.find(({ id }) => id === masteryId);
   const visible = mastery?.abilities.filter((item) => item.tier <= Number(tier)) ?? [];
-  const chosen = visible.find(({ id }) => id === abilityId);
-  const ability = chosen && describeMasteryAbility(chosen);
   const sheet = usePlayCharacter();
   const amulet = sheet?.character.amulet;
+  const legacySheetPick = origin === null && !!abilityId
+    && (amulet?.id === masteryId || !!sheet?.character.masteries?.some(({ id }) => id === masteryId));
+  const fromSheet = origin === 'sheet' || legacySheetPick;
+  useEffect(() => {
+    if (legacySheetPick) setOrigin('sheet');
+  }, [legacySheetPick, setOrigin]);
   const learned = [...(sheet?.character.masteries ?? []), ...(amulet && amulet.tier > 0 ? [amulet] : [])].flatMap(({ id, tier: last }) => {
     const entry = masteryCatalog.find((item) => item.id === id);
     return entry ? [{ entry, last, abilities: entry.abilities.filter((item) => item.tier <= last) }] : [];
   });
-  const pick = (id: string, last: number, ability: string) => { setMasteryId(id); setTier(String(last)); setAbilityId(ability); };
+  const chosen = (fromSheet ? learned.find(({ entry }) => entry.id === masteryId)?.abilities : visible)
+    ?.find(({ id }) => id === abilityId);
+  const ability = chosen && describeMasteryAbility(chosen);
+  const pick = (id: string, last: number, ability: string) => {
+    setMasteryId(id); setTier(String(last)); setAbilityId(ability); setOrigin('sheet');
+  };
   useEffect(() => {
     const use = (event: Event) => {
-      const { masteryId: id, tier: last, abilityId: ability } = (event as CustomEvent<{ masteryId: string; tier: number; abilityId: string }>).detail ?? {};
+      const { masteryId: id, tier: last, abilityId: ability, targetId } = (event as CustomEvent<PlayAbilityRequest>).detail ?? {};
       if (typeof id === 'string' && Number.isSafeInteger(last) && typeof ability === 'string') {
-        setMasteryId(id); setTier(String(last)); setAbilityId(ability);
+        setMasteryId(id); setTier(String(last)); setAbilityId(ability); setOrigin('sheet');
+        const selected = masteryCatalog.find(({ id: key }) => key === id)?.abilities.find(({ id: key, tier }) => key === ability && tier <= last);
+        if (write && generation !== undefined && targetId && targets.some(({ id }) => id === targetId)
+          && selected && describeMasteryAbility(selected).targets === 'one') {
+          write(generation, `${scope}${encodeURIComponent(ability)}/cast`, (previous: CastDraft) => ({ ...previous, targets: [targetId] }), EMPTY_CAST);
+        }
       }
     };
     document.addEventListener(USE_ABILITY_EVENT, use);
     return () => document.removeEventListener(USE_ABILITY_EVENT, use);
-  }, [setMasteryId, setTier, setAbilityId]);
+  }, [setMasteryId, setTier, setAbilityId, setOrigin, generation, scope, targets, write]);
   const selects = (
     <div className="mastery-form-fields">
       <label className="field"><span>종이 시트의 Mastery</span>
-        <select value={masteryId} onChange={(event) => { setMasteryId(event.target.value); setTier(''); setAbilityId(''); }}>
+        <select value={masteryId} onChange={(event) => { setMasteryId(event.target.value); setTier(''); setAbilityId(''); setOrigin('paper'); }}>
           <option value="">선택</option>{masteryCatalog.map(({ id, name }) => <option value={id} key={id}>{name}</option>)}
         </select>
       </label>
       {mastery && <label className="field"><span>배운 마지막 Tier</span>
-        <select value={tier} onChange={(event) => { setTier(event.target.value); setAbilityId(''); }}>
+        <select value={tier} onChange={(event) => { setTier(event.target.value); setAbilityId(''); setOrigin('paper'); }}>
           <option value="">선택</option>{mastery.abilities.map(({ tier: value, name }) => <option key={value} value={value}>Tier {value} · {name}</option>)}
         </select>
       </label>}
       {visible.length > 0 && <label className="field"><span>사용할 능력</span>
-        <select value={abilityId} onChange={(event) => setAbilityId(event.target.value)}>
+        <select value={fromSheet && !ability ? '' : abilityId} onChange={(event) => {
+          setAbilityId(event.target.value); setOrigin('paper');
+        }}>
           <option value="">선택</option>{visible.map(({ id, name, use }) => <option key={id} value={id}>
             {name}{use === '패시브' && !ACTIVE_PAPER_PASSIVES[name] ? ' · 패시브' : ''}
           </option>)}
@@ -451,6 +472,7 @@ export function PlayMastery({ targets = NO_TARGETS, onSheetChange, onJournalChan
       {mastery && <TogglePanel className="mastery-feature" label={<>Mastery 특성 · <span lang="en">{mastery.feature.name}</span></>}>
         <p className="mastery-note">{mastery.feature.text}</p>
       </TogglePanel>}
+      {fromSheet && abilityId && !ability && <p className="mastery-note" role="status">현재 캐릭터 시트에서 이 능력을 사용할 수 없습니다.</p>}
       {ability && <PlayDraftScope name={ability.id}><AbilityForm key={ability.id} ability={ability} targets={targets} records={records}
         onRecord={(record) => setRecords((previous) => [...previous, record])} /></PlayDraftScope>}
       {records.length > 0 && <ul className="mastery-records" aria-label="이번 전투 능력 기록">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePlayDraft } from '../../lib/play-draft';
 import { planRollCorrection, type PlayRollEntry } from '../../lib/play-roll-history';
+import { shortSessionText, type SessionPoint } from '../../lib/play-session';
 import { PLAY_DRAWER_EVENT, PLAY_DRAWER_ID } from './PlayDrawer';
 
 const FIELD = 'input[data-play-roll-field]';
@@ -35,6 +36,16 @@ function nextAction(stage: HTMLElement) {
   const field = Array.from(stage.querySelectorAll<HTMLInputElement>(`${FIELD}[data-play-roll-pending]`)).find(canReach);
   if (field) return field;
   return Array.from(stage.querySelectorAll<HTMLElement>(ACTION)).find(canReach);
+}
+
+export function readPlaySessionPoint(stage: Stage, previousField?: string): SessionPoint {
+  const section = document.getElementById(`play-stage-${stage}`);
+  if (!section) return { stage };
+  const previous = previousField ? findRollField(section, previousField) : undefined;
+  const action = previous?.matches('[data-play-roll-pending]') && canReach(previous) ? previous : nextAction(section);
+  const label = action?.dataset.playRollLabel ?? action?.textContent?.trim();
+  return { stage, ...(action?.dataset.playRollField ? { field: action.dataset.playRollField } : {}),
+    ...(label ? { label: shortSessionText(label, 90) } : {}) };
 }
 
 function focusControl(control: HTMLElement) {
@@ -92,13 +103,21 @@ export function focusPlayRoll(stage: Stage, field?: string, onResult?: (focused:
       return true;
     };
     const revealAttackSide = () => {
-      const side = field?.match(/\/attack:(pc-attack|enemy-attack)$/)?.[1];
+      const side = field?.match(/\/attack:(pc-attack|enemy-attack)$/)?.[1]
+        ?? field?.match(/\/attack-follow-up:(pc|enemy):/)?.[1]?.concat('-attack');
       if (side && switchTo('data-play-attack-side', side)) requestAnimationFrame(reveal);
       else reveal();
     };
     if (switchTo('data-play-combat-target', target)) requestAnimationFrame(revealAttackSide);
     else revealAttackSide();
   });
+}
+
+export function focusNextPlayAction(stage: Stage) {
+  const section = document.getElementById(`play-stage-${stage}`);
+  const action = section && nextAction(section);
+  if (action) focusControl(action);
+  else focusPlayRoll(stage);
 }
 
 export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: () => void }) {
@@ -110,20 +129,34 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
     const desk = bar?.closest<HTMLElement>('.play-desk');
     if (!bar || !desk) return;
     let frame = 0;
+    let pressing = false;
+    const pointerDown = () => { pressing = true; };
+    const pointerDone = () => { pressing = false; };
     const revealFocus = (event: FocusEvent) => {
       const focused = event.target;
-      if (!(focused instanceof HTMLElement) || bar.contains(focused)) return;
+      // A pointer target has already been placed under the pointer. Moving it before pointerup can swallow the click.
+      if (pressing || !(focused instanceof HTMLElement) || bar.contains(focused) || focused.closest('dialog:modal')) return;
       cancelAnimationFrame(frame);
       // Wait for the browser's own focus scrolling before checking the fixed bar.
       frame = requestAnimationFrame(() => {
-        if (document.activeElement !== focused || getComputedStyle(bar).position !== 'fixed') return;
-        const overlap = focused.getBoundingClientRect().bottom + 6 - bar.getBoundingClientRect().top;
+        if (document.activeElement !== focused || !bar.getClientRects().length || getComputedStyle(bar).position !== 'fixed') return;
+        const bounds = focused.getBoundingClientRect();
+        let limit = bar.getBoundingClientRect().top;
+        const journalFooter = focused.closest('.play-journal')?.querySelector('.play-journal-advance');
+        if (journalFooter && !journalFooter.contains(focused)) limit = Math.min(limit, journalFooter.getBoundingClientRect().top);
+        const overlap = bounds.bottom + 6 - limit;
         if (overlap > 0) window.scrollBy({ top: overlap });
       });
     };
-    desk.addEventListener('focusin', revealFocus);
+    document.addEventListener('pointerdown', pointerDown, true);
+    document.addEventListener('pointerup', pointerDone, true);
+    document.addEventListener('pointercancel', pointerDone, true);
+    document.addEventListener('focusin', revealFocus);
     return () => {
-      desk.removeEventListener('focusin', revealFocus);
+      document.removeEventListener('pointerdown', pointerDown, true);
+      document.removeEventListener('pointerup', pointerDone, true);
+      document.removeEventListener('pointercancel', pointerDone, true);
+      document.removeEventListener('focusin', revealFocus);
       cancelAnimationFrame(frame);
     };
   }, []);
@@ -152,12 +185,7 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
     };
   }, [stage]);
 
-  const jump = () => {
-    const section = document.getElementById(`play-stage-${stage}`);
-    const action = section && nextAction(section);
-    if (action) focusControl(action);
-    else focusPlayRoll(stage);
-  };
+  const jump = () => focusNextPlayAction(stage);
 
   // Hardware keyboards (iPad, laptop): N jumps to the next action, U undoes the last roll.
   const shortcuts = useRef({ jump, undo: draft.undoRoll, canUndo: draft.canUndo });
@@ -166,7 +194,7 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement;
-      if (target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog[open]')) return;
+      if (target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog:modal')) return;
       const key = event.key.toLowerCase();
       if (key === 'n') { event.preventDefault(); shortcuts.current.jump(); }
       else if (key === 'u' && shortcuts.current.canUndo) { event.preventDefault(); shortcuts.current.undo(); }
@@ -196,7 +224,7 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
 }
 
 function recordedValue(entry: PlayRollEntry) {
-  return `${entry.dice} ${entry.value}`;
+  return entry.action ? '' : `${entry.dice} ${entry.value}`;
 }
 
 export function PlayRollHistory({ onCorrection, paperCommitted }: {
@@ -216,12 +244,12 @@ export function PlayRollHistory({ onCorrection, paperCommitted }: {
         <ol className="play-roll-log">
           {[...draft.history].reverse().map((entry) => (
             <li key={entry.id}>
-              <span><strong>{entry.label}</strong> <span>{entry.source === 'manual' ? '직접 입력' : '앱 굴림'}</span>
+              <span><strong>{entry.label}</strong> <span>{entry.action ? '상태 기록' : entry.source === 'manual' ? '직접 입력' : '앱 굴림'}</span>
                 {entry.breakdown && <small className="play-skill-total">{entry.breakdown}</small>}
               </span>
               <b>{recordedValue(entry)}</b>
               <button className="btn ghost" type="button" aria-expanded={selection === entry.id}
-                aria-label={`${entry.label} ${recordedValue(entry)} 수정 미리보기`}
+                aria-label={[entry.label, entry.action ? '' : recordedValue(entry), '수정 미리보기'].filter(Boolean).join(' ')}
                 onClick={() => {
                   const next = selection === entry.id ? null : entry.id;
                   setSelection(next);
@@ -237,7 +265,7 @@ export function PlayRollHistory({ onCorrection, paperCommitted }: {
       ) : <p className="play-empty">이 장소의 판정을 확인하면 굴림이 여기에 모입니다.</p>}
       {preview && (
         <div className="play-roll-correction" role="group" aria-label="굴림 수정 미리보기" ref={review} tabIndex={-1}>
-          <p><strong>{preview.origin.label} {recordedValue(preview.origin)}</strong>부터 다시 입력합니다.</p>
+          <p><strong>{preview.origin.label} {recordedValue(preview.origin)}</strong>부터 {preview.origin.action ? '다시 확인합니다.' : '다시 입력합니다.'}</p>
           {preview.affected.length > 1 && <ul>
             {preview.affected.slice(1).map((entry) => <li key={entry.id}>{entry.label} {recordedValue(entry)} 다시 확인</li>)}
           </ul>}
@@ -250,7 +278,7 @@ export function PlayRollHistory({ onCorrection, paperCommitted }: {
               if (!draft.rewindRoll(preview.origin.id)) { setFailed(true); return; }
               setSelection(null);
               onCorrection(preview.origin);
-            }}>이 굴림부터 다시 입력</button>
+            }}>{preview.origin.action ? '이 기록부터 되돌리기' : '이 굴림부터 다시 입력'}</button>
             <button className="btn ghost" type="button" onClick={() => { setSelection(null); heading.current?.focus(); }}>취소</button>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { pooledDie, type RollResult } from '../lib/dice';
 import type { DamageType } from '../lib/damage';
 import { splitActionDamage, type ActionDamagePool } from '../lib/damage-pool';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
-import { CreatureAreaTargets, type SharedActionDamage } from './CreatureAreaTargets';
+import { CreatureAreaTargets, type CreatureAreaRole, type SharedActionDamage } from './CreatureAreaTargets';
 import { CreatureSummonRoll, type CombatSummonControls } from './CreatureSummonRoll';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import { PhysicalDiceRoll } from './PhysicalDiceRoll';
@@ -24,8 +24,8 @@ export function CreatureActionResolution({ action, rule, summons }: {
   const alternate = action.tag === 'Magical' && !!rule.resistance && !['Spellward', 'Magic Resistance'].includes(rule.resistance);
   const elementType = !element ? undefined : element.total <= 2 ? 'Fire' : element.total <= 4 ? 'Lightning' : 'Force';
   const damage: readonly ActionDamage[] = elementType ? [[elementType, 'D6']] : rule.damage ?? [];
-  const renderTarget = (name?: string, shared?: SharedActionDamage) => (
-    <ActionTargetResolution rule={rule} damage={damage} target={name} shared={shared} summons={summons}
+  const renderTarget = (name?: string, shared?: SharedActionDamage, role?: CreatureAreaRole) => (
+    <ActionTargetResolution rule={rule} damage={damage} target={name} shared={shared} role={role} summons={summons}
       elementRevision={rule.elemental ? revision : undefined} />
   );
 
@@ -59,11 +59,12 @@ export function CreatureActionResolution({ action, rule, summons }: {
   );
 }
 
-function ActionTargetResolution({ rule, damage, target, shared, summons, elementRevision }: {
+function ActionTargetResolution({ rule, damage, target, shared, role = 'pc', summons, elementRevision }: {
   rule: CreatureActionRule;
   damage: readonly ActionDamage[];
   target?: string;
   shared?: SharedActionDamage;
+  role?: CreatureAreaRole;
   summons?: CombatSummonControls;
   elementRevision?: [number, Dispatch<SetStateAction<number>>];
 }) {
@@ -83,11 +84,12 @@ function ActionTargetResolution({ rule, damage, target, shared, summons, element
   const halfDamage = resisted === true && rule.success === 'half';
   const additional = !!rule.after && susceptible;
   const withTarget = (label: string) => target ? `${label} · ${target}` : label;
+  const context = role === 'pc' ? 'skill' : 'npc';
 
   return (
     <div className="creature-target-resolution">
         {rule.resistance && (
-          <PhysicalSkillRoll label={withTarget(`${rule.resistance} 판정`)} skill={rule.resistance}
+          <PhysicalSkillRoll label={withTarget(`${rule.resistance} 판정`)} skill={rule.resistance} context={context}
             onResult={(result) => onResistance(skillCheckSucceeded(result))} onClear={() => onResistance(null)} />
         )}
         {resisted !== null && (
@@ -97,7 +99,7 @@ function ActionTargetResolution({ rule, damage, target, shared, summons, element
         )}
         {additional && (
           <PlayDraftScope name={`extra-${revision}`} key={`extra-${revision}`}>
-            <PhysicalSkillRoll label={withTarget(`추가 ${rule.after} 판정`)} skill={rule.after!}
+            <PhysicalSkillRoll label={withTarget(`추가 ${rule.after} 판정`)} skill={rule.after!} context={context}
               onResult={(result) => setExtraResisted(skillCheckSucceeded(result))} onClear={() => setExtraResisted(null)} />
           </PlayDraftScope>
         )}

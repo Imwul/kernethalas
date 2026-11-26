@@ -8,7 +8,7 @@ import {
   skillScores, startingGear, stepStatus, type CreationDraft, type CreationStep, type GearLine, type SupplyId,
 } from '../lib/character-creation';
 import { roll, type RollResult } from '../lib/dice';
-import { CHARACTER_WEAPONS, usePlayCharacter, type PlayCharacter } from '../lib/play-character';
+import { CHARACTER_WEAPONS, usePlayCharacter, type SurvivorSnapshot } from '../lib/play-character';
 import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { Link } from '../lib/router';
 import { XRef } from './bits';
@@ -33,8 +33,9 @@ const perkOf = (reward: string) => /^(.+) Perk$/.exec(reward)?.[1];
  * Builds a level 1 survivor step by step (pp.16–21, 64, 67). Every die can be typed from the table or rolled here,
  * one step can be rolled at once, or "완전 자동" fills whatever is still empty; every result stays editable.
  */
-export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 탭 보기' }: {
-  onApplyGear?: (lines: GearLine[]) => Promise<boolean>;
+export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = '캐릭터 탭 보기' }: {
+  onApplyGear?: (lines: GearLine[], source: string) => Promise<boolean>;
+  onUndoGear?: (source: string) => Promise<boolean>;
   onDone?: () => void;
   doneLabel?: string;
 }) {
@@ -45,7 +46,7 @@ export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 �
   const [weaponSkill, setWeaponSkill] = useState('');
   const [cleared, setCleared] = useState<CreationDraft | null>(null);
   const [withGear, setWithGear] = useState(true);
-  const [applied, setApplied] = usePlayDraftState<{ character: PlayCharacter; presets: Record<string, number> } | null>('creation-applied', null);
+  const [applied, setApplied] = usePlayDraftState<(SurvivorSnapshot & { gearSource?: string }) | null>('creation-applied', null);
   const [savingGear, setSavingGear] = useState(false);
   const [gearSaved, setGearSaved] = useState(false);
   const [message, setMessage] = useState('');
@@ -62,9 +63,11 @@ export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 �
   };
   const auto = () => {
     const next = autoCreate(draft);
+    const moved = CREATION_SKILLS.some((skill) => draft.allot[skill] && next.allot[skill] !== draft.allot[skill]);
     commit(() => setDraft(next), { label: '캐릭터 완전 자동 생성', dice: '—', source: 'app',
       value: CREATION_ATTRIBUTES.map(({ id }) => `${id} ${next.attributes[id]?.total}`).join(' · ') });
     setCleared(null);
+    setMessage(moved ? '+60과 +40을 무기 기술에 배분하기 위해 기존 배분 일부를 옮겼습니다. Skill 단계에서 확인할 수 있습니다.' : '');
     go('summary');
   };
   const rolled = (dice: string) => roll(dice)!;
@@ -288,17 +291,18 @@ export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 �
   const record = async () => {
     if (!pc || !status.summary || applied || savingGear) return;
     const { character, skills: values } = creationRecord(draft);
-    const previous = { character: pc.character, presets: pc.presets };
+    const previous = pc.snapshot();
     const items = withGear ? startingGear(draft) : [];
+    const gearSource = items.length && onApplyGear ? `creation:${crypto.randomUUID()}` : undefined;
     commit(() => {
       pc.replace(character, values);
-      setApplied(previous);
+      setApplied(gearSource ? { ...previous, gearSource } : previous);
     });
     setGearSaved(false);
     setMessage('');
-    if (!items.length || !onApplyGear) return;
+    if (!gearSource || !onApplyGear) return;
     setSavingGear(true);
-    const saved = await onApplyGear(items).catch(() => false);
+    const saved = await onApplyGear(items, gearSource).catch(() => false);
     setGearSaved(saved);
     setMessage(saved ? '' : '장비 장부에 넣지 못했습니다. 장비 탭에서 직접 추가하세요.');
     setSavingGear(false);
@@ -327,9 +331,16 @@ export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 �
         <p className="creator-note">지금 캐릭터 탭의 기록(레벨 {pc.character.level ?? '?'})을 새 생존자로 바꿉니다. 바꾼 뒤 바로 되돌릴 수 있습니다.</p>}
       {applied && pc && <div className="creator-step-actions">
         <p className="creator-done" role="status">캐릭터 탭에 채웠습니다{savingGear ? ' · 시작 장비 저장 중' : gearSaved ? ' · 시작 장비를 장부에 넣었습니다' : ''}.</p>
-        <button type="button" className="linkbtn" disabled={savingGear} onClick={() => {
-          commit(() => pc.restore(applied.character, applied.presets));
-          setApplied(null);
+        <button type="button" className="linkbtn" disabled={savingGear} onClick={async () => {
+          if (applied.gearSource && onUndoGear) {
+            setSavingGear(true);
+            const restored = await onUndoGear(applied.gearSource).catch(() => false);
+            setSavingGear(false);
+            if (!restored) { setMessage('시작 장비 지급을 되돌릴 수 없습니다. 장비 탭에서 이후 변경을 확인하세요.'); return; }
+          }
+          commit(() => { pc.restore(applied); setApplied(null); });
+          setGearSaved(false);
+          setMessage('');
         }}>캐릭터 기록 되돌리기</button>
         {onDone && <button type="button" className="btn ghost" disabled={savingGear} onClick={onDone}>{doneLabel}</button>}
       </div>}
@@ -344,7 +355,7 @@ export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 �
     <section className="creator" aria-label="새 생존자 만들기">
       <div className="creator-head">
         <div className="creator-step-actions">
-          <button type="button" className="btn primary" disabled={!!applied} onClick={auto} title="비어 있는 칸만 채웁니다">완전 자동 생성</button>
+          <button type="button" className="btn primary" disabled={!!applied} onClick={auto} title="빈 칸을 채우고 필요하면 무기 기술 배분을 조정합니다">완전 자동 생성</button>
           <button type="button" className="btn ghost" disabled={draft === EMPTY_CREATION || savingGear} onClick={() => {
             setCleared(draft);
             setDraft(EMPTY_CREATION);

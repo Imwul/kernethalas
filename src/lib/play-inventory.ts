@@ -43,7 +43,7 @@ export interface GearLedger {
   entries: GearEntry[];
 }
 
-const STORAGE_KEY = 'kn-play-gear-v1';
+export const PLAY_GEAR_STORAGE_KEY = 'kn-play-gear-v1';
 const EMPTY: GearLedger = { items: [], entries: [] };
 const DEFAULT_WEIGHT: Partial<Record<string, GearWeight>> = {
   '광원': 'free', '동전': 'coins', '보석': 'gems', '물약': 'light', 'bandage': 'light', 'torch': 'light', 'ration': 'light',
@@ -88,7 +88,7 @@ function isGearEntry(value: unknown): value is GearEntry {
 
 export function readGearLedger(campaignId?: string): GearLedger | null {
   try {
-    const raw = localStorage.getItem(campaignStorageKey(STORAGE_KEY, campaignId));
+    const raw = localStorage.getItem(campaignStorageKey(PLAY_GEAR_STORAGE_KEY, campaignId));
     if (!raw) return EMPTY;
     const data = JSON.parse(raw) as Partial<GearLedger> | null;
     if (!Array.isArray(data?.items) || !Array.isArray(data?.entries)) return null;
@@ -108,12 +108,12 @@ export function isGearLedger(value: unknown): value is GearLedger {
 }
 
 export function storeGearLedger(ledger: GearLedger, campaignId?: string) {
-  try { localStorage.setItem(campaignStorageKey(STORAGE_KEY, campaignId), JSON.stringify(ledger)); return true; }
+  try { localStorage.setItem(campaignStorageKey(PLAY_GEAR_STORAGE_KEY, campaignId), JSON.stringify(ledger)); return true; }
   catch { return false; }
 }
 
 export function isGearStorageEvent(event: StorageEvent, campaignId?: string) {
-  return event.key === campaignStorageKey(STORAGE_KEY, campaignId) || event.key === null;
+  return event.key === campaignStorageKey(PLAY_GEAR_STORAGE_KEY, campaignId) || event.key === null;
 }
 
 function replaceItem(items: GearItem[], item: GearItem | null, id: string) {
@@ -195,6 +195,25 @@ export function undoGearEntry(ledger: GearLedger, expectedId?: string): LedgerRe
   if (expectedId && latest?.id !== expectedId) return { error: '그 뒤에 장부가 바뀌었습니다. 최근 변경부터 되돌릴 수 있습니다.' };
   return latest ? { ledger: { items: replaceItem(ledger.items, latest.old, latest.next.id), entries: ledger.entries.slice(0, -1) } }
     : { error: '되돌릴 장부 기록이 없습니다.' };
+}
+
+/** Reverses one creation grant while keeping edits to unrelated gear. */
+export function undoStartingGear(ledger: GearLedger, source: string): LedgerResult {
+  const prefix = `${source}:`;
+  const granted = ledger.entries.filter((entry) => entry.source?.startsWith(prefix));
+  if (!granted.length) return { ledger };
+  const grantedItems = new Set(granted.map(({ next }) => next.id));
+  const laterEntries = ledger.entries.slice(ledger.entries.indexOf(granted[0]) + 1);
+  const error = '지급한 시작 장비의 수량이나 상태가 바뀌었습니다. 장부에서 해당 변경을 먼저 확인하세요.';
+  if (laterEntries.some((entry) => grantedItems.has(entry.next.id) && !entry.source?.startsWith(prefix))) return { error };
+  let items = ledger.items;
+  for (const entry of granted.slice().reverse()) {
+    if (!sameGearItem(items.find(({ id }) => id === entry.next.id), entry.next)) {
+      return { error };
+    }
+    items = replaceItem(items, entry.old, entry.next.id);
+  }
+  return { ledger: { items, entries: ledger.entries.filter((entry) => !entry.source?.startsWith(prefix)) } };
 }
 
 export function ledgerCarry(items: GearItem[]) {

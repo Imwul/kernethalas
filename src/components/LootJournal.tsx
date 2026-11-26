@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { tableById } from '../content';
 import { rollDie, tableSides } from '../lib/dice';
 import { journalPropertyText, journalRarity, journalRow, journalRowName, potionJournalLine, propertyCount } from '../lib/loot-journal';
@@ -17,22 +17,27 @@ type JournalRollProps = {
   onValue: (value: number) => void;
   resultText?: string;
   breakdown?: string;
+  fieldKey?: string;
+  once?: boolean;
 } & ({ tableId: string; label?: string } | { die: 'D4' | 'D6' | 'D10' | 'D20' | 'D100'; label: string });
 
-export function JournalRoll({ label, value, onValue, resultText, breakdown, ...source }: JournalRollProps) {
+export function JournalRoll({ label, value, onValue, resultText, breakdown, fieldKey, once = false, ...source }: JournalRollProps) {
   const id = useId();
   const [typed, setTyped] = useState('');
   const [invalid, setInvalid] = useState(false);
+  const submitted = useRef(false);
   const commitRoll = usePlayRoll();
   const table = 'tableId' in source ? tableById.get(source.tableId) : undefined;
   const dice = table?.dice ?? ('die' in source ? source.die : '');
   const sides = tableSides(dice);
   const action = label ?? table?.ko ?? '주사위';
-  const field = usePlayRollField(`journal:${action}`, action, dice, value !== null, sides === 100);
+  const field = usePlayRollField(fieldKey ?? `journal:${action}`, action, dice, value !== null, sides === 100);
   if (sides === null) return null;
   const row = table && journalRow(table.id, value);
   const canRoll = !table || automaticRollSides(table) !== null;
   const commit = (roll: number, source: PlayRollDetails['source']) => {
+    if (once && submitted.current) return;
+    submitted.current = true;
     commitRoll(() => onValue(roll), { label: action, dice, value: sides === 100 && roll === 100 ? '00' : String(roll),
       source, field: field['data-play-roll-field'], breakdown });
     setTyped('');

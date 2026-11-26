@@ -83,6 +83,83 @@ test('numbered and manually labeled door reports return with the paper map witho
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(WIDTH);
 });
 
+test('a deferred door resumes confirmed investigation and attempt bonuses without duplicating XP or Lockpick loss', async ({ page }) => {
+  await page.setViewportSize({ width: WIDTH, height: 800 });
+  await page.goto('/play');
+  const character = await openDrawer(page, '캐릭터');
+  await box(character, 'Thievery 수치').fill('50');
+  await box(character, 'Athletics 수치').fill('45');
+  await closeDrawer(page);
+  const gear = await openDrawer(page, '장비');
+  await button(gear, '장비 추가').click();
+  const item = gear.getByRole('form', { name: '장비 등록' });
+  await box(item, '품목 이름').fill('Lockpick');
+  await box(item, '현재 수량').fill('2');
+  await button(item, '장부에 저장').click();
+  await closeDrawer(page);
+
+  const explore = region(page, '장소 탐험');
+  await button(explore, '방').click();
+  await roomEvent(explore, '55');
+  const actions = region(explore, '선택 탐험 행동');
+  await openPane(actions, '문·함정 조사');
+  await choice(actions, '조사할 대상').selectOption('present');
+  const door = region(actions, '문 조사');
+  await detectTrap(door);
+  await roll(door, '함정 여부 D10', '7');
+  await roll(door, '잠김 여부 D20', '16');
+  const trap = region(door, '함정 처리');
+  await roll(trap, '함정 종류 D10', '1');
+  await choice(trap, '함정 처리 방법').selectOption('disarm');
+  await skillRoll(trap, '해제 판정', 'Thievery', 50, 31, 4);
+
+  const opening = region(door, '잠긴 대상 열기');
+  const comparison = region(opening, '잠긴 문 선택지 비교');
+  await expect(comparison).toContainText('Thievery · 기준 50');
+  await expect(comparison).toContainText('Athletics · 기준 45');
+  await expect(comparison).toContainText('Lockpick 장부 2개');
+  await expect(comparison).toContainText('긴장 주사위 D8');
+  await skillRoll(opening, '자물쇠 따기 판정', 'Thievery', 50, 81);
+  await choice(opening, '개방 방법').selectOption('force');
+  await skillRoll(opening, '강제 개방 판정', 'Athletics', 45, 81);
+  await expect(button(actions, '나중에 열기')).toHaveCount(0);
+  await roll(region(opening, '강제 개방 긴장 굴림'), '긴장 주사위 굴린 값', '3');
+
+  await button(actions, '나중에 열기').click();
+  const defer = actions.getByRole('form', { name: '보류할 문 저장' });
+  await box(defer, '종이 지도 번호').fill('B-18');
+  await box(defer, '출입구 표기').fill('남쪽 철문');
+  await button(defer, '돌아갈 곳에 저장').click();
+  await expect(actions.getByText('B-18 · 남쪽 철문을 돌아갈 곳에 저장했습니다.', { exact: true })).toBeVisible();
+  await go(page, '저널');
+  const journal = region(page, '이번 장소 기록');
+  await expect(journal.getByRole('checkbox', { name: 'XP +10', exact: true })).toHaveCount(1);
+  await expect(journal).toContainText('Lockpick −1');
+  await button(journal, '다음 장소').click();
+
+  await page.reload();
+  await openPane(explore, '돌아갈 곳');
+  const returns = region(explore, '돌아갈 곳 목록');
+  await button(returns, 'B-18 남쪽 철문 조사 이어가기').click();
+  await roll(region(explore, '긴장 주사위'), '긴장 주사위 굴린 값', '3');
+  await expect(door).toContainText('저장한 탐지 판정 · 성공');
+  await expect(door).toContainText('저장한 함정 여부 D10 · 7');
+  await expect(door).toContainText('저장한 잠김 여부 D20 · 16');
+  await expect(trap).toHaveCount(0);
+  await expect(comparison).toContainText('Thievery +10 · 기준 60');
+  await expect(comparison).toContainText('Athletics +20 · 기준 65');
+  await go(page, '저널');
+  await expect(journal.getByRole('checkbox', { name: 'XP +10', exact: true })).toHaveCount(0);
+  await expect(journal).not.toContainText('Lockpick −1');
+  await go(page, '탐험');
+  await skillRoll(opening, '자물쇠 따기 판정', 'Thievery', 50, 31);
+  await expect(door).toContainText('개방 성공 · XP +10');
+  await expect(returns.getByRole('button', { name: 'B-18 남쪽 철문 조사 이어가기' })).toHaveCount(0);
+  await go(page, '저널');
+  await expect(journal.getByRole('checkbox', { name: 'XP +10', exact: true })).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(WIDTH);
+});
+
 test('camp stock distinguishes known shortage from paper inventory before D20', async ({ page }) => {
   await page.setViewportSize({ width: WIDTH, height: 800 });
   await page.goto('/play');

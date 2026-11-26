@@ -3,6 +3,7 @@ import { EdgeToggle } from '../EdgeToggle';
 import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
+import { pcCheckModifiers } from '../../lib/play-check-modifiers';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { usePlayCharacter } from '../../lib/play-character';
 import { LINGERING_CONDITIONS as CONDITIONS, usePlayOngoingEffects } from '../../lib/play-effects';
@@ -17,6 +18,7 @@ import { SkillAdjustments } from './SkillAdjustments';
 import '../../styles/play-survival.css';
 
 export type SurvivalPane = 'treatment' | 'rot' | 'growth';
+export const ROT_REST_EVENT = 'kn:rot-rest';
 
 export interface SurvivalReport {
   summary: string;
@@ -34,27 +36,31 @@ type SaveRecord = (record: SurvivalRecord) => void;
 
 interface CheckDraft {
   target: string;
-  edge: Edge;
+  edge?: Edge;
+  rolledEdge?: Edge;
   roll: number | null;
   modifiers?: SkillModifier[];
 }
 
-const EMPTY_CHECK: CheckDraft = { target: '', edge: 'none', roll: null };
+const EMPTY_CHECK: CheckDraft = { target: '', roll: null };
 const CHECK_LABEL = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패' } as const;
 const passed = ({ outcome }: CheckResult) => outcome === 'success' || outcome === 'critical';
 
-function resolveDraft({ target, edge, roll, modifiers }: CheckDraft) {
-  const score = skillBreakdown(target, modifiers);
-  return score === null || roll === null ? null : resolveCheck(d100FromValue(roll), score.total, edge);
+function resolveDraft({ target, edge, rolledEdge, roll, modifiers }: CheckDraft, rules: ReturnType<typeof pcCheckModifiers>) {
+  const score = skillBreakdown(target, modifiers, rules.fixed);
+  return score === null || roll === null ? null : resolveCheck(d100FromValue(roll), score.total, rolledEdge ?? edge ?? rules.edge);
 }
 
-function CheckInputs({ label, value, result, onChange }: {
+function CheckInputs({ label, value, result, rules, onChange }: {
   label: string;
   value: CheckDraft;
   result: CheckResult | null;
+  rules: ReturnType<typeof pcCheckModifiers>;
   onChange: (next: CheckDraft) => void;
 }) {
-  const calculation = skillBreakdown(value.target, value.modifiers);
+  const calculation = skillBreakdown(value.target, value.modifiers, rules.fixed);
+  const edge = (value.roll === null ? undefined : value.rolledEdge) ?? value.edge ?? rules.edge;
+  const update = (patch: Partial<CheckDraft>) => onChange({ ...value, ...patch, roll: null, rolledEdge: undefined });
   const invalid = !!value.target.trim() && calculation === null;
   const recordCritical = useRecordSkillCritical();
   const growthEligible = isGrowthSkill(label);
@@ -63,17 +69,18 @@ function CheckInputs({ label, value, result, onChange }: {
       <div className="survival-fields">
         <label className="field"><span>{label} 수치</span>
           <input value={value.target} placeholder="예 45" aria-invalid={invalid || undefined}
-            onChange={(event) => onChange({ ...value, target: event.target.value, roll: null })} />
+            onChange={(event) => update({ target: event.target.value })} />
         </label>
-        <EdgeToggle value={value.edge} onChange={(edge) => onChange({ ...value, edge, roll: null })} />
+        <EdgeToggle value={edge} onChange={(nextEdge) => update({ edge: nextEdge })} />
       </div>
-      <SkillAdjustments skill={label} base={value.target} onBase={(target) => onChange({ ...value, target, roll: null })}
-        modifiers={value.modifiers ?? []} onModifiers={(modifiers) => onChange({ ...value, modifiers, roll: null })} />
+      <SkillAdjustments skill={label} base={value.target} onBase={(target) => update({ target })}
+        modifiers={value.modifiers ?? []} onModifiers={(modifiers) => update({ modifiers })} fixed={rules.fixed} />
+      {rules.notes.length > 0 && <p className="survival-notice">{rules.notes.join(' / ')}</p>}
       {invalid && <p className="field-err" role="alert">기본 수치와 보정 수치는 정수로 입력하세요.</p>}
       <JournalRoll die="D100" label={label} value={value.roll} breakdown={calculation ? formatSkillBreakdown(calculation) : undefined} onValue={(roll) => {
-        const next = { ...value, roll };
+        const next = { ...value, roll, rolledEdge: roll === null ? undefined : value.edge ?? rules.edge };
         onChange(next);
-        const rolled = resolveDraft(next);
+        const rolled = resolveDraft(next, rules);
         if (rolled) recordCritical(label, rolled);
       }} resultText={result ? `${CHECK_LABEL[result.outcome]}${result.flippedRead ? ` · 뒤집은 값 ${result.read.value}` : ''}${growthEligible && (result.outcome === 'critical' || result.outcome === 'fumble') ? ' · 야영 성장 표시' : ''}` : '판정에 쓸 보정 수치를 입력하세요.'} />
     </>
@@ -95,11 +102,13 @@ const EMPTY_TREATMENT: TreatmentDraft = { purpose: 'heal', check: EMPTY_CHECK, r
 
 function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord: SaveRecord }) {
   const { current: { conditions }, setCondition } = usePlayOngoingEffects();
-  const medicine = usePlayCharacter()?.skill('Medicine') ?? '';
+  const pc = usePlayCharacter();
+  const medicine = pc?.skill('Medicine') ?? '';
+  const rules = pcCheckModifiers(pc, 'Medicine');
   const [draft, setDraft] = usePlayDraftState<TreatmentDraft>('bandage', { ...EMPTY_TREATMENT, check: { ...EMPTY_CHECK, target: medicine } });
   const commitRoll = usePlayRoll();
   const { purpose, check, recovery, damage } = draft;
-  const result = resolveDraft(check);
+  const result = resolveDraft(check, rules);
   const success = result !== null && passed(result);
   const critical = result?.outcome === 'critical';
   const fumble = result?.outcome === 'fumble';
@@ -120,7 +129,7 @@ function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord
         summary: `붕대 처치 ${CHECK_LABEL[result.outcome]}${parts.length ? ` · ${parts.join(', ')}` : ''}`,
         changes: ['Bandage −1 (붕대 처치)', ...parts.map((part) => `${part} (붕대 처치)`)] });
       if (success && purpose !== 'heal') clear(purpose);
-      resetDice({ purpose: success && purpose === 'heal' ? 'bleeding' : purpose, check: { ...check, roll: null } });
+      resetDice({ purpose: success && purpose === 'heal' ? 'bleeding' : purpose, check: { ...check, roll: null, rolledEdge: undefined } });
     });
   };
 
@@ -152,7 +161,7 @@ function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord
           <option value="poisoned">중독 해제</option>
         </select>
       </label>
-      <CheckInputs label="Medicine" value={check} result={result} onChange={(next) => resetDice({ purpose, check: next })} />
+      <CheckInputs label="Medicine" value={check} result={result} rules={rules} onChange={(next) => resetDice({ purpose, check: next })} />
       {needsRecovery && <JournalRoll die={critical ? 'D10' : 'D4'} label="붕대 회복" value={recovery}
         onValue={(value) => setDraft({ ...draft, recovery: value })} resultText={recovery === null ? undefined : `Toughness +${recovery}`} />}
       {fumble && (
@@ -180,21 +189,36 @@ const ROT_STAGES = entryById.get('the-rot')!.outcomes!;
 
 interface RotDraft {
   trigger: RotTrigger;
-  stage: number;
+  stage?: number;
   check: CheckDraft;
   exhaustion: number | null;
   health: number | null;
 }
 
-const EMPTY_ROT: RotDraft = { trigger: 'exposure', stage: 1, check: EMPTY_CHECK, exhaustion: null, health: null };
+const EMPTY_ROT: RotDraft = { trigger: 'exposure', check: EMPTY_CHECK, exhaustion: null, health: null };
 
 function RotTool({ onRecord }: { onRecord: SaveRecord }) {
-  const endurance = usePlayCharacter()?.skill('Endurance') ?? '';
+  const pc = usePlayCharacter();
+  const endurance = pc?.skill('Endurance') ?? '';
   const [draft, setDraft] = usePlayDraftState<RotDraft>('rot', { ...EMPTY_ROT, check: { ...EMPTY_CHECK, target: endurance } });
   const commitRoll = usePlayRoll();
-  const { trigger, stage, check, exhaustion, health } = draft;
+  const { check, exhaustion, health } = draft;
+  const savedStage = pc?.character.rotStage ?? 0;
+  useEffect(() => {
+    if (savedStage === 0) return;
+    const onRest = (event: Event) => {
+      const trigger = (event as CustomEvent).detail;
+      if (trigger !== 'breather' && trigger !== 'camp') return;
+      setDraft((previous) => previous.check.roll !== null || previous.trigger === trigger ? previous : { ...previous, trigger });
+    };
+    document.addEventListener(ROT_REST_EVENT, onRest);
+    return () => document.removeEventListener(ROT_REST_EVENT, onRest);
+  }, [savedStage, setDraft]);
+  const trigger = draft.trigger === 'exposure' && savedStage > 0 ? 'breather' : draft.trigger;
+  const stage = draft.stage ?? (savedStage || 1);
   const start = trigger === 'exposure' ? 0 : stage;
-  const result = start < 8 ? resolveDraft(check) : null;
+  const rules = pcCheckModifiers(pc, 'Endurance', undefined, start);
+  const result = start < 8 ? resolveDraft(check, rules) : null;
   const next = result && !passed(result) ? start + 1 : start;
   const critical = result?.outcome === 'critical';
   const extra = critical || result?.outcome === 'fumble';
@@ -209,7 +233,9 @@ function RotTool({ onRecord }: { onRecord: SaveRecord }) {
     if (campHealth) changes.push(`Health +${health} (부패병 야영 효과)`);
     commitRoll(() => {
       onRecord({ kind: 'rot', summary: `부패병 ${ROT_TRIGGER[trigger]} · ${resultTitle}`, changes });
-      setDraft({ ...draft, check: { ...check, roll: null }, exhaustion: null, health: null });
+      if (pc && next !== savedStage) pc.update({ rotStage: next });
+      setDraft({ trigger: trigger === 'exposure' && next > 0 ? 'breather' : trigger,
+        stage: pc ? undefined : next, check: { ...check, roll: null, rolledEdge: undefined }, exhaustion: null, health: null });
     });
   };
 
@@ -220,7 +246,7 @@ function RotTool({ onRecord }: { onRecord: SaveRecord }) {
         <label className="field"><span>판정 시점</span>
           <select value={trigger} onChange={(event) => setDraft({ ...draft, trigger: event.target.value as RotTrigger,
             check: { ...check, roll: null }, exhaustion: null, health: null })}>
-            {Object.entries(ROT_TRIGGER).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+            {Object.entries(ROT_TRIGGER).map(([id, label]) => <option value={id} key={id} disabled={id === 'exposure' && savedStage > 0}>{label}</option>)}
           </select>
         </label>
         {trigger !== 'exposure' && (
@@ -232,7 +258,7 @@ function RotTool({ onRecord }: { onRecord: SaveRecord }) {
           </label>
         )}
       </div>
-      {start < 8 && <CheckInputs label="Endurance" value={check} result={result} onChange={(value) => setDraft({ ...draft,
+      {start < 8 && <CheckInputs label="Endurance" value={check} result={result} rules={rules} onChange={(value) => setDraft({ ...draft,
         check: value, exhaustion: null, health: null })} />}
       {result && (
         <div className="survival-preview" role="status" aria-label="부패병 결과">
@@ -358,7 +384,7 @@ export function PlaySurvival({ pane, onPane, onReport, only = false }: {
         <button type="button" aria-controls={`${paneId}-growth`} aria-pressed={pane === 'growth'} onClick={() => onPane('growth')}>기술 성장</button>
       </div>}
       <div id={`${paneId}-treatment`} hidden={pane !== 'treatment'}><TreatmentTool onRecord={onRecord} healedHere={records.some(({ kind, key }) => kind === 'treatment' && key === 'heal')} /></div>
-      <div id={`${paneId}-rot`} hidden={pane !== 'rot'}><RotTool onRecord={onRecord} /></div>
+      {(!only || pane === 'rot') && <div id={`${paneId}-rot`} hidden={pane !== 'rot'}><RotTool onRecord={onRecord} /></div>}
       <div id={`${paneId}-growth`} hidden={pane !== 'growth'}><GrowthTool onRecord={onRecord} recorded={records.filter(({ kind }) => kind === 'growth').flatMap(({ key }) => key ?? [])} /></div>
       {records.length > 0 && <ul className="survival-records" aria-label="이번 장소 치료·성장 결과">
         {records.map(({ summary }, index) => <li key={index}>{summary}</li>)}

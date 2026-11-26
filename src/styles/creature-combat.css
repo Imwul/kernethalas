@@ -82,6 +82,19 @@
 .creature-roll-tools > .seg { justify-self: start; flex-wrap: wrap; }
 .creature-roll-tools .seg button { min-height: 44px; }
 .creature-roll-tools .oracle-body { margin: 0; }
+.creature-action-discovery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+  margin-block-end: var(--s2);
+  font: 14px/1.45 var(--f-ui);
+}
+.creature-action-discovery p { flex: 1 1 12rem; margin: 0; overflow-wrap: anywhere; }
+.creature-action-discovery .btn { margin-inline-start: auto; }
+.creature-action-discovery .btn,
+.creature-combat-head > .xref { min-block-size: 44px; }
+.creature-combat-head > .xref { display: inline-flex; align-items: center; }
 .creature-action-check { min-height: 44px; margin-top: var(--s2); }
 .creature-fixed-hit { margin: 0; padding: var(--s3); background: var(--paper); }
 .creature-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); }

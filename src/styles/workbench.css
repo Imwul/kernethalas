@@ -31,6 +31,18 @@
   margin: 0;
 }
 
+.bench-open-feedback {
+  flex: 1 1 100%;
+  font: 14px/1.5 var(--f-ui);
+  color: var(--oxblood-ink);
+}
+
+.pin-actions:has(.bench-open-feedback) {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-inline-size: 11rem;
+}
+
 .bench-saved {
   margin-block: var(--s2) var(--s4);
   min-inline-size: 0;

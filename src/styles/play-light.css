@@ -1,0 +1,44 @@
+.play-light { margin-block: var(--s2); }
+
+.play-light-stock { margin: 0 0 var(--s2); color: var(--ink-2); }
+
+.play-light-entry,
+.play-light-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--s2);
+}
+
+.play-light-entry .field { min-inline-size: min(100%, 9rem); flex: 1; }
+.play-light-entry input { inline-size: 100%; }
+.play-light-actions { margin-block-start: var(--s2); }
+
+.play-entry-light {
+  display: grid;
+  gap: var(--s2);
+  margin-block: var(--s2);
+}
+
+.play-entry-light > :is(p, .play-light) { margin: 0; }
+
+.play-travel-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--s2);
+  margin-block: var(--s2);
+}
+
+.play-travel-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: .35rem;
+  padding: var(--s2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  min-inline-size: 0;
+}
+
+.play-travel-choice p { margin: 0; }
+.play-travel-choice button { margin-block-end: .25rem; }

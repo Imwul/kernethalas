@@ -22,13 +22,15 @@ interface Props {
   rollLabel?: string;
   sourceForRow?: (row: TableRow) => string | undefined;
   showUnrolledViewToggle?: boolean;
+  hideViewToggle?: boolean;
   beforeRoll?: ReactNode;
   roomShape?: RoomShapeState;
   afterResult?: ReactNode;
   play?: boolean;
 }
 
-export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle, beforeRoll, roomShape, afterResult, play = false }: Props) {
+export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle,
+  hideViewToggle = false, beforeRoll, roomShape, afterResult, play = false }: Props) {
   const id = useId();
   const [manual, setManual] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -37,6 +39,8 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
   const field = usePlayRollField(`oracle:${t.id}`, t.ko, t.dice, value !== null, sides === 100);
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
+  const showViewMode = !hideViewToggle && (value !== null || showUnrolledViewToggle);
+  const showResultActions = showViewMode || (!!row && (!play || !only));
   // The local overlay's original wording sits under every result; it adds nothing when it only repeats the label.
   const rawOriginal = row && (sourceForRow?.(row) ?? tableRowSource(t.id, row.min));
   const original = rawOriginal && !t.gloss && rawOriginal.trim().replace(/\.$/, '') !== row.label ? rawOriginal : undefined;
@@ -173,12 +177,12 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
         </div>
       )}
 
-      {(value !== null || showUnrolledViewToggle) && (
+      {showResultActions && (
         <div className="oracle-result-actions">
-          <div className="seg" role="group" aria-label="표 보기">
+          {showViewMode && <div className="seg" role="group" aria-label="표 보기">
             <button type="button" aria-pressed={only} onClick={() => onOnly(true)}>{value === null ? '표 접기' : '결과만'}</button>
             <button type="button" aria-pressed={!only} onClick={() => onOnly(false)}>전체 표</button>
-          </div>
+          </div>}
           {row && !play && <CopyButton text={copyText} label="결과 복사" />}
           {!only && row && <button className="btn ghost" type="button" onClick={onShowRow}>해당 행으로</button>}
         </div>

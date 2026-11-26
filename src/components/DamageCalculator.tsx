@@ -1,6 +1,8 @@
 import type { creatureDefenses } from '../content/creature-defenses';
+import { formatCombatDamage, isCombatDamageRecord, type CombatDamageRecord } from '../lib/combat-damage-records';
 import { calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, listedDamageReactions, splitPcDamage, type DamageReactions, type DamageType } from '../lib/damage';
-import { usePlayDraftState } from '../lib/play-draft';
+import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
+import { playAction } from '../lib/play-roll-history';
 import { XRef } from './bits';
 import { PerkNote } from './PerkNote';
 import { TogglePanel } from './TogglePanel';
@@ -13,6 +15,9 @@ interface Impact {
   weak: boolean;
 }
 
+type PaperTarget = { slot: string; target: string; source?: string; editable: boolean };
+type DamageCandidate = Omit<CombatDamageRecord, 'id' | 'target' | 'source'>;
+
 const REACTION_LABELS = [
   ['vulnerable', '취약'], ['resistant', '저항'], ['immune', '면역'], ['restored', '회복'],
 ] as const satisfies readonly [keyof DamageReactions, string][];
@@ -22,13 +27,14 @@ function readInteger(text: string, min: number): number | null {
   return /^[+-]?\d+$/.test(text.trim()) && Number.isSafeInteger(value) && value >= min ? value : null;
 }
 
-export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCritical, pc = false, confirmedFirst = false }: {
+export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCritical, pc = false, confirmedFirst = false, paper }: {
   impact?: Impact;
   unlocatedArmor: number | null;
   defenses?: ReturnType<typeof creatureDefenses>;
   initialCritical: boolean;
   pc?: boolean;
   confirmedFirst?: boolean;
+  paper?: PaperTarget;
 }) {
   const [rollText, setRollText] = usePlayDraftState('damage-roll', '');
   const [type, setType] = usePlayDraftState<DamageType | ''>('damage-type', '');
@@ -63,6 +69,11 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
     || extraArmorIgnore === null || reduction === null || overflow;
   const fixedAmount = readInteger(confirmedText, 0);
   const incomingAmount = confirmed ? fixedAmount : !invalid && result && !result.restored ? result.amount : null;
+  const damage: DamageCandidate | null = confirmed
+    ? fixedAmount === null ? null : { amount: fixedAmount, type: type || undefined, location: activeImpact?.location }
+    : !invalid && result && type ? {
+      amount: result.amount, type, location: activeImpact?.location, ...(result.restored && { restored: true }),
+    } : null;
 
   return (
     <section className="damage-calc" aria-label={pc ? 'PC 받는 피해 계산기' : '피해 계산기'}>
@@ -73,11 +84,19 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
         </div>
       )}
       {confirmed ? (
-        <label className="field damage-confirmed"><span>확정 피해량</span>
-          <input inputMode="numeric" value={confirmedText} onChange={(event) => setConfirmedText(event.target.value)}
-            aria-invalid={confirmedText !== '' && fixedAmount === null || undefined} placeholder="예: 3" />
-          {confirmedText !== '' && fixedAmount === null && <span className="field-err">0 이상의 정수를 입력하세요.</span>}
-        </label>
+        <div className="damage-fields">
+          <label className="field damage-confirmed"><span>확정 피해량</span>
+            <input inputMode="numeric" value={confirmedText} onChange={(event) => setConfirmedText(event.target.value)}
+              aria-invalid={confirmedText !== '' && fixedAmount === null || undefined} placeholder="예: 3" />
+            {confirmedText !== '' && fixedAmount === null && <span className="field-err">0 이상의 정수를 입력하세요.</span>}
+          </label>
+          {paper && <label className="field"><span>피해 유형 (선택)</span>
+            <select value={type} onChange={(event) => { setType(event.target.value as DamageType | ''); setReactionOverrides({}); }}>
+              <option value="">유형 미지정</option>
+              {DAMAGE_TYPES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </label>}
+        </div>
       ) : (
         <>
           {impact ? (
@@ -163,7 +182,8 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
           )}
         </>
       )}
-      {pc && <PcDamageApplication amount={incomingAmount} />}
+      {pc ? <PcDamageApplication amount={incomingAmount} paper={paper} damage={damage} />
+        : paper && <DamageRecordButtons paper={paper} damage={damage} />}
       {(!confirmed || (pc && !confirmedFirst)) && (
         <div className="damage-refs">
           {!confirmed && <><XRef id="damage-pool" /><XRef id="damage-types" /><XRef id="vulnerability">피해 반응</XRef></>}
@@ -176,7 +196,37 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
 
 const lossText = (value: number) => value > 0 ? `−${value}` : '0';
 
-function PcDamageApplication({ amount }: { amount: number | null }) {
+function DamageRecordButtons({ paper, damage }: { paper: PaperTarget; damage: DamageCandidate | null }) {
+  const draft = usePlayDraft();
+  const commit = usePlayRoll();
+  if (!draft) return null;
+  const saved = draft.slots[paper.slot];
+  const record = isCombatDamageRecord(saved) ? saved : null;
+  if (!record && (!damage || !paper.editable)) return null;
+  const candidate = damage && { target: paper.target, source: paper.source, ...damage };
+  const text = candidate && formatCombatDamage(candidate);
+  const recordedText = record && formatCombatDamage(record);
+  const same = text !== null && text === recordedText;
+  const save = () => {
+    if (!paper.editable || !candidate || !text || same) return;
+    commit(() => draft.write(draft.generation, paper.slot, { ...candidate, id: record?.id ?? crypto.randomUUID() }, null),
+      playAction(`피해 기록 · ${text}`));
+  };
+  return (
+    <div className="damage-paper">
+      {record && <p>저널 · {recordedText}</p>}
+      {paper.editable && <button className="btn ghost" type="button" onClick={save} disabled={!candidate || same}>
+        {same ? '피해 기록됨' : record ? '피해 기록 수정' : '피해 기록'}
+      </button>}
+      {record && <button className="btn ghost" type="button" onClick={() => commit(
+        () => draft.write(draft.generation, paper.slot, null, null),
+        playAction(`피해 기록 취소 · ${recordedText}`),
+      )}>피해 기록 취소</button>}
+    </div>
+  );
+}
+
+function PcDamageApplication({ amount, paper, damage }: { amount: number | null; paper?: PaperTarget; damage: DamageCandidate | null }) {
   const [toughnessText, setToughnessText] = usePlayDraftState('damage-toughness', '');
   const [directHealth, setDirectHealth] = usePlayDraftState('damage-direct-health', false);
   const toughness = readInteger(toughnessText, 0);
@@ -204,6 +254,8 @@ function PcDamageApplication({ amount }: { amount: number | null }) {
       ) : amount !== null && (
         <p className="damage-note">현재 Toughness를 0 이상의 정수로 입력하세요.</p>
       )}
+      {paper && <DamageRecordButtons paper={paper} damage={damage && (damage.restored || loss)
+        ? { ...damage, ...(loss && { loss: { toughness: loss.toughnessLoss, health: loss.healthLoss } }) } : null} />}
     </section>
   );
 }

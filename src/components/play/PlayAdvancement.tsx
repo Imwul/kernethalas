@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { masteryCatalog } from '../../content/entries/masteries';
 import { damagingMasteryAbilities, readMasteryInteger } from '../../lib/mastery-play';
-import { usePlayCharacter } from '../../lib/play-character';
+import { BASE_MASTERY_LIMIT, usePlayCharacter } from '../../lib/play-character';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
@@ -38,12 +38,15 @@ const EMPTY_DRAFT: AdvancementDraft = {
   resistances: { Endurance: '', Resolve: '', Spellward: '' }, battleForm: false,
 };
 interface AdvancementRecord {
+  id?: string;
   level: number;
   summary: string;
   changes: string[];
   /** XP the level-up used up (XP returns to 0) */
   xp?: number;
 }
+
+const advancementKey = ({ id, level }: Pick<AdvancementRecord, 'id' | 'level'>) => `level-up-${id ?? level}`;
 
 function gainedBenefit(draft: AdvancementDraft): string | null {
   const { benefit, die } = draft;
@@ -88,44 +91,43 @@ export function PlayAdvancement({ onSheetChange, onJournalChange, onXpSpent }: {
 }) {
   const [saved, setDraft] = usePlayDraftState('advancement-draft', EMPTY_DRAFT);
   const pc = usePlayCharacter();
+  const base = pc?.character.masteries ?? [];
+  const amulet = pc?.character.amulet;
+  const owned = amulet ? [...base, amulet] : base;
   const [otherMastery, setOtherMastery] = useState(false);
   // Level, XP and the Mastery's current tier come from the character tab until the player types something else.
-  const learnedTier = (id: string) => {
-    const base = pc?.character.masteries?.find((item) => item.id === id);
-    if (base) return String(base.tier);
-    return pc?.character.amulet?.id === id ? String(pc.character.amulet.tier) : '';
-  };
+  const learnedTier = (id: string) => owned.find((item) => item.id === id)?.tier;
+  const activeTier = learnedTier(saved.mastery);
   const draft = {
     ...saved,
     level: saved.level || pc?.level || '',
     xp: saved.xp || (pc?.xp === undefined ? '' : String(pc.xp)),
-    tier: saved.tier || (saved.mastery ? learnedTier(saved.mastery) : ''),
+    tier: activeTier === undefined ? saved.tier : String(activeTier),
   };
   const [records, setRecords] = usePlayDraftState<AdvancementRecord[]>('advancement-records', []);
   const commit = usePlayRoll();
   const patch = (next: Partial<AdvancementDraft>) => setDraft((previous) => ({ ...previous, ...next }));
   const report = useMemo(() => ({
     journal: records.map(({ summary }) => summary).join(' / '),
-    sheet: records.flatMap(({ changes, level }) => changes.map((text, index) => ({ id: `level-up-${level}-${index}`, text }))),
+    sheet: records.flatMap((record) => record.changes.map((text, index) => ({ id: `${advancementKey(record)}-${index}`, text }))),
   }), [records]);
   useEffect(() => { onSheetChange?.(report.sheet); onJournalChange?.(report.journal); }, [report, onSheetChange, onJournalChange]);
   const spent = records.reduce((total, { xp: used }) => total + (used ?? 0), 0);
   useEffect(() => { onXpSpent?.(spent); }, [spent, onXpSpent]);
-  const own = new Set([...(pc?.character.masteries ?? []).map(({ id }) => id), ...(pc?.character.amulet ? [pc.character.amulet.id] : [])]);
-  const masteryOptions = [...masteryCatalog].sort((a, b) => Number(own.has(b.id)) - Number(own.has(a.id)));
-  const learnedIds = new Set([...(pc?.character.masteries ?? []), ...(pc?.character.amulet ? [pc.character.amulet] : [])]
+  const own = new Set(owned.map(({ id }) => id));
+  const roomForBase = base.length < BASE_MASTERY_LIMIT;
+  const learnedIds = new Set(owned
     .flatMap(({ id, tier }) => Array.from({ length: tier }, (_, index) => `${id}:${index + 1}`)));
   const learnedDamaging = damagingMasteryAbilities.filter(({ id }) => learnedIds.has(id));
   const updateCharacter = () => {
     if (!pc || level === null) return;
     const patchCharacter: Parameters<typeof pc.update>[0] = { level: Math.min(99, level + 1) };
     if (mastery && nextAbility) {
-      const base = pc.character.masteries ?? [];
       if (base.some(({ id }) => id === mastery.id)) {
         patchCharacter.masteries = base.map((item) => item.id === mastery.id ? { id: item.id, tier: nextAbility.tier } : item);
-      } else if (pc.character.amulet?.id === mastery.id || draft.tier === '0') {
+      } else if (amulet?.id === mastery.id) {
         patchCharacter.amulet = { id: mastery.id, tier: nextAbility.tier };
-      } else if (base.length < 2) patchCharacter.masteries = [...base, { id: mastery.id, tier: nextAbility.tier }];
+      } else if (roomForBase) patchCharacter.masteries = [...base, { id: mastery.id, tier: nextAbility.tier }];
     }
     if (draft.benefit === 'Sanity' && draft.die !== null && pc.character.sanityMax !== undefined) {
       patchCharacter.sanityMax = pc.character.sanityMax + draft.die;
@@ -145,14 +147,18 @@ export function PlayAdvancement({ onSheetChange, onJournalChange, onXpSpent }: {
   const eligible = level !== null && xp !== null && xp >= 1000;
   const mastery = masteryCatalog.find(({ id }) => id === draft.mastery);
   const tier = readMasteryInteger(draft.tier, 0, 5);
-  const nextAbility = mastery && tier !== null ? mastery.abilities[tier] : undefined;
+  const canSpend = activeTier !== undefined || roomForBase && tier !== null && tier > 0;
+  const nextAbility = mastery && canSpend && tier !== null ? mastery.abilities[tier] : undefined;
   const unlocksBattleForm = nextAbility?.name === 'Battle Form';
-  const ownsBattleForm = mastery?.id === 'm-bulwark' && tier !== null && tier >= 4;
+  const ownsBattleForm = (learnedTier('m-bulwark') ?? 0) >= 4
+    || mastery?.id === 'm-bulwark' && canSpend && (tier ?? 0) >= 4;
   const dice = draft.benefit && draft.benefit in ROLLED_BENEFITS
     ? ROLLED_BENEFITS[draft.benefit as keyof typeof ROLLED_BENEFITS] : undefined;
   const benefit = gainedBenefit(draft);
-  const recorded = level !== null && records.some((record) => record.level === level);
-  const changes = eligible && benefit && (!mastery || nextAbility) ? [
+  const previousSurvivorLines = pc?.room.priorSurvivor?.lineIds;
+  const recorded = level !== null && records.some((record) => record.level === level
+    && !previousSurvivorLines?.includes(`${advancementKey(record)}-0`));
+  const changes = eligible && benefit && (!draft.mastery || nextAbility) ? [
     `레벨 ${level} → ${level + 1}`,
     `XP ${xp.toLocaleString('ko-KR')} → 0`,
     nextAbility ? `Ability Point +1 · ${nextAbility.name} 해금에 사용` : 'Ability Point +1 보관',
@@ -177,17 +183,19 @@ export function PlayAdvancement({ onSheetChange, onJournalChange, onXpSpent }: {
       {eligible && <>
         <Chips label="Ability Point 사용" value={draft.mastery} onChange={(id) => patch({ mastery: id, tier: '' })} options={[
           { value: '', label: '새 포인트 보관' },
-          ...masteryOptions.filter(({ id }) => own.has(id)).map(({ id, name }) => ({ value: id, label: `${name} · Tier ${learnedTier(id)}`, lang: 'en' })),
+          ...masteryCatalog.filter(({ id }) => own.has(id)).map(({ id, name }) => ({ value: id, label: `${name} · Tier ${learnedTier(id)}`, lang: 'en' })),
           ...(draft.mastery && !own.has(draft.mastery) ? [{ value: draft.mastery, label: mastery?.name ?? draft.mastery, lang: 'en' }] : []),
         ]} />
-        <TogglePanel label="다른 Mastery" open={otherMastery} onOpenChange={setOtherMastery}>
+        {roomForBase ? <TogglePanel label="다른 Mastery" open={otherMastery} onOpenChange={setOtherMastery}>
+          <p className="mastery-note">종이 시트에 이미 배운 기본 Mastery를 빈 자리에 등록합니다. 착용 중인 Amulet은 캐릭터 탭에서 등록하세요.</p>
           <Chips label="다른 Mastery" value={draft.mastery} onChange={(id) => { patch({ mastery: id, tier: '' }); setOtherMastery(false); }}
-            options={masteryOptions.filter(({ id }) => !own.has(id)).map(({ id, name }) => ({ value: id, label: name, lang: 'en' }))} />
-        </TogglePanel>
-        {mastery && !own.has(mastery.id) && <Chips label="시트에서 마지막으로 연 Tier" value={draft.tier} onChange={(value) => patch({ tier: value })} options={[
-          { value: '0', label: 'Amulet · 아직 없음' },
+            options={masteryCatalog.filter(({ id }) => !own.has(id)).map(({ id, name }) => ({ value: id, label: name, lang: 'en' }))} />
+        </TogglePanel> : <p className="mastery-note">능력 포인트는 기본 Mastery와 착용 중인 Amulet에 사용할 수 있습니다.</p>}
+        {mastery && !own.has(mastery.id) && roomForBase && <Chips label="시트에서 마지막으로 연 Tier" value={draft.tier} onChange={(value) => patch({ tier: value })} options={[
           ...mastery.abilities.map(({ tier: number, name }) => ({ value: String(number), label: `Tier ${number} · ${name}` })),
         ]} />}
+        {mastery && activeTier === undefined && (!roomForBase || tier === 0) &&
+          <p className="field-err" role="status">현재 시트의 Mastery에만 포인트를 쓸 수 있습니다. 착용 중인 Amulet은 캐릭터 탭에서 확인하세요.</p>}
         {nextAbility && <p className="mastery-rule"><strong>Tier {nextAbility.tier} · <span lang="en">{nextAbility.name}</span></strong><span>{nextAbility.text}</span></p>}
         {mastery && tier === 5 && <p className="mastery-note">Tier 5까지 열었습니다. 다른 Mastery를 고르거나 포인트를 보관하세요.</p>}
         <Chips label="레벨업 혜택 하나" value={draft.benefit} onChange={(benefit) => patch({ benefit: benefit as Benefit, die: null,
@@ -228,14 +236,14 @@ export function PlayAdvancement({ onSheetChange, onJournalChange, onXpSpent }: {
         {changes && !recorded && <div className="mastery-result">
           <ul aria-label="시트에 옮길 레벨업 결과">{changes.map((line) => <li key={line}>{line}</li>)}</ul>
           <button className="btn primary" type="button" onClick={() => commit(() => {
-            setRecords((previous) => [...previous, { level, changes, summary: `레벨업 · ${changes.join(' · ')}`, xp }]);
+            setRecords((previous) => [...previous, { id: crypto.randomUUID(), level, changes, summary: `레벨업 · ${changes.join(' · ')}`, xp }]);
             updateCharacter();
             setDraft(EMPTY_DRAFT);
           })}>레벨업 기록</button>
         </div>}
       </>}
       {records.length > 0 && <ul className="mastery-records" aria-label="이번 장소 레벨업 기록">
-        {records.map(({ level: from, summary }) => <li key={from}>{summary}</li>)}
+        {records.map((record) => <li key={advancementKey(record)}>{record.summary}</li>)}
       </ul>}
       <div className="play-wrap-links"><XRef id="leveling-up">레벨업과 경험치 규칙</XRef><XRef id="masteries">Mastery 해금 규칙</XRef></div>
     </section>

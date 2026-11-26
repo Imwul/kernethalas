@@ -230,6 +230,10 @@ export function usePlayDraft() {
   return useContext(Draft);
 }
 
+export function usePlayDraftScope() {
+  return useContext(Scope);
+}
+
 export function usePlayDraftState<T>(slot: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
   const scope = useContext(Scope);
   const draft = useContext(Draft);

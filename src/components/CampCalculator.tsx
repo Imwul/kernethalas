@@ -3,6 +3,7 @@ import { CAMP_ACTIVITIES, CAMP_BARRICADE, campTotals, resolveCampCheck, type Cam
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { LINGERING_CONDITIONS, usePlayOngoingEffects, type LingeringCondition } from '../lib/play-effects';
 import { GEAR_LOCATIONS, gearCount, gearKey, type GearItem, type PaperChange } from '../lib/play-inventory';
 import { XRef } from './bits';
 import { TogglePanel } from './TogglePanel';
@@ -52,6 +53,7 @@ function CampNumberField({
 
 interface CampDraft {
   quantities: Partial<Record<CampActivityId, string>>;
+  treatConditions?: LingeringCondition[];
   hasRation: boolean;
   sleep: boolean;
   bedroll: boolean;
@@ -74,9 +76,11 @@ export interface CampReport {
   summary: string;
   sheet: PaperChange[];
   canCompleteRest?: boolean;
+  preview?: Pick<ReturnType<typeof campTotals>, 'ration' | 'spent'> & { threshold: number; activityExhaustion: number };
 }
 
 const EMPTY_REPORT: CampReport = { summary: '', sheet: [] };
+const NO_CONDITIONS: LingeringCondition[] = [];
 
 interface CampProps {
   onEncounter?: (planKey: string) => void;
@@ -104,7 +108,11 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
   const [manual, setManual] = useState<string | null>(null);
   const [invalidRoll, setInvalidRoll] = useState(false);
   const commitRoll = usePlayRoll();
-  const { quantities, hasRation, sleep, bedroll, darkness, swapAmulets, other, die, lostToughness, sanityDie } = draft;
+  const { current, removeConditions } = usePlayOngoingEffects();
+  const [treated, setTreated] = usePlayDraftState<LingeringCondition[]>('camp-treated', NO_CONDITIONS);
+  const { quantities, hasRation, sleep, bedroll, darkness, swapAmulets, other, die } = draft;
+  const [lostToughness, setLostToughness] = usePlayDraftState('camp-lost-toughness', draft.lostToughness);
+  const [sanityDie, setSanityDie] = usePlayDraftState('camp-sanity-die', draft.sanityDie);
   const [encounterKey, setEncounterKey] = usePlayDraftState('camp-encounter-key', '');
   const [activitiesOpen, setActivitiesOpen] = usePlayDraftState('camp-activities-open', false);
   const [recoveryOpen, setRecoveryOpen] = usePlayDraftState('camp-recovery-open', false);
@@ -113,10 +121,14 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
   };
   const effectiveDarkness = darkness || domainDarkness === true;
   const roll = readOracleValue(die.trim(), 20);
+  const lockedTreatment = treated.length > 0;
+  // Older saves only entered a count. Preserve their booked costs without guessing which conditions were treated.
+  const legacyTreatment = roll !== null && !draft.treatConditions && !lockedTreatment ? readInteger(quantities.treat ?? '') ?? 0 : 0;
+  const available = LINGERING_CONDITIONS.filter(({ id }) => current.conditions.includes(id) || treated.includes(id));
+  const treatment = useMemo(() => lockedTreatment ? treated : sleep ? NO_CONDITIONS
+    : LINGERING_CONDITIONS.filter(({ id }) => draft.treatConditions?.includes(id) && current.conditions.includes(id)).map(({ id }) => id),
+  [lockedTreatment, treated, sleep, draft.treatConditions, current.conditions]);
   const campRollField = usePlayRollField('camp-check', '야영 판정', 'D20', roll !== null);
-  const recordCampCheck = (value: number, source: 'manual' | 'app') => commitRoll(() => setField('die', String(value)), {
-    label: '야영 판정', dice: 'D20', value: String(value), source, field: campRollField['data-play-roll-field'],
-  });
   const extraCheck = readInteger(other, true);
   const { plan, result, rangeError, planKey } = useMemo(() => {
     const counts: CampQuantities = {};
@@ -124,7 +136,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
     for (const { id: key } of [CAMP_BARRICADE, ...CAMP_ACTIVITIES]) {
       if (sleep && key !== CAMP_BARRICADE.id) continue;
       if (attunementBlocked && key === 'attune') continue;
-      const value = readInteger(quantities[key] ?? '');
+      const value = key === 'treat' && onReport ? treatment.length + legacyTreatment : readInteger(quantities[key] ?? '');
       if (value === null) validCounts = false;
       else counts[key] = value;
     }
@@ -138,16 +150,31 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
     const result = plan && roll !== null ? resolveCampCheck(roll, plan.check, plan.ration !== 'missing') : null;
     const planKey = result ? JSON.stringify([counts, hasRation, sleep, swapAmulets && !sleep, bedroll, effectiveDarkness, extraCheck, roll]) : '';
     return { plan, result, rangeError, planKey };
-  }, [quantities, hasRation, sleep, bedroll, swapAmulets, effectiveDarkness, attunementBlocked, extraCheck, roll]);
+  }, [quantities, hasRation, sleep, bedroll, swapAmulets, effectiveDarkness, attunementBlocked, extraCheck, roll, treatment, onReport, legacyTreatment]);
+  const recordCampCheck = (value: number, source: 'manual' | 'app') => {
+    if (!plan || lockedTreatment) return;
+    commitRoll(() => {
+      if (treatment.length) {
+        removeConditions(treatment);
+        setTreated(treatment);
+      }
+      setField('die', String(value));
+    }, { label: '야영 판정', dice: 'D20', value: String(value), source, field: campRollField['data-play-roll-field'] });
+  };
   const recordedEncounter = Array.isArray(encounterResolved)
     ? encounterResolved.includes(planKey) : planKey === (encounterResolved === true ? encounterKey : encounterResolved);
   const needsEncounter = !!(onEncounter && result && !result.passed && !recordedEncounter);
   const report = useMemo<CampReport>(() => {
-    if (!plan || !result) return EMPTY_REPORT;
+    if (!plan) return EMPTY_REPORT;
+    const preview = { threshold: 12 - plan.check, activityExhaustion: plan.exhaustion, ration: plan.ration, spent: plan.spent };
+    if (!result) return { ...EMPTY_REPORT, preview };
     const sheet: PaperChange[] = [
       ...Object.entries(plan.spent).map(([item, amount]) => ({ id: `camp:spend:${item}`, text: `${item} −${amount} (야영)`, gear: gearCount(item, -amount) })),
       ...Object.entries(plan.produced).map(([item, amount]) => ({ id: `camp:produce:${item}`, text: `${item} +${amount} (야영)`, gear: gearCount(item, amount) })),
     ];
+    for (const { id: condition, label } of LINGERING_CONDITIONS) {
+      if (treated.includes(condition)) sheet.push({ id: `camp:condition:${condition}`, text: `${label} 해제 (야영 치료)` });
+    }
     if (plan.exhaustion) sheet.push({ id: 'camp:activity-exhaustion', text: `Exhaustion ${signed(plan.exhaustion)} (야영 활동)` });
     if (plan.sleepHealth) sheet.push({ id: 'camp:sleep-health', text: `Health +${plan.sleepHealth} (취침)` });
     if (!needsEncounter && result.benefits !== 'unclear') {
@@ -158,18 +185,18 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
         { id: 'camp:exhaustion', text: `Exhaustion ${amounts.exhaustion} (야영 회복)` });
     }
     const outcome = result.passed ? '성공' : needsEncounter ? '실패 · 조우 대기' : '실패 · 조우 종료';
-    return { summary: `야영 D20 ${roll} ${signed(plan.check)} = ${result.total} (${outcome})`, sheet, canCompleteRest: !needsEncounter };
-  }, [plan, result, roll, needsEncounter, lostToughness, sanityDie]);
+    return { summary: `야영 D20 ${roll} ${signed(plan.check)} = ${result.total} (${outcome})`, sheet, canCompleteRest: !needsEncounter, preview };
+  }, [plan, result, roll, needsEncounter, lostToughness, sanityDie, treated]);
   useEffect(() => { onReport?.(report); }, [onReport, report]);
   const spend = plan ? materials(plan.spent) : '';
   const produce = plan ? materials(plan.produced) : '';
 
-  const activityCount = CAMP_ACTIVITIES.filter(({ id: key }) => (readInteger(quantities[key] ?? '') ?? 0) > 0).length + (swapAmulets ? 1 : 0);
+  const activityCount = CAMP_ACTIVITIES.filter(({ id: key }) => (key === 'treat' && onReport ? treatment.length : readInteger(quantities[key] ?? '') ?? 0) > 0).length + Number(swapAmulets);
   const quantityField = (key: CampActivityId, label: string) => (
     <CampNumberField
       key={key} label={label} value={quantities[key] ?? ''}
       onChange={(value) => setDraft((previous) => ({ ...previous, quantities: { ...previous.quantities, [key]: value } }))}
-      invalid={readInteger(quantities[key] ?? '') === null} disabled={attunementBlocked && key === 'attune'}
+      invalid={readInteger(quantities[key] ?? '') === null} disabled={lockedTreatment || (attunementBlocked && key === 'attune')}
     />
   );
 
@@ -179,7 +206,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
       <div className="camp-grid">
         <div className="field">
           <label htmlFor={`${id}-ration`}>Ration</label>
-            <select id={`${id}-ration`} value={hasRation ? 'available' : 'missing'} onChange={(event) => setField('hasRation', event.target.value === 'available')}>
+            <select id={`${id}-ration`} value={hasRation ? 'available' : 'missing'} disabled={lockedTreatment} onChange={(event) => setField('hasRation', event.target.value === 'available')}>
             <option value="available">보유분 1개 사용</option>
             <option value="missing">보유분 없음</option>
           </select>
@@ -187,26 +214,38 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
         {quantityField(CAMP_BARRICADE.id, CAMP_BARRICADE.label)}
       </div>
       <div className="camp-options">
-        <label><input type="checkbox" checked={sleep} onChange={(event) => setField('sleep', event.target.checked)} /> 취침 (Sleep)</label>
-        <label><input type="checkbox" checked={bedroll} onChange={(event) => setField('bedroll', event.target.checked)} /> 침낭 (Bedroll)</label>
-        <label><input type="checkbox" checked={effectiveDarkness} disabled={domainDarkness} onChange={(event) => setField('darkness', event.target.checked)} /> 짙어지는 어둠 17–18</label>
+        <label><input type="checkbox" checked={sleep} disabled={lockedTreatment} onChange={(event) => setField('sleep', event.target.checked)} /> 취침 (Sleep)</label>
+        <label><input type="checkbox" checked={bedroll} disabled={lockedTreatment} onChange={(event) => setField('bedroll', event.target.checked)} /> 침낭 (Bedroll)</label>
+        <label><input type="checkbox" checked={effectiveDarkness} disabled={lockedTreatment || domainDarkness} onChange={(event) => setField('darkness', event.target.checked)} /> 짙어지는 어둠 17–18</label>
       </div>
       {sleep && <p>취침 중에는 방어벽만 설치할 수 있습니다.</p>}
       <TogglePanel className="camp-activities" label="요리 · 제작 · 그 밖의 야영 활동" open={activitiesOpen} onOpenChange={setActivitiesOpen}
         badge={activityCount || undefined}>
         {attunementBlocked && <p>짙어지는 어둠 19–20 · 야영 중 아이템 조율 불가</p>}
-        <fieldset className="camp-grid" disabled={sleep}>
+        <fieldset className="camp-grid" disabled={sleep || lockedTreatment}>
           <legend className="sr-only">추가 야영 활동</legend>
-          {CAMP_ACTIVITIES.map(({ id: key, label }) => quantityField(key, label))}
+          {CAMP_ACTIVITIES.filter(({ id: key }) => !onReport || key !== 'treat').map(({ id: key, label }) => quantityField(key, label))}
           <label className="camp-amulets">
             <input type="checkbox" checked={swapAmulets} onChange={(event) => setField('swapAmulets', event.target.checked)} /> Mastery Amulet 교체
           </label>
         </fieldset>
+        {onReport && available.length > 0 && <fieldset className="camp-options camp-treatments" disabled={sleep || roll !== null}>
+          <legend>치료할 상태</legend>
+          {available.map(({ id: condition, label }) => <label key={condition}>
+            <input type="checkbox" checked={treatment.includes(condition)} onChange={(event) => {
+              const checked = event.target.checked;
+              setDraft((previous) => ({ ...previous, treatConditions: [
+                ...(previous.treatConditions ?? []).filter((id) => id !== condition), ...(checked ? [condition] : []),
+              ] }));
+            }} /> {label}</label>)}
+          <p>선택한 상태마다 Bandage 1개와 Exhaustion +1. 야영 판정을 기록할 때 치료합니다.</p>
+        </fieldset>}
+        {onReport && legacyTreatment > 0 && <p>이전 야영의 치료 수 {legacyTreatment}건 · 해제한 상태는 시트에서 확인하세요.</p>}
       </TogglePanel>
       {inventory && plan && roll === null && Object.keys(plan.spent).length > 0 && <CampStock spent={plan.spent} inventory={inventory} />}
       <div className="camp-grid">
         <CampNumberField label="기타 판정 보정" value={other} onChange={(value) => setField('other', value)} canBeNegative
-          invalid={extraCheck === null} error="정수 보정을 입력하세요." />
+          disabled={lockedTreatment} invalid={extraCheck === null} error="정수 보정을 입력하세요." />
         {onReport ? (
           <form className="camp-roll-form" data-play-roll noValidate onSubmit={(event) => {
             event.preventDefault();
@@ -219,10 +258,10 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
             }
           }}>
             <CampNumberField label="직접 굴린 D20" value={manual ?? die} onChange={(value) => { setManual(value); setInvalidRoll(false); }}
-              placeholder="1–20" physicalDie={campRollField} invalid={invalidRoll} error="1–20 사이의 정수를 입력하세요." />
+              disabled={lockedTreatment} placeholder="1–20" physicalDie={campRollField} invalid={invalidRoll} error="1–20 사이의 정수를 입력하세요." />
             <div className="camp-roll-actions">
-              <button className="btn ghost" type="submit">야영 판정 확인</button>
-              <button className="btn ghost" type="button" onClick={() => {
+              <button className="btn ghost" type="submit" disabled={lockedTreatment}>야영 판정 확인</button>
+              <button className="btn ghost" type="button" disabled={lockedTreatment} onClick={() => {
                 recordCampCheck(rollDie(20), 'app');
                 setManual(null);
                 setInvalidRoll(false);
@@ -238,6 +277,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
       {plan && (
         <dl className="camp-ledger" aria-label="야영 활동 합계">
           <div><dt>Camp Check 보정</dt><dd>{signed(plan.check)}</dd></div>
+          <div><dt>성공에 필요한 D20</dt><dd>{campSuccessRange(12 - plan.check)}</dd></div>
           <div><dt>활동 Exhaustion</dt><dd>{signed(plan.exhaustion)}</dd></div>
           {spend && <div><dt>소모</dt><dd>{spend}</dd></div>}
           {plan.ration === 'cooked' && <div><dt>식량</dt><dd>요리한 Ration 1개 즉시 사용</dd></div>}
@@ -256,15 +296,16 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
           </div>
           {!result.passed && (onEncounter ? needsEncounter && <button className="btn primary camp-encounter" type="button" onClick={() => {
             setEncounterKey(planKey);
-            setDraft((previous) => ({ ...previous, lostToughness: '', sanityDie: '' }));
+            setLostToughness('');
+            setSanityDie('');
             onEncounter(planKey);
           }}>야영 중 조우로</button> : <XRef id="t-encounter-general">전투 조우 표 열기</XRef>)}
           {result.benefits !== 'unclear' && !needsEncounter && (
             <CampBenefits
               benefit={result.benefits}
               missingRation={plan.ration === 'missing'}
-              lostToughness={lostToughness} setLostToughness={(value) => setField('lostToughness', value)}
-              sanityDie={sanityDie} setSanityDie={(value) => setField('sanityDie', value)}
+              lostToughness={lostToughness} setLostToughness={setLostToughness}
+              sanityDie={sanityDie} setSanityDie={setSanityDie}
               open={recoveryOpen} onOpen={setRecoveryOpen} showRollControls={!!onReport}
             />
           )}
@@ -277,6 +318,11 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
       </div>
     </section>
   );
+}
+
+export function campSuccessRange(threshold: number) {
+  if (threshold <= 1) return '1–20';
+  return threshold > 20 ? '성공 범위 없음' : `${threshold}–20`;
 }
 
 function CampStock({ spent, inventory }: { spent: ReturnType<typeof campTotals>['spent']; inventory: GearItem[] }) {

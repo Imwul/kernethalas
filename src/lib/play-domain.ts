@@ -6,11 +6,21 @@ import type { DomainProgress } from './domain-progress';
 export type TensionSides = 8 | 6 | 4;
 export type DarknessEvent = { id: string; roll: number };
 export type InfluenceRoll = { roll: number | null; damageRoll: number | null };
-export type RetreatedEncounter = { id: string; place: string; creatureIds: string[]; kind: 'encounter' | 'overseer' };
+export type RetreatedEncounter = {
+  id: string;
+  place: string;
+  creatureIds: string[];
+  kind: 'encounter' | 'overseer';
+  origin?: { area?: 'room' | 'corridor'; paperId?: string };
+};
+export const RETREAT_RETURN_SLOT = 'retreatReturnId';
+export const RETREAT_BATTLE_ID = 'reentry';
+export const RETREAT_AMBUSH_ID = 'reentry-ambush';
 export type PlayDomainRecord = {
   id: number;
   name: string;
   overseerRoll: number | null;
+  overseerRevealedRoll?: number | null;
   defeated: boolean;
   influence: InfluenceRoll;
   extra: Record<string, InfluenceRoll>;

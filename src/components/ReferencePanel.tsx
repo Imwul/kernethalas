@@ -1,18 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { entryById, hrefOf, procById, rulingById, tableById, titleOf } from '../content';
+import { oraclePageHref, type OracleViewState } from '../lib/oracle';
 import { Link } from '../lib/router';
 import { OracleBody } from '../views/Oracle';
 import { BenchButton, Cite, Notes, PinButton, VChip, XRef } from './bits';
 import { EntryBody } from './EntryBody';
 import { IClose } from './icons';
-import { RulingMatrix } from './RulingMatrix';
+import { RulingBody } from './RulingBody';
 import { RulingNote } from './RulingNote';
 import { procedureTools } from './procedure-tools';
 
-export interface ReferenceFrame {
+export interface ReferenceFrame extends OracleViewState {
   key: number;
   id: string;
-  result?: number;
   opener?: HTMLElement;
   fromSearch?: boolean;
 }
@@ -29,10 +29,10 @@ interface PanelProps {
   onBack: () => void;
   onClose: () => void;
   onNavigate: () => void;
-  onResult: (key: number, value: number | null) => void;
+  onViewChange: (key: number, change: OracleViewState) => void;
 }
 
-export function ReferencePanel({ stack, onBack, onClose, onNavigate, onResult }: PanelProps) {
+export function ReferencePanel({ stack, onBack, onClose, onNavigate, onViewChange }: PanelProps) {
   const desktop = useSyncExternalStore(subscribeDesktop, () => window.matchMedia(desktopQuery).matches, () => false);
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -43,7 +43,7 @@ export function ReferencePanel({ stack, onBack, onClose, onNavigate, onResult }:
   useLayoutEffect(() => {
     const element = dialog.current;
     if (!element || !open) return;
-    if (desktop) element.show();
+    if (desktop && !document.querySelector('dialog:modal')) element.show();
     else element.showModal();
     return () => element.close();
   }, [open, desktop]);
@@ -55,7 +55,7 @@ export function ReferencePanel({ stack, onBack, onClose, onNavigate, onResult }:
   useEffect(() => {
     if (!open || !desktop) return;
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('.search-dialog[open]')) return;
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog:modal')) return;
       event.preventDefault();
       onBack();
     };
@@ -64,7 +64,9 @@ export function ReferencePanel({ stack, onBack, onClose, onNavigate, onResult }:
   }, [open, desktop, onBack]);
 
   const parent = stack.at(-2);
-  const fullPage = current ? hrefOf(current.id) + (current.result === undefined ? '' : `?r=${current.result}&view=one`) : '';
+  const fullPage = !current ? '' : tableById.has(current.id)
+    ? oraclePageHref(current.id, { ...current, only: current.only ?? (current.result !== undefined) })
+    : hrefOf(current.id);
   return (
     <dialog
       ref={dialog}
@@ -90,12 +92,14 @@ export function ReferencePanel({ stack, onBack, onClose, onNavigate, onResult }:
                 if (!event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) onNavigate();
               }}>전체 페이지</Link>
               <PinButton id={current.id} compact />
-              <BenchButton id={current.id} compact />
+              <BenchButton key={current.key} id={current.id} compact oracleView={tableById.has(current.id) ? {
+                result: current.result, only: current.only, encounterPlace: current.encounterPlace,
+              } : undefined} />
             </div>
           </div>
           {stack.map((frame) => (
             <div className="reference-panel-scroll" key={frame.key} hidden={frame !== current}>
-              <PreviewBody frame={frame} onValue={(value) => onResult(frame.key, value)} />
+              <PreviewBody frame={frame} onViewChange={(change) => onViewChange(frame.key, change)} />
             </div>
           ))}
         </div>
@@ -104,7 +108,7 @@ export function ReferencePanel({ stack, onBack, onClose, onNavigate, onResult }:
   );
 }
 
-function PreviewBody({ frame, onValue }: { frame: ReferenceFrame; onValue: (value: number | null) => void }) {
+function PreviewBody({ frame, onViewChange }: { frame: ReferenceFrame; onViewChange: (change: OracleViewState) => void }) {
   const { id } = frame;
   const e = entryById.get(id);
   if (e) return <EntryBody e={e} compact hideTitle />;
@@ -114,7 +118,9 @@ function PreviewBody({ frame, onValue }: { frame: ReferenceFrame; onValue: (valu
       <div className="marks"><VChip v={table.verification} /> <Cite source={table.source} /></div>
       <p className="usage">{table.usage}</p>
       <RulingNote id={table.id} />
-      <OracleBody t={table} value={frame.result ?? null} onValue={onValue} compact />
+      <OracleBody t={table} value={frame.result ?? null} onValue={(value) => onViewChange({ result: value ?? undefined })}
+        only={frame.only ?? true} onOnly={(only) => onViewChange({ only })}
+        encounterPlace={frame.encounterPlace ?? null} onEncounterPlace={(encounterPlace) => onViewChange({ encounterPlace })} compact />
     </article>
   );
   const procedure = procById.get(id);
@@ -140,17 +146,7 @@ function PreviewBody({ frame, onValue }: { frame: ReferenceFrame; onValue: (valu
   if (!ruling) return null;
   return (
     <article className="preview-detail">
-      <div className="marks"><VChip v={ruling.verification} /> <Cite source={ruling.source} /></div>
-      <p className="summary">{ruling.answer}</p>
-      {ruling.matrix && <RulingMatrix matrix={ruling.matrix} compare />}
-      {ruling.conditions?.length ? <ul className="bullets">{ruling.conditions.map((item) => <li key={item}>{item}</li>)}</ul> : null}
-      {ruling.exceptions?.length ? (
-        <section className="block">
-          <h3>예외와 주의</h3>
-          <ul className="bullets">{ruling.exceptions.map((item) => <li key={item}>{item}</li>)}</ul>
-        </section>
-      ) : null}
-      <div className="preview-links">{[...ruling.refs, ...(ruling.tables ?? [])].map((target) => <XRef key={target} id={target} showKind />)}</div>
+      <RulingBody ruling={ruling} showVerification compare />
     </article>
   );
 }

@@ -1,5 +1,7 @@
 import { roomShapeForRoll, type EncounterPlace } from '../content/tables/exploration';
 import type { RoomExitMark, RoomShapeState } from '../components/RoomShapeDiagram';
+import { LOCK_THRESHOLDS, type DoorInvestigation } from './lock-trap';
+import type { PaperMapClue } from './paper-map-clues';
 
 export const PAPER_MAP_SLOT = 'paperMap';
 
@@ -11,6 +13,7 @@ export interface PaperMapDoorReport {
   exit: string;
   text: string;
   opened: boolean;
+  deferred?: DoorInvestigation;
 }
 
 export interface PaperMapLocation {
@@ -21,6 +24,7 @@ export interface PaperMapLocation {
   tags: PaperMapTag[];
   tile?: PaperMapTile;
   doors?: PaperMapDoorReport[];
+  clues?: PaperMapClue[];
 }
 
 export function paperMapKey(paperId: string) {
@@ -31,11 +35,35 @@ function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+export function returnPlaceTags(location: PaperMapLocation): PaperMapTag[] {
+  const tags = new Set(location.tags);
+  for (const { deferred } of location.doors ?? []) {
+    if (deferred) tags.add((deferred.lockRoll ?? 0) >= LOCK_THRESHOLDS.door ? '잠긴 문' : '미탐색 출입구');
+  }
+  return [...tags];
+}
+
+const die = (value: unknown, sides: number) => value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= sides);
+const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000;
+const outcome = (value: unknown) => value === null || value === 'success' || value === 'failure';
+
+function isDoorInvestigation(value: unknown): value is DoorInvestigation {
+  return record(value) && (value.detection === '' || value.detection === 'success' || value.detection === 'failure')
+    && typeof value.touched === 'boolean' && typeof value.trapResolved === 'boolean'
+    && die(value.trapRoll, 10) && die(value.lockRoll, 20) && count(value.pickFailures) && count(value.forceFailures)
+    && (value.trap === null || record(value.trap) && die(value.trap.kind, 10)
+      && typeof value.trap.method === 'string' && ['', 'disarm', 'bypass', 'trigger'].includes(value.trap.method)
+      && outcome(value.trap.result) && outcome(value.trap.avoided));
+}
+
+export function isPaperMapDoorReport(door: unknown): door is PaperMapDoorReport {
+  return record(door) && typeof door.exit === 'string' && !!door.exit.trim() && door.exit.length <= 48
+    && typeof door.text === 'string' && !!door.text.trim() && door.text.length <= 600 && typeof door.opened === 'boolean'
+    && (door.deferred === undefined || !door.opened && isDoorInvestigation(door.deferred));
+}
+
 export function isPaperMapDoorReports(value: unknown): value is PaperMapDoorReport[] {
-  return Array.isArray(value) && value.every((door: unknown) => record(door)
-    && typeof door.exit === 'string' && !!door.exit.trim() && door.exit.length <= 48
-    && typeof door.text === 'string' && !!door.text.trim() && door.text.length <= 600
-    && typeof door.opened === 'boolean')
+  return Array.isArray(value) && value.every(isPaperMapDoorReport)
     && new Set(value.map(({ exit }) => paperMapKey(exit))).size === value.length;
 }
 

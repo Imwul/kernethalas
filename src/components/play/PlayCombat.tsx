@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { entryById, tableById } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
@@ -6,11 +6,13 @@ import type { EncounterSet } from '../../lib/custom-encounters';
 import { rollDie, tableSides } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { automaticRollSides, readOracleValue, rollTable } from '../../lib/oracle';
+import { combatToolsScope } from '../../lib/play-combat-timing';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
 import { USE_ABILITY_EVENT } from './PlayCharacter';
 import { CombatLingeringAlert } from './PlayLingering';
-import type { PaperChange } from '../../lib/play-inventory';
-import { CreatureCombatCard } from '../CreatureCombatCard';
+import type { GearItem, PaperChange } from '../../lib/play-inventory';
+import { AttackFollowUpProvider } from '../AttackFollowUps';
+import { CreatureCombatCard, type CreatureCombatHandle } from '../CreatureCombatCard';
 import { EncounterStart } from '../EncounterStart';
 import { XRef } from '../bits';
 import { IDie } from '../icons';
@@ -18,11 +20,13 @@ import { PlayCreatureSearch } from './PlayCreatureSearch';
 import { PlayBestiaryAdd } from './PlayBestiaryAdd';
 import { EncounterLibraryControls, PlayCustomEncounterEditor } from './PlayCustomEncounter';
 import { PlayDamageComparison } from './PlayDamageComparison';
+import { PlayDiscoveryMode } from './PlayDiscovery';
 import { PlayFlee } from './PlayFlee';
 import { PlayMastery } from './PlayMastery';
 import { PlayRoundBoard, PlayRoundNumber } from './PlayRoundBoard';
-import { PlayStrip, PlayStripPane, type StripItem } from './PlayPanels';
+import { PlayStrip, PlayStripPane, stripPaneId, type StripItem } from './PlayPanels';
 import { PlayTargetAllocation } from './PlayTargetAllocation';
+import { PlayTurnSummary } from './PlayTurnSummary';
 import '../../styles/play-combat.css';
 
 type EncounterTable = 't-encounter-a' | 't-encounter-b' | 't-overseer';
@@ -39,6 +43,9 @@ interface Target {
 }
 
 export type DefeatedCombatTarget = { creatureId: string; label: string };
+export type FinishedCombatOutcome = 'victory' | 'ended';
+type CombatRewards = { xp: number; lootRolls: number; sanityRolls: number };
+export type CombatOutcomePreview = { before: CombatRewards; after: CombatRewards; affected: { text: string; posted: boolean }[] };
 
 interface CombatLineup {
   targets: Target[];
@@ -138,9 +145,14 @@ function EncounterRoll({ table, customSetId, completed = false, submitLabel, onR
 interface PlayCombatProps {
   initialKind?: 'encounter' | 'overseer';
   domainOverseer?: CreatureRecord | null;
+  domainOverseerKnown?: boolean;
+  onRevealDomainOverseer?: () => void;
   onCreatureChange: (creature: CreatureRecord | null) => void;
   onTargetsChange?: (names: string[]) => void;
-  onBattleEnd: (creature: CreatureRecord, outcome: 'victory' | 'ended', creatures: CreatureRecord[], defeated?: DefeatedCombatTarget[]) => void;
+  onBattleEnd: (creature: CreatureRecord, outcome: FinishedCombatOutcome, creatures: CreatureRecord[], defeated?: DefeatedCombatTarget[], edit?: boolean) => void;
+  currentOutcome?: FinishedCombatOutcome;
+  onPreviewBattleEnd?: (outcome: FinishedCombatOutcome, creatures: CreatureRecord[], defeated?: DefeatedCombatTarget[]) => CombatOutcomePreview;
+  onNewEncounter?: () => void;
   onFlee: (remaining: CreatureRecord[], allParticipants?: CreatureRecord[]) => void;
   fled?: boolean;
   finished?: boolean;
@@ -153,6 +165,8 @@ interface PlayCombatProps {
   onCustomSetsChange: (sets: EncounterSet[]) => void;
   onMasterySheetChange?: (items: PaperChange[]) => void;
   onMasteryJournalChange?: (line: string) => void;
+  belt?: readonly GearItem[];
+  onOpenBelt?: () => void;
 }
 
 export type EncounterSeed = { creatureIds: string[]; description: string };
@@ -164,10 +178,11 @@ function restoredLineup(seed: EncounterSeed | undefined) {
   }), EMPTY_LINEUP);
 }
 
-export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatureChange, onTargetsChange, onBattleEnd, onFlee, fled, finished,
+export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOverseerKnown, onRevealDomainOverseer, onCreatureChange, onTargetsChange, onBattleEnd, onFlee, fled, finished,
   seed, bestiaryCreatureId, onCloseBestiaryRequest, customSets, customSetId, onCustomSetSelect, onCustomSetsChange, onMasterySheetChange,
-  onMasteryJournalChange }: PlayCombatProps) {
+  onMasteryJournalChange, currentOutcome, onPreviewBattleEnd, onNewEncounter, belt = [], onOpenBelt }: PlayCombatProps) {
   const methodId = useId();
+  const discovery = useContext(PlayDiscoveryMode);
   const addTargetId = useId();
   const [method, setMethod] = usePlayDraftState<EncounterMethod>('method', initialKind === 'overseer' ? 't-overseer' : 'encounter');
   const [choice, setChoice] = usePlayDraftState<{ table: EncounterTable; roll: number } | null>('table-choice', null);
@@ -177,6 +192,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
   const [toolPanes, setToolPanes] = usePlayDraftState<Record<string, CombatTool | null>>('tool-panes', {});
   const [startOrder, setStartOrder] = usePlayDraftState<Record<string, string>>('start-order', {});
   const toolStrip = useId();
+  const selectedCard = useRef<CreatureCombatHandle>(null);
   const methodInput = useRef<HTMLSelectElement>(null);
   const combatHeading = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef<'method' | 'target' | null>(null);
@@ -207,8 +223,19 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
 
   // Each encounter opens on its start step (initiative or surprise); later choices are remembered per encounter.
   const toolKey = selected ? lineup.encounterId ?? 'encounter' : 'lookup';
+  const roundScope = combatToolsScope(lineup.encounterId);
   const tool: CombatTool | null = Object.hasOwn(toolPanes, toolKey) ? toolPanes[toolKey] : selected ? 'start' : null;
   const setTool = (next: CombatTool | null) => setToolPanes((previous) => ({ ...previous, [toolKey]: next }));
+  const openTool = (next: CombatTool) => {
+    setTool(next);
+    requestAnimationFrame(() => {
+      const pane = document.getElementById(stripPaneId(toolStrip, next));
+      const first = [...(pane?.querySelectorAll<HTMLElement>('button:enabled, select:enabled, input:enabled, a[href]') ?? [])]
+        .find((control) => control.getClientRects().length > 0);
+      first?.focus({ preventScroll: true });
+      (first ?? pane)?.scrollIntoView({ block: 'center' });
+    });
+  };
   useEffect(() => {
     // "전투에서 쓰기" on the character tab's tree opens this fight's Mastery pane.
     const open = () => setToolPanes((previous) => ({ ...previous, [toolKey]: 'mastery' }));
@@ -231,7 +258,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
   const fighting = !finished && !fled && activeTargets.length > 0;
   const toolItems: StripItem<CombatTool>[] = selected ? [
     { id: 'start', label: '조우 시작', badge: order },
-    { id: 'round', label: '라운드', badge: <PlayDraftScope name={`combat-tools-${lineup.encounterId}`}><PlayRoundNumber /></PlayDraftScope> },
+    { id: 'round', label: '라운드', badge: <PlayDraftScope name={roundScope}><PlayRoundNumber /></PlayDraftScope> },
     { id: 'allocation', label: '적 배분' },
     ...(activeTargets.length > 1 ? [{ id: 'compare' as const, label: '피해 비교' }] : []),
     { id: 'mastery', label: 'Mastery·마법' },
@@ -262,6 +289,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
     pendingFocus.current = 'target';
     const additions = Array.from({ length: count }, () => newTarget(creature.id, source));
     setLineup((previous) => additions.reduce(appendTarget, previous));
+    if (!domainOverseerKnown && creature.id === domainOverseer?.id) onRevealDomainOverseer?.();
     setAddingTarget(false);
     setCustomGap(null);
   };
@@ -320,7 +348,8 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
                 <h3 ref={combatHeading} tabIndex={-1} lang="en">{selected.label}</h3>
                 <p>{selected.source}</p>
               </div>
-              <button type="button" className="btn ghost" onClick={clearTargets}>조우 다시 선택</button>
+              {finished || fled ? onNewEncounter && <button type="button" className="btn ghost" onClick={onNewEncounter}>새 조우 시작</button>
+                : <button type="button" className="btn ghost" onClick={clearTargets}>조우 다시 선택</button>}
             </header>
             {targets.length === 1 && targetStatus(selected)}
             <div className="play-combat-actions-row">
@@ -335,7 +364,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
                   setLineup({ ...lineup, targets: remaining, activeId: remaining[0]?.id ?? null });
                 }}>선택 대상 빼기</button>}
               </div>
-              {!fled && (!finished || !tracksDefeats) && <div className="play-combat-complete">
+              {!fled && !finished && <div className="play-combat-complete">
                 <button type="button" className="btn primary" disabled={tracksDefeats && activeTargets.length > 0}
                   onClick={() => onBattleEnd(primary, 'victory', targets.map(({ creature }) => creature), defeatedTargets)}>승리 후 전투 마치기</button>
                 <button type="button" className="btn ghost"
@@ -344,6 +373,10 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
                   <p className="play-combat-note">승리를 확정하려면 교전 중인 적을 처치 또는 이탈로 표시하세요.</p>}
               </div>}
             </div>
+            {!fled && finished && currentOutcome && onPreviewBattleEnd && (currentOutcome === 'victory' || !tracksDefeats || activeTargets.length === 0) &&
+              <FightOutcomeEditor current={currentOutcome}
+                preview={(outcome) => onPreviewBattleEnd(outcome, targets.map(({ creature }) => creature), defeatedTargets)}
+                onConfirm={(outcome) => onBattleEnd(primary, outcome, targets.map(({ creature }) => creature), defeatedTargets, true)} />}
             <div id={addTargetId} hidden={!addingTarget || finished || fled}>
               {addingTarget && !finished && !fled && <PlayCreatureSearch label="추가할 생물 이름" onSelect={(creature) => selectCreature(creature, '이름으로 추가')} />}
             </div>
@@ -388,7 +421,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
               {tableId === 't-overseer' && domainOverseer && (
                 <div className="play-combat-domain-overseer">
                   <button type="button" className="btn primary" onClick={() => selectCreature(domainOverseer, '이 도메인의 Overseer')}>이 도메인의 Overseer 선택</button>
-                  <strong lang="en">{domainOverseer.name}</strong>
+                  {(!discovery || domainOverseerKnown) && <strong lang="en">{domainOverseer.name}</strong>}
                 </div>
               )}
               <EncounterRoll table={table} submitLabel="생물 선택" onResult={(roll) => {
@@ -429,7 +462,12 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           )}
         </div>
       )}
-      {fighting && <CombatLingeringAlert />}
+      {fighting && <PlayDraftScope key={roundScope} name={roundScope}>
+        <PlayTurnSummary targets={activeTargets} selected={selected?.status ? undefined : selected} belt={belt} initiative={order}
+          onAttack={() => selectedCard.current?.openPcAttack()} onBelt={onOpenBelt}
+          onMastery={() => openTool('mastery')} onRound={() => openTool('round')} onFlee={() => openTool('flee')} />
+        <CombatLingeringAlert onOpenRound={() => setTool('round')} />
+      </PlayDraftScope>}
       <div className="play-combat-toolbox">
         <PlayStrip label="전투 진행 도구" prefix={toolStrip} value={tool} onChange={setTool} items={toolItems} />
         {selected && profile && <>
@@ -443,7 +481,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
               <PlayTargetAllocation targets={targets} />
             </PlayDraftScope>
           </PlayStripPane>
-          <PlayDraftScope key={`combat-tools-${lineup.encounterId}`} name={`combat-tools-${lineup.encounterId}`}>
+          <PlayDraftScope key={roundScope} name={roundScope}>
             <PlayStripPane prefix={toolStrip} id="round" open={tool === 'round'}>
               <PlayRoundBoard targets={activeTargets} />
             </PlayStripPane>
@@ -459,10 +497,54 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           </PlayDraftScope>
         </PlayStripPane>}
       </div>
-      {selected && <PlayDraftScope key={`target-${selected.id}`} name={`target-${selected.id}`}>
-        <CreatureCombatCard creature={selected.creature} targetName={selected.label}
-          entry={entryById.get(selected.creature.id)!} summons={summons} showEncounterStart={false} showAftermath={false} />
-      </PlayDraftScope>}
+      {selected && <AttackFollowUpProvider encounterId={lineup.encounterId} targetId={selected.id} readOnly={!fighting || !!selected.status}>
+        <PlayDraftScope key={`target-${selected.id}`} name={`target-${selected.id}`}>
+          <CreatureCombatCard ref={selectedCard} creature={selected.creature} targetName={selected.label}
+            entry={entryById.get(selected.creature.id)!} summons={summons} showEncounterStart={false} showAftermath={false}
+            allowApplyingConditions={fighting && !selected.status} />
+        </PlayDraftScope>
+      </AttackFollowUpProvider>}
     </section>
+  );
+}
+
+function FightOutcomeEditor({ current, preview, onConfirm }: {
+  current: FinishedCombatOutcome;
+  preview: (outcome: FinishedCombatOutcome) => CombatOutcomePreview;
+  onConfirm: (outcome: FinishedCombatOutcome) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const toggle = useRef<HTMLButtonElement>(null);
+  const next = current === 'victory' ? 'ended' : 'victory';
+  const changes = open ? preview(next) : null;
+  const label = (outcome: FinishedCombatOutcome) => outcome === 'victory' ? '승리' : '전투 종료';
+  return (
+    <div className="play-outcome-edit">
+      <button ref={toggle} className="btn ghost" type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        전투 결과 수정
+      </button>
+      <section className="play-outcome-preview" id={id} hidden={!open} aria-label="전투 결과 수정 미리보기">
+        {changes && <>
+          <h4>{label(current)} → {label(next)}</h4>
+          <dl>
+            <div><dt>XP</dt><dd>{changes.before.xp} → {changes.after.xp}</dd></div>
+            <div><dt>전리품 굴림</dt><dd>{changes.before.lootRolls}회 → {changes.after.lootRolls}회</dd></div>
+            <div><dt>Overseer Sanity 회복 D4</dt><dd>{changes.before.sanityRolls}회 → {changes.after.sanityRolls}회</dd></div>
+          </dl>
+          {changes.affected.length > 0 && <>
+            <p>정리와 저널에서 바뀌는 기존 보상</p>
+            <ul>{changes.affected.map(({ text, posted }, index) =>
+              <li key={index}>{text}{posted && ' · 이미 반영됨'}</li>)}</ul>
+          </>}
+          {changes.affected.some(({ posted }) => posted) &&
+            <p>이미 반영한 값은 저널의 정정표에서 확인할 수 있습니다.</p>}
+          <div className="play-combat-complete">
+            <button type="button" className="btn primary" onClick={() => { setOpen(false); onConfirm(next); }}>결과 수정 확정</button>
+            <button type="button" className="btn ghost" onClick={() => { setOpen(false); toggle.current?.focus(); }}>취소</button>
+          </div>
+        </>}
+      </section>
+    </div>
   );
 }

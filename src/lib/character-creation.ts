@@ -185,14 +185,22 @@ export function stepStatus(draft: CreationDraft): Record<CreationStep, boolean> 
 
 const pick = <T,>(items: readonly T[]) => items[rollDie(items.length) - 1];
 
-/** Gives every unused allotment to a random Skill that has none, +60 and +40 to weapon Skills. Assigned Skills stay. */
+/** Fills the board, moving a smaller allotment only when it blocks a mandatory weapon allotment. */
 export function fillAllotment(allot: AllotmentMap): AllotmentMap {
   const next: AllotmentMap = allotmentErrors(allot).length ? {} : { ...allot };
   for (const { amount, weapon, left } of allotmentUse(next)) {
     for (let index = 0; index < left; index += 1) {
       const pool = CREATION_SKILLS.filter((skill) => !next[skill] && (!weapon || isWeaponSkill(skill)));
-      if (!pool.length) break;
-      next[pick(pool)] = amount;
+      if (pool.length) {
+        next[pick(pool)] = amount;
+        continue;
+      }
+      const displaced = CREATION_SKILLS.filter((skill) => isWeaponSkill(skill) && (next[skill] ?? 60) < 40)
+        .sort((a, b) => next[a]! - next[b]!)[0];
+      const open = CREATION_SKILLS.filter((skill) => !isWeaponSkill(skill) && !next[skill]);
+      if (!weapon || !displaced || !open.length) break;
+      next[pick(open)] = next[displaced];
+      next[displaced] = amount;
     }
   }
   return next;
@@ -284,7 +292,8 @@ export function creationRecord(draft: CreationDraft): { character: PlayCharacter
   const scores = skillScores(draft.allot);
   const resistance = draft.resistance ? resistanceScores(draft.resistance) : undefined;
   const weapon = mainWeaponSkill(draft);
-  const defense = weapon && scores[weapon] > scores.Dodge ? weapon : 'Dodge';
+  const startingWeapon = draft.start === 'gear' ? STARTING_WEAPONS.find(({ name }) => name === draft.weapon) : undefined;
+  const defense = weapon && startingWeapon?.traits.includes('Parrying') && scores[weapon] > scores.Dodge ? weapon : 'Dodge';
   return {
     character: {
       ...(draft.name.trim() ? { name: draft.name.trim().slice(0, 40) } : {}),

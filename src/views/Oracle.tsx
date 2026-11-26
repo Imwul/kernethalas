@@ -214,8 +214,11 @@ interface OracleBodyProps {
   onValue: (value: number | null) => void;
   only?: boolean;
   onOnly?: (only: boolean) => void;
+  encounterPlace?: EncounterPlace | null;
+  onEncounterPlace?: (place: EncounterPlace | null) => void;
   compact?: boolean;
   collapseTableBeforeRoll?: boolean;
+  tableDisclosure?: 'hidden' | 'revealed';
   rollLabel?: string;
   sourceForRow?: (row: OracleTable['rows'][number]) => string | undefined;
   roomShape?: RoomShapeState;
@@ -224,17 +227,19 @@ interface OracleBodyProps {
   play?: boolean;
 }
 
-export function OracleBody({ t, value, onValue, only, onOnly, compact = false, collapseTableBeforeRoll = false, rollLabel, sourceForRow, roomShape, afterResult, play = false }: OracleBodyProps) {
+export function OracleBody({ t, value, onValue, only, onOnly, encounterPlace, onEncounterPlace, compact = false, collapseTableBeforeRoll = false,
+  tableDisclosure, rollLabel, sourceForRow, roomShape, afterResult, play = false }: OracleBodyProps) {
   const [localOnly, setLocalOnly] = useState(compact);
-  const [encounterPlace, setEncounterPlace] = useState<EncounterPlace | null>(null);
+  const [localEncounterPlace, setLocalEncounterPlace] = useState<EncounterPlace | null>(null);
   const table = useRef<HTMLDivElement>(null);
   const sides = tableSides(t.dice);
-  const resultOnly = only ?? localOnly;
+  const resultOnly = tableDisclosure ? tableDisclosure === 'hidden' : only ?? localOnly;
   const showTable = sides === null || !resultOnly || (value === null && !collapseTableBeforeRoll);
   const isEncounter = t.id === 't-encounter-check';
-  const contextual = isEncounter && encounterPlace !== null;
+  const place = encounterPlace === undefined ? localEncounterPlace : encounterPlace;
+  const contextual = isEncounter && place !== null;
   const activeTable = contextual
-    ? { ...t, columns: undefined, rows: encounterRowsForPlace(encounterPlace) }
+    ? { ...t, columns: undefined, rows: encounterRowsForPlace(place) }
     : t;
   return (
     <div className={`oracle-body${compact ? ' compact' : ''}${sides ? ' split' : ''}`}>
@@ -253,13 +258,15 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
           afterResult={afterResult}
           play={play}
           showUnrolledViewToggle={collapseTableBeforeRoll}
+          hideViewToggle={!!tableDisclosure}
           beforeRoll={isEncounter && (
             <div className="oracle-encounter-place">
               <span aria-hidden="true">장소</span>
               <div className="seg" role="group" aria-label="조우 장소">
-                {([null, 'room', 'corridor'] as const).map((place) => (
-                  <button key={place ?? 'both'} type="button" aria-pressed={encounterPlace === place} onClick={() => setEncounterPlace(place)}>
-                    {place === null ? '방·통로 비교' : ENCOUNTER_PLACES[place].label}
+                {([null, 'room', 'corridor'] as const).map((choice) => (
+                  <button key={choice ?? 'both'} type="button" aria-pressed={place === choice}
+                    onClick={() => (onEncounterPlace ?? setLocalEncounterPlace)(choice)}>
+                    {choice === null ? '방·통로 비교' : ENCOUNTER_PLACES[choice].label}
                   </button>
                 ))}
               </div>
@@ -272,7 +279,7 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
           }}
         />
       )}
-      <div className="oracle-table-area">
+      {tableDisclosure !== 'hidden' && <div className="oracle-table-area">
         <Notes notes={t.notes} />
         {showTable && (
           <div className="oracle-table-sheet" ref={table}>
@@ -285,7 +292,7 @@ export function OracleBody({ t, value, onValue, only, onOnly, compact = false, c
             <Relations related={t.related} />
           </details>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -297,6 +304,8 @@ export function OraclePage({ id }: { id: string }) {
   if (!t) return <NotFound />;
   const value = readOracleValue(search.get('r'), tableSides(t.dice));
   const only = search.get('view') === 'one';
+  const place = search.get('place');
+  const encounterPlace = place === 'room' || place === 'corridor' ? place : null;
   const setParam = (key: string, val: string | null) => {
     const params = new URLSearchParams(search);
     if (val === null) params.delete(key);
@@ -319,7 +328,9 @@ export function OraclePage({ id }: { id: string }) {
         </div>
         <div className="oracle-detail-actions">
           <PinButton id={t.id} />
-          <BenchButton id={t.id} />
+          <BenchButton id={t.id} oracleView={value !== null || encounterPlace || only ? {
+            result: value ?? undefined, only, encounterPlace,
+          } : undefined} />
         </div>
       </header>
       <RulingNote key={`note:${t.id}`} id={t.id} />
@@ -330,6 +341,8 @@ export function OraclePage({ id }: { id: string }) {
         onValue={(n) => setParam('r', n === null ? null : String(n))}
         only={only}
         onOnly={(v) => setParam('view', v ? 'one' : null)}
+        encounterPlace={encounterPlace}
+        onEncounterPlace={(v) => setParam('place', v)}
       />
     </div>
   );

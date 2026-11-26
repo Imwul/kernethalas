@@ -1,4 +1,5 @@
 import type { OracleTable } from '../content/schema';
+import type { EncounterPlace } from '../content/tables/exploration';
 import { rollD100, rollDie, tableSides } from './dice';
 import { tableRowSource } from './overlay';
 
@@ -32,9 +33,23 @@ export function rollTable(t: OracleTable): number | null {
   return sides === 100 ? rollD100().value : rollDie(sides);
 }
 
+export interface OracleViewState {
+  result?: number;
+  only?: boolean;
+  encounterPlace?: EncounterPlace | null;
+}
+
+export function oraclePageHref(id: string, { result, only, encounterPlace }: OracleViewState = {}): string {
+  const params = new URLSearchParams();
+  if (result !== undefined) params.set('r', String(result));
+  if (only) params.set('view', 'one');
+  if (id === 't-encounter-check' && encounterPlace) params.set('place', encounterPlace);
+  return `/oracle/${id}${params.size ? `?${params}` : ''}`;
+}
+
 export function quickRollHref(t: OracleTable): string | null {
   const value = rollTable(t);
-  return value === null ? null : `/oracle/${t.id}?r=${value}&view=one`;
+  return value === null ? null : oraclePageHref(t.id, { result: value, only: true });
 }
 
 /** A row's short name for summaries and the journal: its label, or the first sentence of its text. */

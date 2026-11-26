@@ -64,6 +64,10 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
   const encounter = explore(page).getByRole('region', { name: '조우 판정', exact: true });
   await expect(encounter).toBeVisible();
   await enter(encounter, '직접 굴린 값', '1');
+  await page.getByRole('button', { name: '저널', exact: true }).click();
+  await page.getByRole('textbox', { name: '장소 이름 (선택)', exact: true }).fill('출구 통로');
+  await page.getByRole('textbox', { name: '덧붙일 메모 (선택)', exact: true }).fill('출구 왼쪽의 종이 표식');
+  await page.getByRole('button', { name: '탐험', exact: true }).click();
   await explore(page).getByRole('button', { name: '출구로 이동 선택' }).click();
   await explore(page).getByRole('button', { name: '이 도메인에 남기' }).click();
   await expect(explore(page).getByRole('button', { name: '출구로 이동 확정' })).toHaveCount(0);
@@ -94,6 +98,10 @@ test('physical Lair and Exit checks carry across rooms, undo, reload and the tri
   await showDomain(page, '도메인 1');
   await expect(effects.getByRole('region', { name: '도메인 진행 설정' })).toContainText('발견한 출구');
   await expect(effects.getByRole('region', { name: '도메인 진행 설정' })).toContainText(lairName);
+  await effects.getByText('탐험 연대기', { exact: true }).click();
+  const timeline = effects.getByRole('region', { name: '도메인 탐험 연대기', exact: true });
+  await timeline.getByText('출구 통로', { exact: true }).click();
+  await expect(timeline.getByText('출구 왼쪽의 종이 표식', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 

@@ -4,13 +4,14 @@ import { tableById } from '../../content';
 import type { TableRow } from '../../content/schema';
 import { d100FromValue, resolveCheck, rollDie, type Edge } from '../../lib/dice';
 import { followUpSteps } from '../../lib/exploration-follow-up';
-import type { LockTarget } from '../../lib/lock-trap';
+import { EMPTY_DOOR_INVESTIGATION, type LockTarget } from '../../lib/lock-trap';
 import { readOracleValue } from '../../lib/oracle';
 import { paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
 import { activeDarkness } from '../../lib/play-domain';
+import { pcCheckModifiers } from '../../lib/play-check-modifiers';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
 import { usePlayCharacter } from '../../lib/play-character';
-import { gearCount, type GearEffect, type PaperChange } from '../../lib/play-inventory';
+import { gearCount, type GearEffect, type GearLedger, type PaperChange } from '../../lib/play-inventory';
 import { useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
 import { FieldCare } from './PlayLingering';
@@ -65,7 +66,10 @@ interface Props {
   finishedSources: string[];
   mapLocation?: PaperMapLocation;
   mapExits?: number;
-  onMapDoorSave?: (report: PaperMapDoorReport) => void;
+  onMapDoorSave?: (report: PaperMapDoorReport, paperId?: string) => boolean;
+  resumeExit?: string;
+  onResumeHandled?: () => void;
+  gearLedger?: GearLedger;
 }
 
 const DOOR_TABLE = tableById.get('t-door')!;
@@ -111,7 +115,7 @@ function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetIt
 }
 
 export function PlayExplorationActions({ room, actionsRef, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat,
-  scavengeLimit = 1, finishedSources, mapLocation, mapExits = 0, onMapDoorSave }: Props) {
+  scavengeLimit = 1, finishedSources, mapLocation, mapExits = 0, onMapDoorSave, resumeExit, onResumeHandled, gearLedger }: Props) {
   const [rolls, setRolls] = usePlayDraftState<ActionRoll[]>('action-tension', []);
   const [pane, setPane] = usePlayDraftState<ExplorationAction | null>('action-pane', null);
   const [searchAttempt, setSearchAttempt] = usePlayDraftState('scavenge-selected', 1);
@@ -120,6 +124,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const [manualExit, setManualExit] = usePlayDraftState('door-manual-exit', '');
   const [finishedDoors, setFinishedDoors] = usePlayDraftState<DoorRecord[]>('finished-doors', []);
   const [doorRoll, setDoorRoll] = usePlayDraftState<number | null>('door-roll', null);
+  const [resumedDoor, setResumedDoor] = usePlayDraftState<PaperMapDoorReport | null>('resumed-door', null);
   const [deepStarted, setDeepStarted] = usePlayDraftState('deep-started', false);
   const [contentsRoll, setContentsRoll] = usePlayDraftState<number | null>('deep-contents', null);
   const [contentsRevision, setContentsRevision] = usePlayDraftState('deep-contents-revision', 0);
@@ -132,6 +137,9 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const [lootGear, setLootGear] = useState<GearEffect>();
   const [followUps, setFollowUps] = useState<Record<string, ActionSheetItem[]>>({});
   const [savedDoorMessage, setSavedDoorMessage] = useState('');
+  const [deferForm, setDeferForm] = useState(false);
+  const [deferPaperId, setDeferPaperId] = useState('');
+  const [deferExit, setDeferExit] = useState('');
   const panelId = useId();
   const panel = useRef<HTMLElement>(null);
   const currentSearch = Math.min(searchAttempt, scavengeLimit);
@@ -139,6 +147,26 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
     setScavenge((current) => JSON.stringify(current[attempt]) === JSON.stringify(result)
       ? current : { ...current, [attempt]: result });
   }, []);
+
+  const startResuming = useCallback((saved: PaperMapDoorReport) => {
+    setResumedDoor(saved);
+    setMapExit(`exit:${saved.exit}`);
+    setDoor('present');
+    setSavedDoorMessage('');
+    setPane('door');
+    requestAnimationFrame(() => {
+      const heading = panel.current?.querySelector<HTMLElement>('.play-door-map h4');
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'center' });
+    });
+  }, [setDoor, setMapExit, setPane, setResumedDoor]);
+
+  useEffect(() => {
+    if (!resumeExit) return;
+    const saved = mapLocation?.doors?.find(({ exit }) => paperMapKey(exit) === paperMapKey(resumeExit));
+    if (saved?.deferred) startResuming(saved);
+    onResumeHandled?.();
+  }, [resumeExit, mapLocation, startResuming, onResumeHandled]);
 
   useImperativeHandle(actionsRef, () => ({
     open(action, exit) {
@@ -175,6 +203,40 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
     ...(mapLocation?.doors?.map(({ exit }) => exit) ?? []),
   ])];
   const previousDoor = mappedExit ? mapLocation?.doors?.find(({ exit }) => paperMapKey(exit) === paperMapKey(mappedExit)) : undefined;
+  const savedInvestigation = !!previousDoor?.deferred && !resumedDoor;
+  const canDeferDoor = canArchiveDoor && doorPresent && !activeDoor?.opened && !previousDoor?.opened && !savedInvestigation;
+  useEffect(() => {
+    if (!resumedDoor || !activeDoor || !previousDoor || !onMapDoorSave) return;
+    if (activeDoor.pendingTension) {
+      if (previousDoor.opened) onMapDoorSave(resumedDoor);
+      return;
+    }
+    const deferred = activeDoor.opened ? undefined : activeDoor.investigation;
+    if (activeDoor.opened === previousDoor.opened && JSON.stringify(deferred) === JSON.stringify(previousDoor.deferred)) return;
+    onMapDoorSave({ exit: resumedDoor.exit, text: (activeDoor.text || resumedDoor.text).slice(0, 600), opened: activeDoor.opened,
+      ...(deferred ? { deferred } : {}) });
+  }, [resumedDoor, activeDoor, previousDoor, onMapDoorSave]);
+
+  const archiveDoor = (title: string, text: string) => {
+    setFinishedDoors((previous) => [...previous, { text: `${title} · ${text}`, sheet: lockSheet(doorKey, activeDoor) }]);
+    setDoor('roll');
+    setDoorRoll(null);
+    setDoorReport(null);
+    setResumedDoor(null);
+    setMapExit('');
+    setManualExit('');
+    setDeferForm(false);
+  };
+  const deferDoor = (paperId: string, exit: string) => {
+    if (!canDeferDoor || !paperId || !exit) return;
+    const report = { exit, text: doorText.slice(0, 600), opened: false, deferred: activeDoor?.investigation ?? EMPTY_DOOR_INVESTIGATION };
+    if (!onMapDoorSave?.(report, paperId)) {
+      setSavedDoorMessage('장소 종류와 지도 번호를 확인하세요.');
+      return;
+    }
+    archiveDoor(`${paperId} · ${exit}`, `${doorText} · 개방 보류`);
+    setSavedDoorMessage(`${paperId} · ${exit}을 돌아갈 곳에 저장했습니다.`);
+  };
   const darknessRecords = useMemo(() => {
     const prior = [...priorDarknessRolls];
     return rolls.flatMap(({ id, darkness, followUpId }) => {
@@ -278,6 +340,9 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
         onReport: publish,
         renderTension: (attempt) => renderTension(`${key}-${attempt}`, '강제 개방 긴장 굴림'),
         tensionReady: (attempt) => tensionResolved(rolls.find(({ id }) => id === `${key}-${attempt}`)),
+        nextTension: nextTension ?? initialSides,
+        resume: target === 'door' ? resumedDoor?.deferred : undefined,
+        gearLedger,
       }} />
     </PlayDraftScope>
   );
@@ -299,10 +364,10 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       <PlayStripPane prefix={panelId} id="door" open={pane === 'door'}>
         <div className="play-explore-action-body">
           {mapLocation && onMapDoorSave && <section className="play-door-map" aria-label="종이 지도 출입구 연결">
-            <h4>{mapLocation.paperId} 출입구</h4>
+            <h4 tabIndex={-1}>{mapLocation.paperId} 출입구</h4>
             <div className="play-door-map-fields">
               <label className="field"><span>조사할 출입구</span>
-                <select value={mapExit} onChange={(event) => {
+                <select value={mapExit} disabled={!!resumedDoor} onChange={(event) => {
                   setMapExit(event.target.value);
                   setSavedDoorMessage('');
                 }}>
@@ -319,30 +384,48 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
               </label>}
             </div>
             {previousDoor && <p className="play-explore-note"><strong>저장한 조사</strong> · {previousDoor.text}</p>}
+            {previousDoor?.deferred && !resumedDoor && !doorPresent && <button type="button" className="btn ghost"
+              onClick={() => startResuming(previousDoor)}>저장한 문 조사 이어가기</button>}
           </section>}
-          <label className="field"><span>조사할 대상</span>
+          {!resumedDoor && !previousDoor?.opened && !savedInvestigation && <label className="field"><span>조사할 대상</span>
             <select value={door} onChange={(event) => setDoor(event.target.value as typeof door)}>
               <option value="roll">문 존재부터 굴리기</option>
               <option value="present">지도에 문 표시됨</option>
             </select>
-          </label>
-          {door === 'roll' && <PlayDraftScope name={`exists-${doorKey}`}>
+          </label>}
+          {door === 'roll' && (!previousDoor || !previousDoor.opened && !savedInvestigation) && <PlayDraftScope name={`exists-${doorKey}`}>
             <JournalRoll key={doorKey} tableId={DOOR_TABLE.id} label="문이 있는가?" value={doorRoll} onValue={setDoorRoll}
               resultText={doorRoll !== null && doorRoll <= 5 ? '문 있음 · 잠김과 함정을 이어서 확인합니다.' : '문 없음'} />
           </PlayDraftScope>}
-          {doorPresent && lock('door', setDoorReport, doorKey)}
+          {doorPresent && !savedInvestigation && (!previousDoor?.opened || resumedDoor || activeDoor?.opened) && lock('door', setDoorReport, doorKey)}
+          {canDeferDoor && onMapDoorSave && !deferForm && <button type="button"
+            className="btn ghost play-explore-action-btn" onClick={() => {
+              if (mapLocation && mappedExit) deferDoor(mapLocation.paperId, mappedExit);
+              else {
+                setDeferPaperId(mapLocation?.paperId ?? '');
+                setDeferExit(mappedExit);
+                setDeferForm(true);
+              }
+            }}>나중에 열기</button>}
+          {deferForm && canDeferDoor && <form className="play-door-map-fields" aria-label="보류할 문 저장" onSubmit={(event) => {
+            event.preventDefault();
+            deferDoor(deferPaperId.trim(), deferExit.trim());
+          }}>
+            <label className="field"><span>종이 지도 번호</span><input value={deferPaperId} maxLength={32} autoComplete="off"
+              onChange={(event) => setDeferPaperId(event.target.value)} /></label>
+            <label className="field"><span>출입구 표기</span><input value={deferExit} maxLength={48} autoComplete="off"
+              onChange={(event) => setDeferExit(event.target.value)} /></label>
+            <button type="submit" className="btn primary" disabled={!deferPaperId.trim() || !deferExit.trim()}>돌아갈 곳에 저장</button>
+            <button type="button" className="btn ghost" onClick={() => setDeferForm(false)}>취소</button>
+          </form>}
           {canArchiveDoor && <div className="play-explore-next">
-            {mappedExit && onMapDoorSave && <button type="button" className="btn ghost" onClick={() => {
-              onMapDoorSave({ exit: mappedExit, text: doorText.slice(0, 600), opened: !!activeDoor?.opened });
+            {mappedExit && onMapDoorSave && !savedInvestigation && (!previousDoor?.opened || activeDoor?.opened) && <button type="button" className="btn ghost" onClick={() => {
+              onMapDoorSave({ exit: mappedExit, text: doorText.slice(0, 600), opened: !!activeDoor?.opened,
+                ...(!activeDoor?.opened && previousDoor?.deferred ? { deferred: activeDoor?.investigation ?? previousDoor.deferred } : {}) });
               setSavedDoorMessage(`${doorTitle} 조사 기록을 저장했습니다.`);
             }}>선택한 출입구에 조사 저장</button>}
             <button className="btn ghost play-explore-action-btn" type="button" onClick={() => {
-              setFinishedDoors((previous) => [...previous, { text: `${doorTitle} · ${doorText}`, sheet: lockSheet(doorKey, activeDoor) }]);
-              setDoor('roll');
-              setDoorRoll(null);
-              setDoorReport(null);
-              setMapExit('');
-              setManualExit('');
+              archiveDoor(doorTitle, doorText);
               setSavedDoorMessage('');
             }}>다른 문 조사</button>
           </div>}
@@ -433,7 +516,9 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const id = useId();
   const commitRoll = usePlayRoll();
   const recordCritical = useRecordSkillCritical();
-  const [check, setCheck] = usePlayDraftState<{ skill: string; roll: number; edge: Edge; modifiers?: SkillModifier[] } | null>('scavenge-check', null);
+  const [check, setCheck] = usePlayDraftState<{
+    skill: string; roll: number; edge: Edge; modifiers?: SkillModifier[]; madness?: number;
+  } | null>('scavenge-check', null);
   const [draftSkill, setSkill] = useState<string | null>(null);
   const [draftRoll, setRoll] = useState<string | null>(null);
   const [draftEdge, setEdge] = useState<Edge | null>(null);
@@ -449,14 +534,16 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const [spoilsGear, setSpoilsGear] = useState<GearEffect>();
   const pc = usePlayCharacter();
   const savedScavenge = pc?.skill('Scavenge') ?? '';
-  // Madness 5 makes Scavenging Demanding (−10) per result (p.91); it starts in the adjustments and stays editable.
-  const madnessPenalty = pc?.madness.scavenging ?? 0;
+  const rules = pcCheckModifiers(pc, 'Scavenge');
   const skill = draftSkill ?? check?.skill ?? savedScavenge;
   const rawRoll = draftRoll ?? (check ? String(check.roll) : '');
-  const edge = draftEdge ?? check?.edge ?? 'none';
-  const modifiers = draftModifiers ?? check?.modifiers ?? (madnessPenalty ? [{ reason: '난이도', amount: `-${madnessPenalty}` }] : []);
-  const breakdown = skillBreakdown(skill, modifiers);
-  const confirmedSkill = check && skillBreakdown(check.skill, check.modifiers);
+  const edge = draftEdge ?? check?.edge ?? rules.edge;
+  const modifiers = draftModifiers ?? check?.modifiers ?? [];
+  // Earlier saves stored the initial Madness modifier among the editable overrides.
+  const previousFormat = check !== null && check.madness === undefined;
+  const fixed = previousFormat ? [] : rules.fixed;
+  const breakdown = skillBreakdown(skill, modifiers, fixed);
+  const confirmedSkill = check && skillBreakdown(check.skill, check.modifiers, [{ label: '광기', value: -(check.madness ?? 0) }]);
   const checkOutcome = check && confirmedSkill ? resolveCheck(d100FromValue(check.roll), confirmedSkill.total, check.edge) : null;
   const allowsTable = checkOutcome?.outcome === 'success' || checkOutcome?.outcome === 'critical';
   const effective = tableRoll === null ? null : tableRoll + (bonus && checkOutcome?.outcome === 'critical' ? 5 : 0);
@@ -492,7 +579,7 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
       return;
     }
     commitRoll(() => {
-      setCheck({ skill: skill.trim(), roll, edge, modifiers });
+      setCheck({ skill: skill.trim(), roll, edge, modifiers, ...(!previousFormat && { madness: pc?.madness.scavenging ?? 0 }) });
       recordCritical('Scavenge', resolveCheck(d100FromValue(roll), breakdown.total, edge));
       setBonus(false);
       setTableRoll(null);
@@ -516,6 +603,7 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
         <label className="field"><span>Scavenge 수치</span><input value={skill} inputMode="text"
           onChange={(event) => setSkill(event.target.value)} placeholder="예: 55" /></label>
         <EdgeToggle value={edge} onChange={setEdge} />
+        {rules.notes.length > 0 && !check && <p className="physical-check-exhausted">{rules.notes.join(' / ')}</p>}
         <div className="field"><label htmlFor={`${id}-scavenge-roll`}>Scavenge D100</label><PlayDieHint dice="D100" sides={100} />
           <input id={`${id}-scavenge-roll`} value={rawRoll} inputMode="numeric" {...diceField}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-scavenge-error` : undefined}
@@ -525,10 +613,9 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
           <button className="btn ghost" type="submit">판정</button>
           <button className="btn ghost" type="button" onClick={() => applyCheck(breakdown ? rollDie(100) : null, 'app')}>D100 굴리기</button>
         </div>
-        <SkillAdjustments skill="Scavenge" base={skill} onBase={setSkill} modifiers={modifiers} onModifiers={setModifiers} />
+        <SkillAdjustments skill="Scavenge" base={skill} onBase={setSkill} modifiers={modifiers} onModifiers={setModifiers} fixed={fixed} />
         {invalid && <p className="field-err" id={`${id}-scavenge-error`} role="alert">Skill 정수와 1–100 사이의 주사위(또는 00)를 입력하세요.</p>}
       </form>
-      {!check && madnessPenalty > 0 && <p className="play-explore-note">광기 · 뒤지기 −{madnessPenalty} 기본 적용</p>}
       {allowsTable && pc?.hasPerk('Scavenger') && <p className="play-explore-note">Scavenger Perk · 표 결과를 D4만큼 올리거나 내릴 수 있음</p>}
       {checkOutcome && <div className="play-explore-note" role="status">
         뒤지기 {CHECK_LABELS[checkOutcome.outcome]}

@@ -1,0 +1,21 @@
+.attack-follow-up-roll,
+.attack-pending {
+  display: grid;
+  gap: var(--s2);
+  min-inline-size: 0;
+}
+
+.attack-follow-up-roll .xref { justify-self: start; }
+.attack-pending h4 { margin: 0; font: 700 15px/1.4 var(--f-ui); }
+.attack-pending ul { margin: 0; padding: 0; list-style: none; }
+.attack-pending li {
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s2);
+  border-block-start: 1px solid var(--rule);
+  font: 14px/1.45 var(--f-ui);
+  overflow-wrap: anywhere;
+}
+.attack-pending li p { margin: 0; }
+.attack-pending .btn[aria-pressed='true'] { background: var(--copper-wash); border-color: var(--copper-ink); }
+.checkcalc-score-kind { display: flex; align-items: center; gap: var(--s2); min-block-size: 44px; font: 14px/1.4 var(--f-ui); }

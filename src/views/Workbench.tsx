@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { entryById, tableById, procById, rulingById, hrefOf, titleOf, kindOf } from '../content';
 import { Link } from '../lib/router';
-import { nav, OPEN_MAX, useNav } from '../lib/store';
+import { BENCH_FULL_MESSAGE, nav, OPEN_MAX, useNav } from '../lib/store';
+import { oraclePageHref, type OracleViewState } from '../lib/oracle';
 import { BENCH_SET_NAME_MAX, benchSetName, readBenchSets, storeBenchSets, type BenchLayout, type BenchSet } from '../lib/workbench-sets';
 import { EntryBody } from '../components/EntryBody';
+import { RulingBody } from '../components/RulingBody';
 import { IClose, IDown, IUp } from '../components/icons';
 import { KIND_KO } from '../components/Plan';
 import { procedureTools } from '../components/procedure-tools';
-import { Notes, XRef } from '../components/bits';
+import { BenchButton, Notes } from '../components/bits';
 import { LedgerItem } from './Home';
 import { OracleBody } from './Oracle';
 import '../styles/workbench.css';
@@ -124,11 +126,15 @@ function SavedBenchSets({ layout, onRestore }: { layout: BenchLayout; onRestore:
   );
 }
 
-export function PaneBody({ id }: { id: string }) {
+export function PaneBody({ id, oracleView, onOracleViewChange }: {
+  id: string;
+  oracleView?: OracleViewState;
+  onOracleViewChange?: (change: OracleViewState) => void;
+}) {
   const e = entryById.get(id);
   if (e) return <EntryBody e={e} compact />;
   const t = tableById.get(id);
-  if (t) return <TablePane id={id} />;
+  if (t) return <TablePane id={id} view={oracleView} onViewChange={onOracleViewChange} />;
   const p = procById.get(id);
   if (p) {
     const Tool = procedureTools[id];
@@ -164,58 +170,60 @@ export function PaneBody({ id }: { id: string }) {
     );
   }
   const r = rulingById.get(id);
-  if (r)
-    return (
-      <div style={{ display: 'grid', gap: 10 }}>
-        <p className="ans" style={{ margin: 0, fontFamily: 'var(--f-ko)', fontSize: 17 }}>
-          {r.answer}
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-          {r.refs.map((x) => <XRef key={x} id={x} showKind />)}
-        </div>
-      </div>
-    );
+  if (r) return <div className="preview-detail"><RulingBody ruling={r} showVerification /></div>;
   return <p className="muted">항목을 찾을 수 없습니다.</p>;
 }
 
-function TablePane({ id }: { id: string }) {
+function TablePane({ id, view, onViewChange }: { id: string; view?: OracleViewState; onViewChange?: (change: OracleViewState) => void }) {
   const t = tableById.get(id)!;
-  const [v, setV] = useState<number | null>(null);
+  const [localView, setLocalView] = useState<OracleViewState>({});
+  const reading = view ?? localView;
+  const update = onViewChange ?? ((change: OracleViewState) => setLocalView((previous) => ({ ...previous, ...change })));
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       <p className="usage" style={{ margin: 0, fontSize: 15 }}>
         {t.usage}
       </p>
-      <OracleBody t={t} value={v} onValue={setV} compact />
+      <OracleBody t={t} value={reading.result ?? null} onValue={(value) => update({ result: value ?? undefined })}
+        only={reading.only ?? true} onOnly={(only) => update({ only })}
+        encounterPlace={reading.encounterPlace ?? null} onEncounterPlace={(encounterPlace) => update({ encounterPlace })} compact />
     </div>
   );
 }
 
-export function Pane({ id, onFocus, tab, hidden }: { id: string; onFocus?: () => void; tab?: boolean; hidden?: boolean }) {
+export function Pane({ id, onFocus, onClose, tab, hidden }: {
+  id: string; onFocus?: () => void; onClose?: () => void; tab?: boolean; hidden?: boolean;
+}) {
   const k = kindOf(id);
+  const { benchTables } = useNav();
+  const reading = benchTables[id] ?? {};
+  const href = k === 'table'
+    ? oraclePageHref(id, { ...reading, only: reading.only ?? (reading.result !== undefined) })
+    : hrefOf(id);
   return (
     <section className="pane" aria-label={titleOf(id).ko} onFocus={onFocus} hidden={hidden}
       role={tab ? 'tabpanel' : undefined} id={tab ? `bench-panel-${id}` : undefined}
       aria-labelledby={tab ? `bench-tab-${id}` : undefined}>
       <div className="pane-head">
         <span className="pk">{k ? KIND_SHORT[k] : ''}</span>
-        <Link to={hrefOf(id)}>{titleOf(id).ko}</Link>
-        <button className="iconbtn" onClick={() => nav.close(id)} aria-label={`${titleOf(id).ko} 닫기`}>
+        <Link to={href}>{titleOf(id).ko}</Link>
+        <button className="iconbtn" onClick={onClose ?? (() => nav.close(id))} aria-label={`${titleOf(id).ko} 닫기`}>
           <IClose />
         </button>
       </div>
       <div className="pane-body">
-        <PaneBody id={id} />
+        <PaneBody id={id} oracleView={reading} onOracleViewChange={(change) => nav.setBenchTable(id, change)} />
       </div>
     </section>
   );
 }
 
 export function Workbench() {
-  const { open, active, pins, recent } = useNav();
-  const [layout, setLayout] = useState<BenchLayout>('columns');
+  const { open, active, pins, recent, benchLayout: layout } = useNav();
   const cur = active && open.includes(active) ? active : open[open.length - 1];
-  const [undo, setUndo] = useState<{ msg: string; run: () => void } | null>(null);
+  const layoutTabs = useRef<HTMLButtonElement>(null);
+  const [undo, setUndo] = useState<{ msg: string; run: () => boolean | void } | null>(null);
+  const [undoBlocked, setUndoBlocked] = useState(false);
   useEffect(() => {
     if (!undo) return;
     const t = setTimeout(() => setUndo(null), 10000);
@@ -223,10 +231,20 @@ export function Workbench() {
   }, [undo]);
   const closeAll = () => {
     const prev = nav.closeAll();
+    setUndoBlocked(false);
     setUndo({ msg: `펼친 항목 ${prev.open.length}개를 닫았습니다.`, run: () => nav.restoreOpen(prev) });
+  };
+  const closeTab = (id: string) => {
+    nav.close(id);
+    requestAnimationFrame(() => {
+      const next = nav.get().active;
+      if (next) document.getElementById(`bench-tab-${next}`)?.focus();
+      else layoutTabs.current?.focus();
+    });
   };
   const clearRecent = () => {
     const prev = nav.clearRecent();
+    setUndoBlocked(false);
     setUndo({ msg: `최근 열람 ${prev.length}개를 비웠습니다.`, run: () => nav.restoreRecent(prev) });
   };
   return (
@@ -238,12 +256,14 @@ export function Workbench() {
             <button
               className="btn ghost"
               onClick={() => {
-                undo.run();
-                setUndo(null);
+                const blocked = undo.run() === false;
+                setUndoBlocked(blocked);
+                if (!blocked) setUndo(null);
               }}
             >
               되돌리기
             </button>
+            {undoBlocked && <span>{BENCH_FULL_MESSAGE}</span>}
           </>
         )}
       </div>
@@ -257,10 +277,10 @@ export function Workbench() {
           <h2 id="open-h">펼친 항목 ({open.length}/{OPEN_MAX})</h2>
           <span className="more bench-actions">
             <span className="seg" role="group" aria-label="배치">
-              <button aria-pressed={layout === 'columns'} onClick={() => setLayout('columns')}>
+              <button aria-pressed={layout === 'columns'} onClick={() => nav.setBenchLayout('columns')}>
                 나란히
               </button>
-              <button aria-pressed={layout === 'tabs'} onClick={() => setLayout('tabs')}>
+              <button ref={layoutTabs} aria-pressed={layout === 'tabs'} onClick={() => nav.setBenchLayout('tabs')}>
                 탭
               </button>
             </span>
@@ -272,10 +292,7 @@ export function Workbench() {
           </span>
         </div>
         <BenchPresets />
-        <SavedBenchSets layout={layout} onRestore={(set) => {
-          nav.replaceOpen(set);
-          setLayout(set.layout);
-        }} />
+        <SavedBenchSets layout={layout} onRestore={nav.replaceOpen} />
         {open.length === 0 ? (
           <div className="empty">
             규칙·표·절차 페이지에서 <b>작업대에 펼치기</b>를 누르면 여기에 펼쳐집니다.
@@ -302,7 +319,7 @@ export function Workbench() {
                     className="x"
                     type="button"
                     aria-label={`${titleOf(id).ko} 닫기`}
-                    onClick={() => nav.close(id)}
+                    onClick={() => closeTab(id)}
                   >
                     <IClose />
                   </button>
@@ -312,6 +329,7 @@ export function Workbench() {
             <div className={`bench-cols ${layout === 'columns' && open.length > 1 ? 'multi' : ''}`}>
               {open.map((id) => (
                 <Pane key={id} id={id} onFocus={layout === 'columns' ? () => nav.activate(id) : undefined}
+                  onClose={layout === 'tabs' ? () => closeTab(id) : undefined}
                   tab={layout === 'tabs'} hidden={layout === 'tabs' && cur !== id} />
               ))}
             </div>
@@ -340,9 +358,7 @@ export function Workbench() {
                     <button className="iconbtn reorder" aria-label={`${titleOf(id).ko} 아래로 옮기기`} title="아래로 옮기기" disabled={i === pins.length - 1} onClick={() => nav.movePin(id, 1)}>
                       <IDown />
                     </button>
-                    <button className="iconbtn" aria-label={`${titleOf(id).ko} 작업대에 펼치기`} title="작업대에 펼치기" onClick={() => nav.open(id)}>
-                      +
-                    </button>
+                    <BenchButton id={id} compact label={`${titleOf(id).ko} 작업대에 펼치기`} />
                     <button className="iconbtn" aria-label={`${titleOf(id).ko} 고정 해제`} title="고정 해제" onClick={() => nav.togglePin(id)}>
                       <IClose />
                     </button>

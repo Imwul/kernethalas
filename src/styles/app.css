@@ -2383,7 +2383,8 @@ details.fold[open] > summary::before {
     padding-left: 0;
   }
 }
-.ruling .ans {
+.qbody .ans, .preview-detail .ans {
+  margin: 0;
   font-family: var(--f-ko);
   font-size: 18px;
 }

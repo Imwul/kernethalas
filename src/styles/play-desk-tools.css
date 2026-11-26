@@ -75,6 +75,13 @@
 
 /* Side drawer: docked in the context column on wide desks, a sheet over the page otherwise. */
 .play-drawer {
+  position: relative;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -82,8 +89,10 @@
   border: 1px solid var(--rule);
   border-block-start: 3px solid var(--copper);
   background: var(--paper);
+  color: var(--ink);
 }
-.play-drawer[hidden] { display: none; }
+.play-drawer:not([open]) { display: none; }
+.play-drawer::backdrop { background: color-mix(in srgb, var(--bone) 60%, transparent); }
 .play-drawer-head {
   display: flex;
   flex-wrap: wrap;
@@ -126,6 +135,7 @@
     inset-block: var(--play-sticky-top) 0;
     inset-inline-end: 0;
     inline-size: min(32rem, 100vw);
+    block-size: auto;
     border-block-start-width: 3px;
     box-shadow: var(--shadow);
   }

@@ -1,10 +1,13 @@
 import { masteryCatalog } from '../content/entries/masteries';
+import { activeConditionOrigin, type ConditionOrigin } from './play-combat-timing';
 import type { PlaySlots } from './play-roll-history';
 import { usePlayDraft } from './play-draft';
 import type { PaperChange } from './play-inventory';
 
 export const PLAY_EFFECTS_SLOT = 'ongoingEffects';
 export const PLAY_EFFECT_CHANGES_SLOT = 'ongoingEffectChanges';
+export const LINGERING_ENTRY_SLOT = 'lingeringAtEntry';
+export const LINGERING_RECORDED_SLOT = 'lingering-recorded';
 export const LINGERING_CONDITIONS = [
   { id: 'bleeding', label: '출혈' }, { id: 'burning', label: '화상' }, { id: 'poisoned', label: '중독' },
 ] as const;
@@ -12,8 +15,13 @@ export const LINGERING_CONDITIONS = [
 type Condition = typeof LINGERING_CONDITIONS[number]['id'];
 export type RestKind = 'rest' | 'camp';
 export type TrackedAbility = { id: string; name: string; used?: RestKind; reserved?: number };
-/** levels: the X of Bleeding (X) and Poisoned (X), used for damage per combat round; outside combat each condition is 1 per place. */
-export type PlayOngoing = { conditions: Condition[]; abilities: TrackedAbility[]; levels?: Partial<Record<Condition, number>> };
+/** Bleeding and Poisoned use their levels in combat, and deal one damage per room outside combat. */
+export type PlayOngoing = {
+  conditions: Condition[];
+  abilities: TrackedAbility[];
+  levels?: Partial<Record<Condition, number>>;
+  poisonOrigin?: ConditionOrigin;
+};
 export type LingeringCondition = Condition;
 /** Conditions named in a creature action's text, with their (X) when given. */
 export function conditionsInText(text: string): { id: Condition; level: number }[] {
@@ -25,7 +33,7 @@ export function conditionsInText(text: string): { id: Condition; level: number }
   if (/Burning/.test(text)) found.push({ id: 'burning', level: 1 });
   return found;
 }
-const EMPTY: PlayOngoing = { conditions: [], abilities: [] };
+export const EMPTY_PLAY_ONGOING: PlayOngoing = { conditions: [], abilities: [] };
 const NO_CHANGES: PaperChange[] = [];
 const known = masteryCatalog.flatMap(({ abilities }) => abilities);
 
@@ -51,6 +59,9 @@ export function isPlayOngoing(value: unknown): value is PlayOngoing {
   if (!record(value) || !Array.isArray(value.conditions) || !Array.isArray(value.abilities) || value.abilities.length > 200) return false;
   if (value.levels !== undefined && !(record(value.levels) && Object.entries(value.levels).every(([id, level]) =>
     condition(id) && Number.isSafeInteger(level) && (level as number) >= 1 && (level as number) <= 99))) return false;
+  if (value.poisonOrigin !== undefined && !(value.conditions.includes('poisoned') && record(value.poisonOrigin)
+    && typeof value.poisonOrigin.encounter === 'string' && value.poisonOrigin.encounter.length <= 600
+    && Number.isSafeInteger(value.poisonOrigin.round) && Number(value.poisonOrigin.round) >= 1)) return false;
   return value.conditions.every(condition) && new Set(value.conditions).size === value.conditions.length
     && value.abilities.every((item: unknown) => record(item) && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && typeof item.name === 'string' && item.name.trim().length > 0 && item.name.length <= 80
@@ -83,7 +94,19 @@ export function readPlayOngoing(slots: PlaySlots): PlayOngoing {
       abilities = updateAbility(abilities, current);
     }
   }
-  return conditions.length || abilities.length ? { conditions, abilities } : EMPTY;
+  return conditions.length || abilities.length ? { conditions, abilities } : EMPTY_PLAY_ONGOING;
+}
+
+function withoutConditions(previous: PlayOngoing, ids: readonly Condition[]): PlayOngoing {
+  if (!previous.conditions.some((id) => ids.includes(id))) return previous;
+  const levels = { ...previous.levels };
+  for (const id of ids) delete levels[id];
+  return {
+    ...previous,
+    conditions: previous.conditions.filter((id) => !ids.includes(id)),
+    levels: Object.keys(levels).length ? levels : undefined,
+    poisonOrigin: ids.includes('poisoned') ? undefined : previous.poisonOrigin,
+  };
 }
 
 function updateAbility(previous: TrackedAbility[], item: TrackedAbility) {
@@ -94,7 +117,8 @@ function updateAbility(previous: TrackedAbility[], item: TrackedAbility) {
 
 export function usePlayOngoingEffects() {
   const draft = usePlayDraft();
-  const current = draft ? readPlayOngoing(draft.slots) : EMPTY;
+  const current = draft ? readPlayOngoing(draft.slots) : EMPTY_PLAY_ONGOING;
+  const origin = draft && activeConditionOrigin(draft.slots);
   const update = (change: (previous: PlayOngoing) => PlayOngoing) => {
     draft?.write(draft.generation, PLAY_EFFECTS_SLOT, change, current);
   };
@@ -121,19 +145,20 @@ export function usePlayOngoingEffects() {
   };
   return {
     current, trackAbility, release,
-    setCondition: (id: Condition, checked: boolean) => update((previous) => {
-      const levels = { ...previous.levels };
-      if (!checked) delete levels[id];
-      return {
-        ...previous, conditions: [...previous.conditions.filter((entry) => entry !== id), ...(checked ? [id] : [])],
-        ...(Object.keys(levels).length ? { levels } : { levels: undefined }),
-      };
-    }),
+    setCondition: (id: Condition, checked: boolean) => update((previous) => !checked ? withoutConditions(previous, [id])
+      : previous.conditions.includes(id) ? previous : {
+        ...previous, conditions: [...previous.conditions, id],
+        ...(id === 'poisoned' && origin ? { poisonOrigin: origin } : {}),
+      }),
+    removeConditions: (ids: readonly Condition[]) => update((previous) => withoutConditions(previous, ids)),
     /** Gives the PC a condition; Bleeding and Poisoned stack their X (p.88–89), Burning does not. */
     addCondition: (id: Condition, level = 1) => update((previous) => {
       const before = previous.conditions.includes(id) ? previous.levels?.[id] ?? 1 : 0;
       const next = id === 'burning' ? 1 : Math.min(99, before + level);
-      return { ...previous, conditions: [...previous.conditions.filter((entry) => entry !== id), id], levels: { ...previous.levels, [id]: next } };
+      return {
+        ...previous, conditions: before ? previous.conditions : [...previous.conditions, id], levels: { ...previous.levels, [id]: next },
+        ...(id === 'poisoned' && !before && origin ? { poisonOrigin: origin } : {}),
+      };
     }),
     setLevel: (id: Condition, level: number) => update((previous) => previous.conditions.includes(id)
       ? { ...previous, levels: { ...previous.levels, [id]: Math.max(1, Math.min(99, level)) } } : previous),

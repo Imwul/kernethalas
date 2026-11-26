@@ -47,6 +47,10 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   await journal.getByRole('button', { name: '다음 장소', exact: true }).click();
   await page.reload();
   await page.getByRole('button', { name: '동쪽 묘실 재진입' }).click();
+  const tension = page.getByRole('textbox', { name: '긴장 주사위 굴린 값', exact: true });
+  await tension.fill('3');
+  await tension.press('Enter');
+  await page.getByRole('button', { name: '남아 있던 적과 조우', exact: true }).click();
   await expect(combat.getByRole('group', { name: '전투 대상' }).getByRole('button')).toHaveCount(5);
   await expect(combat.getByText('재진입 · 적 Health 전부 회복').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);

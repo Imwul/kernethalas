@@ -1,15 +1,21 @@
 import { creatureById } from '../content/entries/creatures';
-import { MAX_SET_NAME, readPlayCustomEncounterRows, type EncounterSet } from './custom-encounters';
+import { isCombatDamageRecord, isCombatDamageSlot } from './combat-damage-records';
+import { isAttackFollowUp } from './attack-follow-ups';
+import { MAX_SET_NAME, PLAY_ENCOUNTER_STORAGE_KEY, readPlayCustomEncounterRows, type EncounterSet } from './custom-encounters';
 import { DAMAGE_TYPES } from './damage';
 import { DICE_CHAIN } from './dice';
-import { isPaperMapDoorReports, isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
-import { campaignStorageKey } from './play-campaigns';
-import { isPlayOngoing, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT } from './play-effects';
-import { ARMOR_DICE, GEAR_WEIGHTS, isGearLedger, type GearLedger } from './play-inventory';
+import { isPaperMapDoorReport, isPaperMapDoorReports, isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
+import { isPaperMapClues, type PaperMapClue } from './paper-map-clues';
+import { campaignStorageKey, openSavedCampaign, PLAY_ROOM_STORAGE_KEY } from './play-campaigns';
+import { isPlayOngoing, LINGERING_ENTRY_SLOT, LINGERING_RECORDED_SLOT, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT } from './play-effects';
+import { ARMOR_DICE, GEAR_LOCATIONS, GEAR_WEIGHTS, gearKey, isGearLedger, PLAY_GEAR_STORAGE_KEY, showIntegrity, type GearLedger } from './play-inventory';
+import { RETREAT_RETURN_SLOT } from './play-domain';
+import { isPlayLight, PLAY_LIGHT_SLOT } from './play-light';
+import { isPlaySession, PLAY_SESSION_SLOT } from './play-session';
 import { readPlayRollHistory, safePlaySlot, type PlayRollEntry } from './play-roll-history';
 import { isPlayPendingRolls, PLAY_PENDING_ROLLS_SLOT } from './play-pending-rolls';
 import { isSkillModifierList, isSkillPresetRecord, SKILL_PRESETS_SLOT } from './play-skill';
-import { isPlayCharacter, PLAY_CHARACTER_SLOT } from './play-character';
+import { isPlayCharacter, MADNESS_TIMING_SLOT, PLAY_CHARACTER_SLOT, SURVIVOR_BASELINE_SLOT } from './play-character';
 import { isPlayTimeline, PLAY_TIMELINE_SLOT } from './play-timeline';
 import { isGrowthSkill } from './skill-growth';
 
@@ -26,6 +32,7 @@ export interface PlayCheckpoint {
   place: string;
   stage: string;
   createdAt: number;
+  lightRemaining?: number | null;
   data: PlayCheckpointData;
 }
 
@@ -36,6 +43,7 @@ export const CHECKPOINT_NAME_MAX = 80;
 export const CHECKPOINT_MAX_BYTES = 2 * 1024 * 1024;
 const EDGE = ['none', 'advantage', 'disadvantage'];
 const OUTCOMES = ['critical', 'success', 'failure', 'fumble'];
+const ATTACK_OUTCOMES = ['hit', 'critical-hit', 'miss', 'defended', 'both-failed', 'reroll'];
 const PLACE_TYPES = ['room', 'corridor'];
 const ENCOUNTER_KINDS = ['encounter', 'overseer'];
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -86,9 +94,10 @@ const domainProgress = shape({
 });
 const influence = shape({ roll: nullable(between(1, 10)), damageRoll: nullable(isPositive) });
 const domain = shape({
-  id: isPositive, name: isText, overseerRoll: nullable(between(1, 10)), defeated: isBoolean, influence,
+  id: isPositive, name: isText, overseerRoll: nullable(between(1, 10)), overseerRevealedRoll: optional(nullable(between(1, 10))), defeated: isBoolean, influence,
   extra: recordOf(influence), darkness: list(shape({ id: isText, roll: isD100 })), encounterSetId: optional(isText),
-  retreats: optional(list(shape({ id: isText, place: isText, creatureIds: list(creature), kind: oneOf(ENCOUNTER_KINDS) }))),
+  retreats: optional(list(shape({ id: isText, place: isText, creatureIds: list(creature), kind: oneOf(ENCOUNTER_KINDS),
+    origin: optional(shape({ area: optional(oneOf(PLACE_TYPES)), paperId: optional(textWithLimit(32)) })) }))),
   progress: optional(domainProgress),
 });
 const battle = shape({
@@ -96,51 +105,81 @@ const battle = shape({
   seed: optional(shape({ creatureIds: list(creature), description: isText })), creatureIds: list(creature),
   outcome: nullable(oneOf(['victory', 'ended', 'fled'])),
   defeatedTargets: optional(list(shape({ creatureId: creature, label: isText }))),
+  victoryXp: optional(isCount),
 });
 const tension = shape({ sides: tensionDie, value: between(1, 8), nextDie: tensionDie, darkness: isBoolean });
 const lootReport = shape({ journal: isText, sheet: isText, gear: optional(storyEffect) });
-const checkDraft = shape({ target: isText, edge: oneOf(EDGE), roll: nullable(isD100), modifiers: optional(isSkillModifierList) });
-const encounterRoll = shape({ roll: isText, edge: oneOf(EDGE), growthRecorded: optional(isBoolean) });
-const encounterCheck = shape({ skill: isText, roll: isText, edge: oneOf(EDGE), growthRecorded: optional(isBoolean) });
+const checkDraft = shape({ target: isText, edge: optional(oneOf(EDGE)), rolledEdge: optional(oneOf(EDGE)),
+  roll: nullable(isD100), modifiers: optional(isSkillModifierList) });
+const encounterRoll = shape({ roll: isText, edge: optional(oneOf(EDGE)), growthRecorded: optional(isBoolean) });
+const encounterCheck = shape({ skill: isText, roll: isText, edge: optional(oneOf(EDGE)), growthRecorded: optional(isBoolean) });
 const roundTiming = oneOf(['start', 'end', 'round']);
 const mapLocation = shape({ domainId: isPositive, paperId: (value) => isText(value) && value.length <= 32 && !!paperMapKey(value),
   note: textWithLimit(400), area: oneOf(PLACE_TYPES), tags: list(oneOf(PAPER_MAP_TAGS)), tile: optional(isPaperMapTile),
-  doors: optional(isPaperMapDoorReports) });
+  doors: optional(isPaperMapDoorReports), clues: optional(isPaperMapClues) });
 const carryCounts = shape({ normal: isText, heavy: isText, light: isText, coins: isText, gems: isText });
 const tradeDirection = oneOf(['buy', 'sell']);
 const tradeLine = shape({ direction: tradeDirection, name: isText, quantity: isPositive, price: isCount });
 const masteryTarget = shape({ attack: optional(skillResult), defense: optional(skillResult), roll: optional(rollResult),
   armor: optional(isText), reduction: optional(isText), modifier: optional(isText),
   reactions: optional(recordOf(isBoolean)), confirmed: optional(isBoolean) });
+const confirmedAttack = nullable(shape({ id: isText, attacker: isText, defender: isText, breakdown: optional(textWithLimit(1800)),
+  result: optional(shape({ outcome: oneOf(ATTACK_OUTCOMES), reason: isText, attackerFumble: isBoolean })) }));
+const areaRoles = (value: unknown) => isRecord(value) && Object.entries(value).every(([index, role]) =>
+  /^(?:[0-9]|1[01])$/.test(index) && shape({ role: oneOf(['pc', 'companion', 'minion']), revision: isPositive })(role))
+  && Object.values(value).filter((choice) => (choice as { role: string }).role === 'pc').length <= 1;
+
+const survivorBaseline = shape({ lineIds: list(isText), xpSpent: isCount, goals: recordOf(isCount) });
+const madnessTiming = list(shape({ result: oneOf([4, 7]), previousLines: list(isText) }));
+const lingeringConditions = list(oneOf(['bleeding', 'burning', 'poisoned']));
+const pendingGrowth = list((value) => isText(value) && isGrowthSkill(value));
+const pendingSkill = shape({ skill: optional(textWithLimit(64)), roll: optional(textWithLimit(8)), difficulty: optional(textWithLimit(8)),
+  edge: optional(oneOf(EDGE)), weapon: optional(isText), modifiers: optional(isSkillModifierList) });
 
 const ROOT_FIELDS: Record<string, Validator> = {
   active: oneOf(['explore', 'combat', 'wrapup', 'journal']),
   combat: isText, wrap: isText, placeName: isText, note: isText, roomLedgerId: isText,
   nextTension: oneOf(['', 'D4', 'D6', 'D8']), initialTension: tensionDie, domainId: isPositive, roomNumber: isPositive,
+  [RETREAT_RETURN_SLOT]: nullable(isText),
   domains: (value) => Array.isArray(value) && value.length > 0 && value.every(domain)
     && new Set(value.map(({ id }) => id)).size === value.length,
   dismissedDarkness: list(isText), paperApplied: list((value) => isText(value) || shape({ id: isText, text: isText })(value)),
   journalCopiedText: isText, skillCriticalHistory: list(isText),
-  pendingSkillGrowth: list((value) => isText(value) && isGrowthSkill(value)),
+  pendingSkillGrowth: pendingGrowth,
   battles: recordOf(battle), targetNames: recordOf(list(isText)), battleLines: recordOf(isText),
   masteryReports: recordOf(isText), masterySheet: recordOf(list(paperChange)), battleSheet: recordOf(list(paperChange)),
-  [PAPER_MAP_SLOT]: (value) => Array.isArray(value) && value.every(mapLocation)
-    && value.every(({ tile, area }) => tile === undefined || isPaperMapTile(tile, area))
-    && new Set(value.map(({ domainId, paperId }) => `${domainId}/${paperMapKey(paperId)}`)).size === value.length,
+  [PAPER_MAP_SLOT]: (value) => {
+    if (!Array.isArray(value) || !value.every(mapLocation)) return false;
+    const places = new Set(value.map(({ domainId, paperId }) => `${domainId}/${paperMapKey(paperId)}`));
+    return places.size === value.length && value.every(({ tile, area, clues = [], domainId, paperId }) =>
+      (tile === undefined || isPaperMapTile(tile, area)) && clues.every(({ relatedPaperId }: PaperMapClue) => !relatedPaperId
+        || paperMapKey(relatedPaperId) !== paperMapKey(paperId) && places.has(`${domainId}/${paperMapKey(relatedPaperId)}`)));
+  },
   [PLAY_TIMELINE_SLOT]: isPlayTimeline,
+  [PLAY_SESSION_SLOT]: isPlaySession,
   [PLAY_EFFECTS_SLOT]: isPlayOngoing, [PLAY_EFFECT_CHANGES_SLOT]: list(paperChange),
+  [PLAY_LIGHT_SLOT]: isPlayLight,
   [PLAY_PENDING_ROLLS_SLOT]: isPlayPendingRolls, [SKILL_PRESETS_SLOT]: isSkillPresetRecord, [PLAY_CHARACTER_SLOT]: isPlayCharacter,
   characterWorkspace: nullable(oneOf(['create', 'sheet'])),
+  introStart: nullable(shape({ damage: between(1, 6), sanity: between(1, 4) })),
+  [SURVIVOR_BASELINE_SLOT]: nullable(survivorBaseline), [MADNESS_TIMING_SLOT]: madnessTiming,
   confirmedBreather: isText, confirmedCamp: isText,
-  lingeringAtEntry: list(oneOf(['bleeding', 'burning', 'poisoned'])),
+  [LINGERING_ENTRY_SLOT]: lingeringConditions, [LINGERING_RECORDED_SLOT]: nullable(lingeringConditions),
 };
 
 // The most heavily structured child records are read as arrays or objects in the Play views.
 // Plain leaf preferences and future fields can be carried through the format as bounded JSON.
 const SCOPED_FIELDS: Record<string, Validator> = {
-  'creation-applied': nullable(shape({ character: isPlayCharacter, presets: isSkillPresetRecord })),
+  'creature-actions-revealed': isBoolean,
+  'creation-applied': nullable(shape({ character: isPlayCharacter, presets: isSkillPresetRecord, gearSource: optional(isText), continuity: optional(shape({
+    baseline: nullable(survivorBaseline), madnessTiming, ongoing: isPlayOngoing, entryConditions: lingeringConditions,
+    recordedConditions: optional(nullable(lingeringConditions)), pendingGrowth,
+  })) })),
   'sheet-log': list(paperChange),
   'entry-tension': nullable(tension),
+  'entry-light-mode': oneOf(['lit', 'dark', 'exempt']),
+  'entry-light-resolve': nullable(oneOf(['critical', 'success', 'failure', 'fumble'])),
+  'entry-dark-check': nullable(confirmedSkill),
   'breather-tension-check': nullable(tension),
   'force-tension': recordOf(tension),
   'action-tension': list(shape({ id: isText, result: tension, darkness: nullable(isD100), followUpId: optional(isText) })),
@@ -154,6 +193,7 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'encounter-roll': nullable(between(1, 20)),
   'event-roll': nullable(isD100),
   'paper-map-key': isText,
+  'paper-map-resume-exit': textWithLimit(48),
   'lineup': shape({
     targets: list(shape({ id: isText, creatureId: creature, source: isText, ordinal: optional(isPositive),
       status: optional(oneOf(['defeated', 'left'])) })),
@@ -174,13 +214,19 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'start-perception': encounterCheck,
   'start-enemy-surprise': encounterRoll,
   'start-enemy-initiative': encounterRoll,
-  'scavenge-check': nullable(shape({ skill: isText, roll: isD100, edge: oneOf(EDGE), modifiers: optional(isSkillModifierList) })),
+  'scavenge-check': nullable(shape({ skill: isText, roll: isD100, edge: oneOf(EDGE), modifiers: optional(isSkillModifierList), madness: optional(between(0, 1000)) })),
   'door-map-exit': textWithLimit(53),
   'door-manual-exit': textWithLimit(48),
+  'resumed-door': nullable((value) => isPaperMapDoorReport(value) && !!value.deferred),
   'scavenge-quantity': list(nullable(isPositive)),
   'scavenge-selected': isPositive,
   'round-board-open': isBoolean,
   'round-position': shape({ round: isPositive, timing: roundTiming, actor: nullable(isText) }),
+  'round-actions': nullable(shape({ round: isPositive, standard: isBoolean, free: isBoolean, reactions: between(0, 99) })),
+  'lingering-rounds': list(isPositive),
+  'lingering-round-fire': isBoolean,
+  'poison-resisted-rounds': list(isPositive),
+  'applied-conditions': list(isText),
   'round-actor': isText,
   'round-reminders': list(shape({ id: isText, actor: isText, timing: roundTiming, note: textWithLimit(120), checkedAt: optional(isText),
     effect: oneOf(['bleeding', 'burning', 'poisoned', 'frightened', 'dazed', 'stunned', 'freezing', 'custom']) })),
@@ -207,12 +253,13 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'summons': summonRoll,
   'summon-added': nullable(between(-1, 4)),
   'summon-done': list(between(1, 4)),
-  'attack-confirmed-pc': nullable(shape({ id: isText, attacker: isText, defender: isText })),
-  'attack-confirmed-enemy': nullable(shape({ id: isText, attacker: isText, defender: isText })),
+  'attack-confirmed-pc': confirmedAttack,
+  'attack-confirmed-enemy': confirmedAttack,
   'attack-defense-mode-pc': oneOf(['opposed', 'unopposed', 'automatic']),
   'attack-defense-mode-enemy': oneOf(['opposed', 'unopposed', 'automatic']),
   'area-open': isBoolean,
   'area-targets': (value) => Array.isArray(value) && value.length <= 12 && value.every(textWithLimit(48)),
+  'area-roles': areaRoles,
   'area-target-revision': isCount,
   'area-damage-mode': oneOf(['individual', 'shared']),
   'area-shared-damage': recordOf(rollResult),
@@ -221,16 +268,22 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'gem-values': list(nullable(isPositive)),
   'follow-report': lootReport,
   'attack-inputs': recordOf(shape({ skill: optional(isText), rollv: optional(isText),
-    edge: optional(oneOf(EDGE)), growthSkill: optional(isText), growthRecorded: optional(isBoolean), modifiers: optional(isSkillModifierList) })),
+    edge: optional(oneOf(EDGE)), growthSkill: optional(isText), growthRecorded: optional(isBoolean), modifiers: optional(isSkillModifierList),
+    attackSkillKind: optional(oneOf(['base', 'adjusted'])) })),
   'camp-plan': shape({ quantities: recordOf(isText), hasRation: isBoolean, sleep: isBoolean, bedroll: isBoolean,
-    darkness: isBoolean, swapAmulets: isBoolean, other: isText, die: isText, lostToughness: isText, sanityDie: isText }),
+    darkness: isBoolean, swapAmulets: isBoolean, other: isText, die: isText, lostToughness: isText, sanityDie: isText,
+    treatConditions: optional(lingeringConditions) }),
+  'camp-treated': lingeringConditions,
+  'camp-lost-toughness': isText,
+  'camp-sanity-die': isText,
   'magic-item': shape({ item: nullable(isPositive), base: nullable(isPositive), detail: nullable(isPositive),
     mastery: nullable(isPositive), attuned: oneOf(['', 'camp', 'reason', 'reason-roll']), rarity: nullable(isPositive),
     properties: list(nullable(shape({ value: isPositive, detail: nullable(isPositive) }))), peculiarity: isText }),
   'bandage': shape({ purpose: oneOf(['heal', 'bleeding', 'poisoned']), check: checkDraft,
     recovery: nullable(isPositive), damage: list(nullable(isPositive)) }),
   'lingering': list(oneOf(['bleeding', 'burning', 'poisoned'])),
-  'rot': shape({ check: checkDraft }),
+  'rot': shape({ trigger: oneOf(['exposure', 'breather', 'camp']), stage: optional(between(0, 8)), check: checkDraft,
+    exhaustion: nullable(between(1, 4)), health: nullable(between(1, 4)) }),
   'skill-growth': shape({ name: isText, score: isText, roll: nullable(isD100), gain: nullable(between(1, 4)) }),
   'records': list(shape({ kind: oneOf(['treatment', 'rot', 'growth']), summary: isText, changes: list(isText) })),
   'answers': recordOf((value) => isText(value) || isFiniteNumber(value)),
@@ -243,7 +296,8 @@ const SCOPED_FIELDS: Record<string, Validator> = {
     benefit: oneOf(['', 'Health', 'Toughness', 'Sanity', 'Aether', '피해 풀', '능력 피해', 'Skill', 'Resistance']),
     die: nullable(isPositive), type: isText, skill: isText, skillScore: isText, ability: isText,
     resistances: shape({ Endurance: isText, Resolve: isText, Spellward: isText }), battleForm: isBoolean }),
-  'advancement-records': list(shape({ level: isPositive, summary: isText, changes: list(isText) })),
+  'advancement-records': list(shape({ id: optional(isText), level: isPositive, summary: isText, changes: list(isText) })),
+  'ability-origin': nullable(oneOf(['sheet', 'paper'])),
   'cast': shape({ level: isText, targets: nullable(list(isText)), manual: isText, spent: isText,
     aether: isText, blocked: isBoolean, resuming: isBoolean, rolls: recordOf(masteryTarget) }),
   'mastery-records': list(shape({ ability: isText, summary: isText, affected: list(isText), sustained: isBoolean,
@@ -270,6 +324,7 @@ function isSafeJson(value: unknown): boolean {
 
 function validSlot(key: string, data: unknown) {
   if (!safePlaySlot(key)) return false;
+  if (isCombatDamageSlot(key)) return nullable(isCombatDamageRecord)(data);
   const scoped = key.includes('/');
   const leaf = key.slice(key.lastIndexOf('/') + 1);
   const fields = scoped ? SCOPED_FIELDS : ROOT_FIELDS;
@@ -282,6 +337,9 @@ function validSlot(key: string, data: unknown) {
     return nullable(confirmedSkill)(data);
   }
   if (scoped && leaf.startsWith('oracle-history:')) return list(isPositive)(data);
+  if (leaf.startsWith('skill-pending:')) return pendingSkill(data);
+  if (scoped && leaf.startsWith('spoils-revealed:')) return nullable(isBoolean)(data);
+  if (scoped && leaf.startsWith('attack-effect:')) return isAttackFollowUp(data);
   return true;
 }
 
@@ -303,17 +361,18 @@ function validEncounters(value: unknown): value is EncounterSet[] {
 
 function validateCheckpoint(value: unknown): PlayCheckpoint | null {
   if (!isSafeJson(value) || !isRecord(value) || !isRecord(value.data)) return null;
-  const { id, name, place, stage, createdAt, data } = value;
+  const { id, name, place, stage, createdAt, lightRemaining, data } = value;
   if (!isText(id) || !/^[a-z0-9_-]{1,80}$/i.test(id) || !isText(name) || !name.trim() || name.length > CHECKPOINT_NAME_MAX
     || !isText(place) || !place.trim() || !isText(stage) || !stage.trim() || !isFiniteNumber(createdAt)
     || !Number.isSafeInteger(createdAt) || createdAt < 0 || createdAt > 8.64e15
+    || lightRemaining !== undefined && lightRemaining !== null && (typeof lightRemaining !== 'number' || !isCount(lightRemaining))
     || !validSlots(data.slots) || !isGearLedger(data.gear) || !validEncounters(data.encounters)) return null;
   const history = readPlayRollHistory(data.history);
   if (data.history !== undefined && (!Array.isArray(data.history) || history.length !== data.history.length
     || !history.every((entry) => entry.changes.every(({ slot, before, after }) =>
       [...before, ...after].every((item) => validSlot(slot, item)))))) return null;
   return {
-    id, name, place, stage, createdAt,
+    id, name, place, stage, createdAt, ...(lightRemaining !== undefined ? { lightRemaining } : {}),
     data: { slots: data.slots, gear: data.gear, encounters: data.encounters, history },
   };
 }
@@ -331,10 +390,47 @@ export function parsePlayCheckpoint(raw: string): PlayCheckpoint | null {
   } catch { return null; }
 }
 
-export function capturePlayCheckpoint(name: string, place: string, stage: string, data: PlayCheckpointData) {
-  const checkpoint: PlayCheckpoint = { id: crypto.randomUUID(), name, place, stage, createdAt: Date.now(), data };
+export function capturePlayCheckpoint(name: string, place: string, stage: string, data: PlayCheckpointData, lightRemaining?: number | null) {
+  const checkpoint: PlayCheckpoint = { id: crypto.randomUUID(), name, place, stage, createdAt: Date.now(), data, lightRemaining };
   // Use the same decoder for a captured game and a file, keeping existing draft objects separate.
   return parsePlayCheckpoint(exportPlayCheckpoint(checkpoint));
+}
+
+export function forkPlayCheckpoint(checkpoint: PlayCheckpoint, name: string) {
+  const saved = validateCheckpoint(checkpoint);
+  if (!saved) return { error: '저장 지점의 형식을 확인하세요.' };
+  const { slots, history, gear, encounters } = saved.data;
+  return openSavedCampaign(name, [
+    [PLAY_ROOM_STORAGE_KEY, JSON.stringify({ slots, history, undo: [] })],
+    [PLAY_GEAR_STORAGE_KEY, JSON.stringify(gear)],
+    [PLAY_ENCOUNTER_STORAGE_KEY, JSON.stringify(encounters)],
+  ]);
+}
+
+function previewGear(ledger: GearLedger) {
+  const groups = new Map<string, { name: string; stacks: Map<string, number> }>();
+  for (const { name, count, integrity, location } of ledger.items) {
+    const key = gearKey(name);
+    const group = groups.get(key) ?? { name, stacks: new Map() };
+    const stack = `${GEAR_LOCATIONS[location]}${integrity ? ` · 내구도 ${showIntegrity(integrity)}` : ''}`;
+    group.stacks.set(stack, (group.stacks.get(stack) ?? 0) + count);
+    groups.set(key, group);
+  }
+  return new Map([...groups].map(([key, { name, stacks }]) => [key, {
+    name, summary: [...stacks].sort(([a], [b]) => a.localeCompare(b, 'ko')).map(([stack, count]) => `${stack} ${count}개`).join(' / '),
+  }]));
+}
+
+export function compareCheckpointGear(current: GearLedger, saved: GearLedger) {
+  const before = previewGear(current);
+  const after = previewGear(saved);
+  return [...new Set([...before.keys(), ...after.keys()])].flatMap((key) => {
+    const old = before.get(key);
+    const next = after.get(key);
+    return old?.summary === next?.summary && old?.name === next?.name ? [] : [{
+      key, name: next?.name ?? old!.name, current: old?.summary ?? '미등록', saved: next?.summary ?? '미등록',
+    }];
+  });
 }
 
 export function readPlayCheckpoints(campaignId?: string): PlayCheckpoint[] | null {

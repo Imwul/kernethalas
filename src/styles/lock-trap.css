@@ -59,3 +59,12 @@
 .lock-trap-check { display: inline-flex; align-items: center; gap: var(--s1); min-height: 44px; }
 .lock-trap-check input { accent-color: var(--copper-ink); }
 .lock-trap-physical { min-width: 0; }
+.lock-opening-comparison dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+.lock-opening-comparison dl > div { padding: var(--s2); border: 1px solid var(--rule-soft); }
+.lock-opening-comparison dt { font: 700 15px/1.4 var(--f-ui); margin-block-end: var(--s1); }
+.lock-opening-comparison dd { margin: 0; font: 14px/1.45 var(--f-ui); overflow-wrap: anywhere; }

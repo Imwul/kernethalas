@@ -1,6 +1,8 @@
 import { createContext, useContext } from 'react';
 import { usePlayDraft } from './play-draft';
 import { SKILL_PRESETS_SLOT, skillPresetName } from './play-skill';
+import { EMPTY_PLAY_ONGOING, PLAY_EFFECTS_SLOT, LINGERING_ENTRY_SLOT, LINGERING_RECORDED_SLOT, readPlayOngoing, type LingeringCondition, type PlayOngoing } from './play-effects';
+import { SKILL_GROWTH_SLOT, type GrowthSkill } from './skill-growth';
 
 /**
  * What the player copies once from the paper sheet: name, level, XP, main weapon, defense, Masteries,
@@ -9,6 +11,8 @@ import { SKILL_PRESETS_SLOT, skillPresetName } from './play-skill';
  * and folded in when the player moves on.
  */
 export const PLAY_CHARACTER_SLOT = 'pcCharacter';
+export const SURVIVOR_BASELINE_SLOT = 'survivorBaseline';
+export const MADNESS_TIMING_SLOT = 'madnessTiming';
 export const CHARACTER_WEAPONS = ['Bladed Weapons', 'Bludgeoning Weapons', 'Shafted Weapons', 'Unarmed Combat & Fist Weapons'] as const;
 export const CHARACTER_DEFENSES = ['Dodge', ...CHARACTER_WEAPONS] as const;
 /** Older saves allowed up to six; the rules allow two plus an Amulet Mastery (p.21). */
@@ -31,6 +35,8 @@ export type PlayCharacter = {
   goals?: CharacterGoal[];
   completedGoals?: string[];
   exhaustion?: number;
+  /** Current stage of the Rot. Zero means uninfected. */
+  rotStage?: number;
   /** current Sanity carried into this place (this place's records add on top) and the sheet's maximum */
   sanity?: number;
   sanityMax?: number;
@@ -63,13 +69,14 @@ const isName = (value: unknown) => typeof value === 'string' && value.trim().len
 
 export function isPlayCharacter(value: unknown): value is PlayCharacter {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const { name, level, xp, weapon, defense, masteries, amulet, goals, completedGoals, exhaustion, sanity, sanityMax, madness, perks, ...rest } = value as Record<string, unknown>;
+  const { name, level, xp, weapon, defense, masteries, amulet, goals, completedGoals, exhaustion, rotStage, sanity, sanityMax, madness, perks, ...rest } = value as Record<string, unknown>;
   if (Object.keys(rest).length) return false;
   if (name !== undefined && !(typeof name === 'string' && name.length <= 40)) return false;
   if (level !== undefined && !isLevel(level)) return false;
   // stored values may sit below zero while this place's records add to them (see currentProgress)
   if (xp !== undefined && !(Number.isSafeInteger(xp) && Math.abs(xp as number) <= 1_000_000)) return false;
   if (exhaustion !== undefined && !(Number.isSafeInteger(exhaustion) && Math.abs(exhaustion as number) <= 99)) return false;
+  if (rotStage !== undefined && !isCount(rotStage, 8)) return false;
   if (sanity !== undefined && !(Number.isSafeInteger(sanity) && Math.abs(sanity as number) <= 999)) return false;
   if (sanityMax !== undefined && !isCount(sanityMax, 999)) return false;
   if (madness !== undefined && !(Array.isArray(madness) && madness.length <= 100 && madness.every((result) => Number.isSafeInteger(result) && result >= 1 && result <= 10))) return false;
@@ -78,7 +85,7 @@ export function isPlayCharacter(value: unknown): value is PlayCharacter {
   if (defense !== undefined && !oneOf(CHARACTER_DEFENSES)(defense)) return false;
   if (amulet !== undefined && !isMastery(amulet, 0)) return false;
   if (goals !== undefined && !(Array.isArray(goals) && goals.length <= ACTIVE_GOAL_LIMIT && goals.every((goal) => !!goal && typeof goal === 'object'
-    && isName(goal.name) && isCount(goal.progress, 1_000_000) && Object.keys(goal).length === 2)
+    && isName(goal.name) && Number.isSafeInteger(goal.progress) && Math.abs(goal.progress) <= 1_000_000 && Object.keys(goal).length === 2)
     && new Set(goals.map(({ name: goal }) => goal)).size === goals.length)) return false;
   if (completedGoals !== undefined && !(Array.isArray(completedGoals) && completedGoals.length <= 100 && completedGoals.every(isName)
     && new Set(completedGoals).size === completedGoals.length)) return false;
@@ -96,7 +103,22 @@ export function abilityPoints(character: PlayCharacter) {
   return { used, total, left: total === undefined ? undefined : total - used };
 }
 
-/** What this place's records add to XP and Exhaustion, provided by the play desk. */
+export type SurvivorBaseline = { lineIds: string[]; xpSpent: number; goals: Record<string, number> };
+export type MadnessTiming = { result: 4 | 7; previousLines: string[] };
+export type SurvivorSnapshot = {
+  character: PlayCharacter;
+  presets: Record<string, number>;
+  continuity?: {
+    baseline: SurvivorBaseline | null;
+    madnessTiming: MadnessTiming[];
+    ongoing: PlayOngoing;
+    entryConditions: LingeringCondition[];
+    recordedConditions?: LingeringCondition[] | null;
+    pendingGrowth: GrowthSkill[];
+  };
+};
+
+/** What the current survivor's place records add to the paper sheet. */
 export type RoomProgress = {
   xp: number;
   exhaustion: number;
@@ -106,8 +128,11 @@ export type RoomProgress = {
   sanityItems: string[];
   /** Personal Goal progress this place's records show (kills by type, Lore Books, …) */
   goals: Record<string, number>;
+  lineIds: string[];
+  baseline?: SurvivorBaseline;
+  priorSurvivor?: SurvivorBaseline;
 };
-export const NO_ROOM_PROGRESS: RoomProgress = { xp: 0, exhaustion: 0, sanity: 0, xpItems: [], exhaustionItems: [], sanityItems: [], goals: {} };
+export const NO_ROOM_PROGRESS: RoomProgress = { xp: 0, exhaustion: 0, sanity: 0, xpItems: [], exhaustionItems: [], sanityItems: [], goals: {}, lineIds: [] };
 export const CharacterRoomContext = createContext<RoomProgress>(NO_ROOM_PROGRESS);
 
 export function currentProgress(character: PlayCharacter, room: RoomProgress) {
@@ -116,7 +141,7 @@ export function currentProgress(character: PlayCharacter, room: RoomProgress) {
     xp: character.xp === undefined ? undefined : Math.max(0, character.xp + room.xp),
     exhaustion: character.exhaustion === undefined ? undefined : Math.max(0, character.exhaustion + room.exhaustion),
     sanity: sanity === undefined ? undefined : Math.max(0, character.sanityMax === undefined ? sanity : Math.min(sanity, character.sanityMax)),
-    goals: (character.goals ?? []).map((goal) => ({ ...goal, progress: goal.progress + (room.goals[goal.name] ?? 0) })),
+    goals: (character.goals ?? []).map((goal) => ({ ...goal, progress: Math.max(0, goal.progress + (room.goals[goal.name] ?? 0)) })),
   };
 }
 
@@ -139,6 +164,8 @@ export function usePlayCharacter() {
   if (!play) return null;
   const character = (play.slots[PLAY_CHARACTER_SLOT] as PlayCharacter | undefined) ?? EMPTY_CHARACTER;
   const presets = (play.slots[SKILL_PRESETS_SLOT] as Record<string, number> | undefined) ?? EMPTY_PRESETS;
+  const write = <T>(slot: string, value: T) => play.write<T | undefined>(play.generation, slot, value, undefined);
+  const madnessTiming = (play.slots[MADNESS_TIMING_SLOT] as MadnessTiming[] | undefined) ?? [];
   const skill = (name: string | undefined) => {
     const key = skillPresetName(name);
     return key && Object.hasOwn(presets, key) ? String(presets[key]) : '';
@@ -164,20 +191,44 @@ export function usePlayCharacter() {
         return next;
       }, EMPTY_CHARACTER);
     },
-    /** Replaces the whole record (a new survivor) and merges the given Skill values. */
+    /** A new survivor starts with their own skills and ignores earlier changes to the paper sheet. */
     replace(next: PlayCharacter, skills?: Record<string, number>) {
-      play.write(play.generation, PLAY_CHARACTER_SLOT, next, EMPTY_CHARACTER);
-      if (!skills) return;
-      const known = Object.fromEntries(Object.entries(skills).flatMap(([name, score]) => {
+      write(PLAY_CHARACTER_SLOT, next);
+      const known = Object.fromEntries(Object.entries(skills ?? {}).flatMap(([name, score]) => {
         const key = skillPresetName(name);
         return key && Number.isSafeInteger(score) && score >= 0 ? [[key, score]] : [];
       }));
-      play.write(play.generation, SKILL_PRESETS_SLOT, (previous: Record<string, number>) => ({ ...previous, ...known }), EMPTY_PRESETS);
+      write(SKILL_PRESETS_SLOT, known);
+      write(SURVIVOR_BASELINE_SLOT, room.baseline ?? null);
+      write(MADNESS_TIMING_SLOT, []);
+      write(PLAY_EFFECTS_SLOT, EMPTY_PLAY_ONGOING);
+      write(LINGERING_ENTRY_SLOT, []);
+      write(LINGERING_RECORDED_SLOT, null);
+      write(SKILL_GROWTH_SLOT, []);
     },
-    /** Puts back an exact earlier record and Skill values (undo of a replace). */
-    restore(previous: PlayCharacter, previousPresets: Record<string, number>) {
-      play.write(play.generation, PLAY_CHARACTER_SLOT, previous, EMPTY_CHARACTER);
-      play.write(play.generation, SKILL_PRESETS_SLOT, previousPresets, EMPTY_PRESETS);
+    snapshot(): SurvivorSnapshot {
+      return { character, presets, continuity: {
+        baseline: room.priorSurvivor ?? null,
+        madnessTiming,
+        ongoing: readPlayOngoing(play.slots),
+        entryConditions: (play.slots[LINGERING_ENTRY_SLOT] as LingeringCondition[] | undefined) ?? [],
+        recordedConditions: (play.slots[LINGERING_RECORDED_SLOT] as LingeringCondition[] | undefined) ?? null,
+        pendingGrowth: (play.slots[SKILL_GROWTH_SLOT] as GrowthSkill[] | undefined) ?? [],
+      } };
+    },
+    restore({ character: previous, presets: previousPresets, continuity }: SurvivorSnapshot) {
+      write(PLAY_CHARACTER_SLOT, previous);
+      write(SKILL_PRESETS_SLOT, previousPresets);
+      if (!continuity) return;
+      write(SURVIVOR_BASELINE_SLOT, continuity.baseline);
+      write(MADNESS_TIMING_SLOT, continuity.madnessTiming);
+      write(PLAY_EFFECTS_SLOT, continuity.ongoing);
+      write(LINGERING_ENTRY_SLOT, continuity.entryConditions);
+      write(LINGERING_RECORDED_SLOT, continuity.recordedConditions ?? null);
+      write(SKILL_GROWTH_SLOT, continuity.pendingGrowth);
+    },
+    recordMadnessTiming(result: 4 | 7) {
+      write(MADNESS_TIMING_SLOT, [...madnessTiming, { result, previousLines: room.lineIds }]);
     },
     setSkill(name: string, value: number | undefined) {
       const key = skillPresetName(name);

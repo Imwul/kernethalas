@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Note, Relation, SourceRef, Verification } from '../content/schema';
 import { BOOK_LABEL, kindOf, titleOf } from '../content';
-import { nav, useNav } from '../lib/store';
+import type { OracleViewState } from '../lib/oracle';
+import { BENCH_FULL_MESSAGE, nav, OPEN_MAX, useNav } from '../lib/store';
 import { IAddPane, ICopy, IPin } from './icons';
 import { ContextLink } from './ReferenceContext';
 
@@ -122,14 +123,24 @@ export function PinButton({ id, compact = false }: { id: string; compact?: boole
   );
 }
 
-export function BenchButton({ id, compact = false }: { id: string; compact?: boolean }) {
+export function BenchButton({ id, compact = false, label = '작업대에 펼치기', oracleView }: {
+  id: string;
+  compact?: boolean;
+  label?: string;
+  oracleView?: OracleViewState;
+}) {
   const { open } = useNav();
   const on = open.includes(id);
+  const [blockedId, setBlockedId] = useState<string | null>(null);
   return (
-    <button className={compact ? 'iconbtn' : 'btn ghost'} aria-pressed={on} onClick={() => nav.open(id)} title="작업대에 펼치기" aria-label={compact ? '작업대에 펼치기' : undefined}>
-      <IAddPane />
-      {!compact && (on ? '작업대에 있음' : '작업대에 펼치기')}
-    </button>
+    <>
+      <button type="button" className={compact ? 'iconbtn' : 'btn ghost'} aria-pressed={on}
+        onClick={() => setBlockedId(nav.open(id, oracleView) ? null : id)} title={label} aria-label={compact ? label : undefined}>
+        <IAddPane />
+        {!compact && (on ? '작업대에 있음' : label)}
+      </button>
+      {blockedId === id && open.length >= OPEN_MAX && !on && <span className="bench-open-feedback" role="alert">{BENCH_FULL_MESSAGE}</span>}
+    </>
   );
 }
 

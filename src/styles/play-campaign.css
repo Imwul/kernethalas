@@ -42,6 +42,17 @@
 .home-play-resume .home-play-launch svg { flex: none; }
 .home-play-resume-info { color: var(--ink-2); font: 14px/1.45 var(--f-ui); overflow-wrap: anywhere; }
 
+@media (max-width: 620px) {
+  .play-header { position: relative; }
+  .campaign-selector { position: static; }
+  .campaign-selector .play-popover-body {
+    inset-inline: 0;
+    inline-size: 100%;
+    min-inline-size: 0;
+    max-inline-size: none;
+  }
+}
+
 @media (max-width: 520px) {
   .campaign-selector-row { grid-template-columns: minmax(0, 1fr); }
   .campaign-selector-row > button { justify-self: start; }

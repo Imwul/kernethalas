@@ -3,7 +3,7 @@
  * can show the running totals without a second bookkeeping step. Only resolved numbers count ("XP +10",
  * "Exhaustion −2"); a change that still shows a die is left to the player.
  */
-import type { RoomProgress } from './play-character';
+import type { MadnessTiming, RoomProgress } from './play-character';
 
 type SheetLine = { id: string; text: string };
 
@@ -35,22 +35,30 @@ export function exhaustionChange(text: string) {
  * make every Sanity loss 1 larger and every XP gain 10 smaller per result.
  */
 export function roomProgress(sheet: readonly SheetLine[], xpSpent = 0,
-  { xpLoss = 0, extraSanityLoss = 0, goals = {} }: { xpLoss?: number; extraSanityLoss?: number; goals?: Record<string, number> } = {}): RoomProgress {
+  { xpLoss = 0, extraSanityLoss = 0, goals = {}, madnessTiming = [] }: {
+    xpLoss?: number; extraSanityLoss?: number; goals?: Record<string, number>; madnessTiming?: MadnessTiming[];
+  } = {}): RoomProgress {
   const xpItems: string[] = [];
   const exhaustionItems: string[] = [];
   const sanityItems: string[] = [];
   let xp = 0;
   let exhaustion = 0;
   let sanity = 0;
-  for (const { text } of sheet) {
+  const exemptions = { 4: new Map<string, number>(), 7: new Map<string, number>() };
+  for (const { result, previousLines } of madnessTiming) {
+    const counts = exemptions[result];
+    for (const id of previousLines) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  for (const { id, text } of sheet) {
     const gained = xpGain(text);
-    if (gained) { xp += Math.max(0, gained - xpLoss); xpItems.push(text); }
+    const penalty = Math.max(0, xpLoss - (exemptions[7].get(id) ?? 0) * 10);
+    if (gained) { xp += Math.max(0, gained - penalty); xpItems.push(text); }
     const changed = exhaustionChange(text);
     if (changed) { exhaustion += changed; exhaustionItems.push(text); }
-    const mind = sanityChange(text, extraSanityLoss);
+    const mind = sanityChange(text, Math.max(0, extraSanityLoss - (exemptions[4].get(id) ?? 0)));
     if (mind) { sanity += mind; sanityItems.push(text); }
   }
-  return { xp: xp - xpSpent, exhaustion, sanity, xpItems, exhaustionItems, sanityItems, goals };
+  return { xp: xp - xpSpent, exhaustion, sanity, xpItems, exhaustionItems, sanityItems, goals, lineIds: [...new Set(sheet.map(({ id }) => id))] };
 }
 
 /** Personal Goals the place's records can count (p.64–67); the rest are kept by hand. */

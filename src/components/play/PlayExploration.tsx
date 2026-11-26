@@ -1,23 +1,31 @@
-import { useEffect, useId, useMemo, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { tableById } from '../../content';
 import { creatureById } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, roomShapeForRoll, type EncounterPlace } from '../../content/tables/exploration';
+import type { CheckOutcome } from '../../lib/dice';
 import { DEFAULT_DOMAIN_PROGRESS, domainPlaceLabel, introEncounterCreature, markDomainPlace, removeDomainMark, stepDomainDie, type DomainProgress } from '../../lib/domain-progress';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { RETREAT_AMBUSH_ID } from '../../lib/play-domain';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { LINGERING_RECORDED_SLOT } from '../../lib/play-effects';
 import { capturePaperMapTile, paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
-import { gearCount } from '../../lib/play-inventory';
+import { gearCount, type GearLedger } from '../../lib/play-inventory';
+import { EMPTY_SUPPLIES, afterLightCost, lightRemaining, readPlayLight, type PlaySupplies } from '../../lib/play-light';
 import { rowTitle } from '../../lib/oracle';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
+import { PhysicalSkillRoll } from '../PhysicalSkillRoll';
 import type { RoomShapeState } from '../RoomShapeDiagram';
 import { TensionTool, type TensionDie, type TensionResult } from '../TensionTool';
+import { CHARACTER_LOG_SLOT } from './PlayExhaustion';
+import { LingeringEntryAlert, recordedRoomDamage } from './PlayLingering';
+import { PlayLight } from './PlayLight';
 import { EMPTY_FOLLOW_UP, ExplorationFollowUp } from './ExplorationFollowUp';
 import { PlayDomainExit, PlayDomainProgress, type DomainDestination } from './PlayDomainProgress';
 import { PlayExplorationActions, type ActionSheetItem, type ExplorationActionReport, type ExplorationActionsHandle } from './PlayExplorationActions';
 import { PlayRoll } from './PlayRoll';
 import { PlayStrip, PlayStripPane } from './PlayPanels';
-import { PlayPaperMap } from './PlayPaperMap';
+import { PlayPaperMap, type PlayPaperMapHandle } from './PlayPaperMap';
 import { PlayFinishedStep } from './PlayFocus';
 import { EMPTY_ROOM_SHAPE, PlayTileControls } from './PlayTileControls';
 import '../../styles/play-exploration.css';
@@ -44,6 +52,8 @@ interface Props {
   finishedSources: string[];
   initialTension?: TensionDie;
   lightCost?: number;
+  supplies?: PlaySupplies;
+  onOpenGear?: () => void;
   onDarknessChange?: (roll: number | null) => void;
   onActionDarknessChange?: (rolls: number[]) => void;
   darknessEffectCount?: number;
@@ -58,6 +68,16 @@ interface Props {
   paperMapDomain?: number;
   paperMap?: PaperMapLocation[];
   onPaperMapChange?: Dispatch<SetStateAction<PaperMapLocation[]>>;
+  gearLedger?: GearLedger;
+  retreatArrival?: {
+    place: string;
+    areaKnown: boolean;
+    kind: 'encounter' | 'overseer';
+    ambush: 'victory' | 'ended' | 'fled' | null;
+    outcome: 'victory' | 'ended' | 'fled' | null;
+    started: boolean;
+    onCombat: () => void;
+  };
 }
 
 const SHAPE_TABLE = tableById.get('t-room-shape')!;
@@ -73,6 +93,7 @@ const PLACE_DESCRIPTIONS = {
 
 const PLACE_LABELS = { shape: '모양으로 결정', room: '방', corridor: '통로' } as const;
 type PlaceChoice = keyof typeof PLACE_LABELS;
+type EntryLight = 'lit' | 'dark' | 'exempt';
 type TileDraft = RoomShapeState & { roll: number };
 const EMPTY_PAPER_MAP: PaperMapLocation[] = [];
 
@@ -93,16 +114,18 @@ const PLAY_ENCOUNTERS = {
 
 const EMPTY_ACTIONS: ExplorationActionReport = { text: '', sheet: [], nextTension: null, darknessRolls: [] };
 
-export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJournal, finishedSources, initialTension = 8, lightCost = 1,
+export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJournal, finishedSources, initialTension = 8, lightCost = 1, supplies = EMPTY_SUPPLIES, onOpenGear,
   onDarknessChange, onActionDarknessChange, darknessEffectCount, onTrader,
   domainProgress = DEFAULT_DOMAIN_PROGRESS, onDomainProgress, domainPlaceId = '1', domainPlaceName,
-  domainDestinations, domainDefeated, onLeaveDomain, paperMapDomain = 1, paperMap = EMPTY_PAPER_MAP, onPaperMapChange }: Props) {
+  domainDestinations, domainDefeated, onLeaveDomain, paperMapDomain = 1, paperMap = EMPTY_PAPER_MAP, onPaperMapChange, gearLedger, retreatArrival }: Props) {
+  const paperMapRef = useRef<PlayPaperMapHandle>(null);
   const [revisit, setRevisit] = usePlayDraftState('revisit', false);
   const [choice, setChoice] = usePlayDraftState<PlaceChoice>('place-choice', 'shape');
   const [shapeRoll, setShapeRoll] = usePlayDraftState<number | null>('shape-roll', null);
   const [tileDraft, setTileDraft] = usePlayDraftState<TileDraft | null>('room-tile', null);
   const [tileOpen, setTileOpen] = useState(false);
   const [paperLocation, setPaperLocation] = usePlayDraftState('paper-map-key', '');
+  const [resumeExit, setResumeExit] = usePlayDraftState('paper-map-resume-exit', '');
   const [descriptions, setDescriptions] = usePlayDraftState<Record<EncounterPlace, number | null>>('place-description', { room: null, corridor: null });
   const [lair, setLair] = usePlayDraftState('lair', false);
   const [arrival, setArrival] = usePlayDraftState<'lair' | 'exit' | null>('domain-arrival', null);
@@ -113,6 +136,8 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
   const [eventLairApplied, setEventLairApplied] = usePlayDraftState('event-lair-applied', false);
   const [tension, setTension] = usePlayDraftState<TensionResult | null>('entry-tension', null);
   const [enteredLightCost, setEnteredLightCost] = usePlayDraftState<number | null>('entry-light-cost', null);
+  const [entryLight, setEntryLight] = usePlayDraftState<EntryLight>('entry-light-mode', 'lit');
+  const [darkResolve, setDarkResolve] = usePlayDraftState<CheckOutcome | null>('entry-light-resolve', null);
   const [darknessRoll, setDarknessRoll] = usePlayDraftState<number | null>('entry-darkness', null);
   const [encounterRoll, setEncounterRoll] = usePlayDraftState<number | null>('encounter-roll', null);
   const [eventRoll, setEventRoll] = usePlayDraftState<number | null>('event-roll', null);
@@ -132,6 +157,17 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
   const rolledShape = shapeRoll === null ? undefined : roomShapeForRoll(shapeRoll);
   const tile = tileDraft?.roll === shapeRoll ? tileDraft : null;
   const place = choice === 'shape' ? (intro ? null : rolledShape?.place ?? null) : choice;
+  const slots = usePlayDraft()?.slots;
+  const remainingLight = lightRemaining(slots ? readPlayLight(slots) : null, supplies.lightEntries);
+  const enteringDark = place === 'room' && entryLight === 'dark';
+  const darkCheck = enteringDark && !revisit;
+  const darkSanityLoss = darkCheck && (darkResolve === 'failure' || darkResolve === 'fumble');
+  const lightMissing = place === 'room' && entryLight === 'lit' && remainingLight === 0 && !tension;
+  const readyForEntry = !lightMissing && (!darkCheck || darkResolve !== null || !!tension);
+  const roomDamageRecord = slots?.[LINGERING_RECORDED_SLOT];
+  const legacyLog = slots?.[CHARACTER_LOG_SLOT];
+  const roomDamage = useMemo(() => place === 'room' ? recordedRoomDamage(roomDamageRecord, legacyLog) : [],
+    [place, roomDamageRecord, legacyLog]);
   const placeLabel = place ? PLACE_LABELS[place] : null;
   const mapRecord = paperMap.find((record) => record.domainId === paperMapDomain && paperMapKey(record.paperId) === paperLocation);
   const mapExits = !revisit && choice === 'shape' ? rolledShape?.exits
@@ -152,6 +188,9 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
     ? DARKNESS_TABLE.rows.find(({ min, max }) => min <= darknessRoll && darknessRoll <= max) : undefined;
   const darknessAmbush = darknessRow?.next?.some(({ id }) => id === 't-encounter-general');
   const tensionReady = !!tension && (!tension.darkness || !!darknessRow);
+  const returnAmbushResolved = retreatArrival?.ambush === 'victory' || retreatArrival?.ambush === 'ended';
+  const returnCompleted = retreatArrival?.outcome === 'victory' || retreatArrival?.outcome === 'ended';
+  const returnReady = tensionReady && (!darknessAmbush || returnAmbushResolved);
   const mustCheckEncounter = !!place && !revisit && !lairRoom && !introSkip && !darknessAmbush && tensionReady;
   const encountered = place && mustCheckEncounter && encounterRoll !== null
     ? encounterRoll >= ENCOUNTER_PLACES[place].threshold : null;
@@ -161,12 +200,12 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
   const scavengeLimit = eventRow?.min === 40 ? 2 : eventRow?.min === 55 ? 3 : 1;
   const eventCanStartCombat = eventRow?.next?.some(({ id }) => id === 't-encounter-general');
   const entryNextTension = mayRollEvent && eventRoll === 67 ? 8 : tensionReady ? tension?.nextDie : undefined;
-  const entryResolved = tensionReady && !darknessAmbush
+  const entryResolved = retreatArrival ? returnReady && returnCompleted : tensionReady && !darknessAmbush
     && (revisit || lairRoom || introSkip || encountered === false && (!mayRollEvent || !!eventRow));
   const actions = !!place && entryNextTension ? actionReport : EMPTY_ACTIONS;
   const next = actions.nextTension ?? entryNextTension;
   const nextTension = next ? `D${next}` : null;
-  const roomLightCost = place === 'room' ? enteredLightCost ?? lightCost : null;
+  const roomLightCost = place === 'room' && entryLight === 'lit' ? enteredLightCost ?? lightCost : null;
   const placeReport = placeLabel
     ? [mapRecord?.paperId, revisit ? `${placeLabel} 재방문` : placeLabel].filter(Boolean).join(' · ') : null;
   const shapeReport = shapeRow ? [mapRecord?.paperId, shapeRow.ko].filter(Boolean).join(' · ') : null;
@@ -181,10 +220,11 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
   const priorDarknessRolls = useMemo(() => [darknessRow ? darknessRoll : null, resolvedEvent.darkness]
     .filter((roll): roll is number => roll !== null), [darknessRow, darknessRoll, resolvedEvent.darkness]);
   const encounterReport = !place || !tensionReady ? null
-    : darknessAmbush || encountered === true ? 'encounter' : lairRoom ? 'overseer' : (encountered === false || revisit || introSkip) ? 'none' : null;
+    : retreatArrival ? retreatArrival.kind : darknessAmbush || encountered === true ? 'encounter' : lairRoom ? 'overseer'
+      : (encountered === false || revisit || introSkip) ? 'none' : null;
   const introBattleId = `intro-encounter-${introEncounterRoll}${introEncounterSource ? `:${introEncounterSource}` : ''}`;
   const introBattleFinished = finishedSources.includes(introEncounterSource ?? introBattleId);
-  const showIntroEncounter = intro && !introBattleFinished && (darknessAmbush || encountered === true || introEncounterRequested);
+  const showIntroEncounter = !retreatArrival && intro && !introBattleFinished && (darknessAmbush || encountered === true || introEncounterRequested);
 
   useEffect(() => {
     onReport({ area: place, place: placeReport, shape: shapeReport, description: descriptionReport, nextTension,
@@ -195,14 +235,17 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
         domainProgress.lair?.id === domainPlaceId ? `은신처 발견 · ${namedPlace}` : '',
         domainProgress.exit?.id === domainPlaceId ? `출구 발견 · ${namedPlace}` : '',
         mapNote ? `지도 메모 · ${mapNote}` : '',
+        darkCheck && darkResolve ? `어두운 방 · Resolve ${darkSanityLoss ? '실패' : '성공'}` : '',
         actions.text,
       ].filter(Boolean).join(' / '), sheet: [
         ...(firstEntry ? [{ id: 'domain-entry-xp', text: 'XP +50 · 새 도메인 첫 진입' }] : []),
         ...(roomLightCost !== null && tension ? [{ id: 'room-light', text: `광원 −${roomLightCost}`, gear: gearCount('광원', -roomLightCost) }] : []),
+        ...(darkSanityLoss ? [{ id: 'room-dark-resolve', text: 'Sanity −1 (광원 없이 새 방 진입)' }] : []),
+        ...roomDamage,
         ...resolvedDarkness.items, ...resolvedEvent.items, ...actions.sheet,
       ] });
   }, [onReport, place, placeReport, shapeReport, descriptionReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
-    firstEntry, domainProgress.lair?.id, domainProgress.exit?.id, domainPlaceId, namedPlace, mapNote]);
+    firstEntry, domainProgress.lair?.id, domainProgress.exit?.id, domainPlaceId, namedPlace, mapNote, roomDamage, darkCheck, darkResolve, darkSanityLoss]);
   useEffect(() => { onDarknessChange?.(darknessReport ? darknessRoll : null); }, [onDarknessChange, darknessReport, darknessRoll]);
   useEffect(() => {
     onActionDarknessChange?.(resolvedEvent.darkness === null ? actions.darknessRolls : [resolvedEvent.darkness, ...actions.darknessRolls]);
@@ -248,24 +291,40 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
         ? capturePaperMapTile(shapeRoll, tile ?? (storedTile?.roll === shapeRoll ? storedTile : EMPTY_ROOM_SHAPE), record.area)
         : undefined;
       const savedTile = currentTile ?? storedTile;
+      const clues = record.clues ?? stored?.clues;
       const location = {
         ...record,
         ...(savedTile ? { tile: savedTile } : {}),
         ...(stored?.area === record.area && stored.doors ? { doors: stored.doors } : {}),
+        ...(clues ? { clues } : {}),
       };
       return index < 0 ? [...previous, location] : previous.map((item, i) => i === index ? location : item);
     });
     setPaperLocation(key);
   };
 
-  const saveMapDoor = (report: PaperMapDoorReport) => {
-    if (!mapRecord) return;
-    onPaperMapChange?.((previous) => previous.map((record) => {
-      if (record.domainId !== mapRecord.domainId || paperMapKey(record.paperId) !== paperLocation) return record;
-      const doors = record.doors ?? [];
-      const index = doors.findIndex(({ exit }) => paperMapKey(exit) === paperMapKey(report.exit));
-      return { ...record, doors: index < 0 ? [...doors, report] : doors.map((door, i) => i === index ? report : door) };
-    }));
+  const saveMapDoor = (report: PaperMapDoorReport, paperId = mapRecord?.paperId) => {
+    if (!paperId || !place || !onPaperMapChange) return false;
+    const key = paperMapKey(paperId);
+    const match = (record: PaperMapLocation) => record.domainId === paperMapDomain && paperMapKey(record.paperId) === key;
+    const saved = paperMap.find(match);
+    if (!key || saved && saved.area !== place) return false;
+    onPaperMapChange((previous) => {
+      const index = previous.findIndex(match);
+      if (index < 0) {
+        const mapTile = !revisit && choice === 'shape' && shapeRoll !== null
+          ? capturePaperMapTile(shapeRoll, tile ?? EMPTY_ROOM_SHAPE, place) : undefined;
+        return [...previous, { domainId: paperMapDomain, paperId, area: place, note: '', tags: [], tile: mapTile, doors: [report] }];
+      }
+      return previous.map((record, i) => {
+        if (i !== index) return record;
+        const doors = record.doors ?? [];
+        const doorIndex = doors.findIndex(({ exit }) => paperMapKey(exit) === paperMapKey(report.exit));
+        return { ...record, doors: doorIndex < 0 ? [...doors, report] : doors.map((door, j) => j === doorIndex ? report : door) };
+      });
+    });
+    setPaperLocation(key);
+    return true;
   };
 
   return (
@@ -274,8 +333,8 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
         <div className="play-explore-choice">
           <span aria-hidden="true">방문 구분</span>
           <div className="seg" role="group" aria-label="방문 구분">
-            <button type="button" aria-pressed={!revisit} onClick={() => setRevisit(false)}>새 장소</button>
-            <button type="button" aria-pressed={revisit} onClick={() => {
+            <button type="button" aria-pressed={!revisit} disabled={!!retreatArrival} onClick={() => setRevisit(false)}>새 장소</button>
+            <button type="button" aria-pressed={revisit} disabled={!!retreatArrival} onClick={() => {
               setChoice(place ?? 'room');
               setRevisit(true);
             }}>재방문</button>
@@ -285,7 +344,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
           <span aria-hidden="true">장소 종류</span>
           <div className="seg" role="group" aria-label="장소 종류">
             {(['shape', 'room', 'corridor'] as const).filter((option) => !(revisit || intro) || option !== 'shape').map((option) => (
-              <button key={option} type="button" aria-pressed={choice === option}
+              <button key={option} type="button" aria-pressed={choice === option} disabled={!!retreatArrival && (retreatArrival.areaKnown || !!tension)}
                 onClick={() => setChoice(option)}>{PLACE_LABELS[option]}</button>
             ))}
           </div>
@@ -308,19 +367,22 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
         </>
       )}
 
-      {onPaperMapChange && <PlayPaperMap area={place} domainId={paperMapDomain} locations={paperMap} active={mapRecord} canRevisit={!tension}
-        onSave={saveMapLocation} onRevisit={(record) => {
+      {onPaperMapChange && <PlayPaperMap ref={paperMapRef} area={place} domainId={paperMapDomain} locations={paperMap} active={mapRecord}
+        revisiting={revisit} canRevisit={!tension && !retreatArrival}
+        onSave={saveMapLocation} onRevisit={(record, exit) => {
           setChoice(record.area);
           setRevisit(true);
           setArrival(null);
           setPaperLocation(paperMapKey(record.paperId));
+          setResumeExit(exit ?? '');
         }} />}
       {intro && !place && <p className="play-explore-note">종이 지도에서 들어간 방 또는 통로를 선택하세요. <XRef id="first-domain-rules" /></p>}
 
       {place && (
         <>
+          {place === 'room' && <LingeringEntryAlert />}
           <div className="play-explore-context">
-            <p>{revisit ? `정리한 ${placeLabel} 재방문` : `새 ${placeLabel}`}
+            <p>{retreatArrival ? `${retreatArrival.place} 재진입` : revisit ? `정리한 ${placeLabel} 재방문` : `새 ${placeLabel}`}
               {roomLightCost !== null && <> · <XRef id="lightsource">광원 {roomLightCost} 소모</XRef></>}
             </p>
             {!onDomainProgress && !revisit && (
@@ -336,8 +398,27 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
               </label>
             )}
           </div>
+          {place === 'room' && <section className="play-entry-light" aria-label="입장할 때 쓸 광원">
+            <PlayLight supplies={supplies} onOpenGear={onOpenGear} />
+            {roomLightCost !== null && remainingLight !== null && <p className="play-light-stock" role="status">
+              {tension ? `현재 광원 ${remainingLight}` : afterLightCost(remainingLight, roomLightCost)}
+            </p>}
+            <label className="field"><span>입장할 때 쓸 광원</span>
+              <select value={entryLight} disabled={!!tension} onChange={(event) => setEntryLight(event.target.value as EntryLight)}>
+                <option value="lit">횃불·램프 등 남은 광원 사용</option>
+                <option value="exempt">주문·특성 등으로 광원 소모 없음</option>
+                <option value="dark">광원 없이 입장</option>
+              </select>
+            </label>
+            {lightMissing && <p className="field-err" role="status">남은 광원이 0입니다. 새 광원을 준비하거나 사용할 방식을 선택하세요.</p>}
+            {enteringDark && <p className="play-explore-note"><XRef id="blinded">Blinded</XRef> 적용.
+              {darkCheck && ' 새 방에 들어갈 때 Resolve를 굴리고, 실패하면 Sanity 1을 잃습니다.'}
+            </p>}
+            {darkCheck && <PhysicalSkillRoll label="어두운 방 Resolve 판정" skill="Resolve" slot="entry-dark-check" readOnly={!!tension}
+              onResult={(result) => setDarkResolve(result.outcome)} />}
+          </section>}
           {/* Lair/exit and tension are rolled on every entry, so they share one row next to the shape. */}
-          <div className="play-entry-dice">
+          {readyForEntry && <div className="play-entry-dice">
             {onDomainProgress && <PlayDomainProgress progress={domainProgress} place={place} placeId={domainPlaceId} placeName={namedPlace}
               revisit={revisit} onChange={onDomainProgress} atLair={lairRoom} atExit={exitHere} onLairMark={markLair}
               onExitMark={(marked) => onDomainProgress(marked
@@ -352,12 +433,12 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
               <PlayFinishedStep summary={tension ? `D${tension.sides} ${tension.value} · ${tension.darkness ? '짙어지는 어둠 · ' : ''}다음 D${tension.nextDie}` : null}>
                 <TensionTool initialSides={initialTension} value={tension} showDarknessLink={false} onResult={(result) => {
                   setTension(result);
-                  if (enteredLightCost === null && place === 'room') setEnteredLightCost(lightCost);
+                  if (enteredLightCost === null && roomLightCost !== null) setEnteredLightCost(roomLightCost);
                   applyDarkness(null);
                 }} />
               </PlayFinishedStep>
             </section>
-          </div>
+          </div>}
           {tension?.darkness && (
             <PlayRoll label="짙어지는 어둠" table={DARKNESS_TABLE} value={darknessRoll} onValue={applyDarkness} />
           )}
@@ -369,7 +450,9 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
             <PlayRoll label="조우 판정" table={PLAY_ENCOUNTERS[place]} value={encounterRoll} onValue={setEncounterRoll} condense />
           )}
           {mayRollEvent && (
-            <PlayRoll label="이벤트" table={EVENT_TABLE} value={eventRoll} onValue={applyEvent} condense />
+            <PlayRoll label="이벤트" table={EVENT_TABLE} value={eventRoll} onValue={applyEvent} condense
+              afterResult={onPaperMapChange && eventReport && <button className="btn ghost" type="button" onClick={() =>
+                paperMapRef.current?.pinClue({ source: 'event', text: eventReport })}>이벤트를 단서로 남기기</button>} />
           )}
           <PlayDraftScope name="event-follow">
             <ExplorationFollowUp key={eventRoll} kind="event" row={eventRow?.min}
@@ -394,13 +477,18 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
           </section>}
           {tensionReady && (
             <div className="play-explore-next">
-              {darknessAmbush && !intro && (
+              {darknessAmbush && (!intro || !!retreatArrival) && !returnAmbushResolved && retreatArrival?.ambush !== 'fled' && (
                 <>
                   <p>적에게 기습당했습니다. 전투 시작 방식에서 기습당함을 선택하세요.</p>
-                  <button type="button" className="btn primary" data-play-next="" onClick={() => onCombat('encounter')}>매복 조우로</button>
+                  <button type="button" className="btn primary" data-play-next=""
+                    onClick={() => onCombat('encounter', retreatArrival ? RETREAT_AMBUSH_ID : undefined)}>매복 조우로</button>
                 </>
               )}
-              {lairRoom && !darknessAmbush && (
+              {retreatArrival?.ambush === 'fled' && <p>매복에서 후퇴했습니다. 다시 들어가려면 후퇴했던 장소에서 선택하세요.</p>}
+              {retreatArrival?.outcome === 'fled' && <p>남아 있던 적에게서 후퇴했습니다. 다시 들어가려면 후퇴했던 장소에서 선택하세요.</p>}
+              {retreatArrival && returnReady && !retreatArrival.outcome && <button type="button" className="btn primary" data-play-next=""
+                onClick={retreatArrival.onCombat}>{retreatArrival.started ? '재진입 전투 이어가기' : '남아 있던 적과 조우'}</button>}
+              {!retreatArrival && lairRoom && !darknessAmbush && (
                 <>
                   <p>{domainDefeated ? '이 도메인의 Overseer를 처치했습니다.' : '은신처 방에서는 일반 조우 판정을 생략합니다.'}</p>
                   {!domainDefeated && <button type="button" className="btn primary" data-play-next="" onClick={() => onCombat('overseer')}>Overseer 조우로</button>}
@@ -416,22 +504,26 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
                 badge: descriptionRoll !== null ? `D100 ${descriptionRoll}` : undefined }]} />
             <PlayStripPane prefix={descriptionId} id="description" open={descriptionOpen}>
               <PlayRoll label={`${placeLabel} 환경 묘사 굴림`} table={PLACE_DESCRIPTIONS[place]}
-                value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))} />
+                value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))}
+                afterResult={onPaperMapChange && description && <button className="btn ghost" type="button" onClick={() =>
+                  paperMapRef.current?.pinClue({ source: 'description', text: description.ko })}>환경 묘사를 단서로 남기기</button>} />
             </PlayStripPane>
           </div>}
-          {entryNextTension && <div className="play-explore-step" role="group" aria-labelledby={actionsHeading}>
+          {entryNextTension && (!retreatArrival || returnCompleted) && <div className="play-explore-step" role="group" aria-labelledby={actionsHeading}>
             <h3 id={actionsHeading}>탐험 후속 행동</h3>
             <PlayExplorationActions actionsRef={actionsRef} room={place === 'room'} initialSides={entryNextTension}
               darknessEffectCount={darknessEffectCount} priorDarknessRolls={priorDarknessRolls}
               onReport={setActionReport} onCombat={startEncounter} scavengeLimit={scavengeLimit} finishedSources={finishedSources}
-              mapLocation={mapRecord} mapExits={mapExits} onMapDoorSave={onPaperMapChange ? saveMapDoor : undefined} />
+              mapLocation={mapRecord} mapExits={mapExits} onMapDoorSave={onPaperMapChange ? saveMapDoor : undefined}
+              gearLedger={gearLedger} resumeExit={revisit ? resumeExit : undefined} onResumeHandled={() => setResumeExit('')} />
           </div>}
           {entryResolved && <div className="play-explore-next">
             {/* Most rooms end without loot or rest, so the journal is the usual next stop. */}
             {onJournal && <button type="button" className={lairRoom ? 'btn ghost' : 'btn primary'} data-play-next="" onClick={onJournal}>저널로</button>}
             <button type="button" className={lairRoom || onJournal ? 'btn ghost' : 'btn primary'} data-play-next={onJournal ? undefined : ''} onClick={onWrapUp}>정리로</button>
           </div>}
-          {exitHere && tensionReady && onLeaveDomain && <PlayDomainExit mode={domainProgress.mode} onLeave={onLeaveDomain} destinations={domainDestinations} />}
+          {exitHere && tensionReady && (!retreatArrival || returnCompleted) && onLeaveDomain &&
+            <PlayDomainExit mode={domainProgress.mode} onLeave={onLeaveDomain} destinations={domainDestinations} />}
         </>
       )}
     </section>

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { CHECKPOINT_MAX_BYTES, exportPlayCheckpoint, parsePlayCheckpoint, type PlayCheckpoint } from '../src/lib/play-checkpoints';
 import { newDomainProgress } from '../src/lib/domain-progress';
 import { newPlayDomain } from '../src/lib/play-domain';
+import { EMPTY_DOOR_INVESTIGATION } from '../src/lib/lock-trap';
 
 function checkpoint(): PlayCheckpoint {
   return {
@@ -29,6 +30,26 @@ describe('play checkpoint files', () => {
   test('round-trips the current roll, map index, growth marks, gear and encounter IDs', () => {
     const saved = checkpoint();
     expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+  });
+
+  test('retains linked map clues with older locations and rejects malformed or unresolved links', () => {
+    const saved = checkpoint();
+    const clue = { id: 'clue-1', text: '두 방에 같은 문장이 새겨져 있다.', source: 'description', status: 'hypothesis', relatedPaperId: 'C-02' };
+    const first = { domainId: 1, paperId: 'B-07', area: 'room', note: '', tags: [], clues: [clue] };
+    const second = { domainId: 1, paperId: 'C-02', area: 'corridor', note: '석관 옆', tags: [] };
+    saved.data.slots.paperMap = [first, second];
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+
+    for (const invalid of [
+      [{ ...clue, relatedPaperId: 'b-07' }],
+      [{ ...clue, relatedPaperId: 'C-03' }],
+      [{ ...clue, status: 'unknown' }],
+      [{ ...clue, text: '단'.repeat(401) }],
+      [clue, clue],
+    ]) {
+      saved.data.slots.paperMap = [{ ...first, clues: invalid }, second];
+      expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
+    }
   });
 
   test('round-trips paper records and a bounded summon roll', () => {
@@ -77,6 +98,32 @@ describe('play checkpoint files', () => {
       value.data.slots.paperMap = ['B-07', 'b-07'].map((paperId) => ({ domainId: 1, paperId, area: 'room', note: '', tags: [] }));
     })).toBeNull();
     expect(visit((value) => { value.data.slots['combat/place/round-reminders'] = false; })).toBeNull();
+  });
+
+  test('round-trips resumable door investigations alongside older map notes', () => {
+    const saved = checkpoint();
+    const deferred = { ...EMPTY_DOOR_INVESTIGATION, detection: 'success', trapRoll: 6, lockRoll: 16, pickFailures: 1, forceFailures: 2 };
+    const door = { exit: '북쪽 철문', text: '함정 없음 · 문 잠김', opened: false, deferred };
+    saved.data.slots.paperMap = [{ domainId: 1, paperId: 'B-07', area: 'room', note: '', tags: [],
+      doors: [{ exit: '남쪽 문', text: '문 개방', opened: true }, door] }];
+    saved.data.slots['explore/paper-map-resume-exit'] = door.exit;
+    saved.data.slots['explore/resumed-door'] = door;
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+
+    saved.data.slots['explore/resumed-door'] = { ...door, deferred: { ...deferred, trapRoll: 11 } };
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
+  });
+
+  test('retains mapped retreat origins alongside legacy retreats without origins', () => {
+    const saved = checkpoint();
+    saved.data.slots.domains = [{ ...newPlayDomain(1), retreats: [
+      { id: 'legacy', place: '예전 방', creatureIds: ['cr-necropede'], kind: 'encounter' },
+      { id: 'mapped', place: 'B-07', creatureIds: ['cr-necropede'], kind: 'encounter', origin: { paperId: 'B-07', area: 'corridor' } },
+    ] }];
+    saved.data.slots.retreatReturnId = 'mapped';
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+    saved.data.slots.retreatReturnId = 1;
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
   });
 
   test('rejects foreign versions, oversized files and prototype keys in slot names or data', () => {

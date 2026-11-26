@@ -4,17 +4,19 @@ import type { CreatureRecord } from '../content/entries/creatures';
 import type { CheckResult, Edge } from '../lib/dice';
 import { encounterCheck, encounterFear, encounterInitiativeModifier, encounterInteger, encounterOpposed } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
+import { pcCheckModifiers } from '../lib/play-check-modifiers';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { usePlayCharacter } from '../lib/play-character';
 import { isSkillDouble, skillCriticalEffect } from '../lib/skill-criticals';
 import { useRecordSkillCritical } from '../lib/skill-growth';
+import { skillBreakdown } from '../lib/play-skill';
 import { XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/encounter-start.css';
 
 type StartMode = 'initiative' | 'surprise' | 'ambushed';
-type RollDraft = { roll: string; edge: Edge; growthRecorded?: boolean };
-const emptyRoll: RollDraft = { roll: '', edge: 'none' };
+type RollDraft = { roll: string; edge?: Edge; growthRecorded?: boolean };
+const emptyRoll: RollDraft = { roll: '' };
 const emptyCheck = { ...emptyRoll, skill: '' };
 const labels = { pc: 'PC 측 선공', enemy: '적 측 선공', reroll: '동률 · 다시 굴림', undefined: '원문에 승자 명시 없음' } as const;
 
@@ -98,31 +100,44 @@ export function EncounterStart({ creature, onResolved }: {
 
   const mind = mindOverride ?? creature?.mind ?? '';
   const alertActive = knownAlert || alert;
+  const livingShadow = pc?.hasPerk('Living Shadow') ?? false;
+  const automaticSurprise = livingShadow && !alertActive;
+  const activeMode = automaticSurprise ? 'shadow'
+    : (mode === 'surprise' && alertActive || mode === 'ambushed' && livingShadow) ? 'initiative' : mode;
   const fearLoss = Math.max(knownFear, fear);
   const enemyMind = encounterInteger(mind);
-  const resolveCheck = encounterCheck(resolve.roll, encounterInteger(resolve.skill), resolve.edge);
+  const resolveRules = pcCheckModifiers(pc, 'Resolve');
+  const stealthRules = pcCheckModifiers(pc, 'Stealth');
+  const initiativeRules = pcCheckModifiers(pc, 'Perception');
+  const resolveTarget = skillBreakdown(resolve.skill, [], resolveRules.fixed)?.total ?? null;
+  const resolveEdge = resolve.edge ?? resolveRules.edge;
+  const stealthEdge = stealth.edge ?? stealthRules.edge;
+  const initiativeEdge = perception.edge ?? initiativeRules.edge;
+  const resolveCheck = encounterCheck(resolve.roll, resolveTarget, resolveEdge);
   const fearFumble = `Sanity ${fearLoss} + D4 손실`;
   const followerCount = followers.trim() ? encounterInteger(followers) : 0;
   const stealthSkill = encounterInteger(stealth.skill);
   const stealthTarget = stealthSkill === null || followerCount === null || followerCount < 0
     ? null : stealthSkill - followerCount * 10;
-  const surprisePC = encounterCheck(stealth.roll, stealthTarget, stealth.edge);
-  const enemySurpriseCheck = encounterCheck(surpriseEnemy.roll, enemyMind, surpriseEnemy.edge);
-  const surprise = mode === 'surprise' && !alertActive && surprisePC && enemySurpriseCheck
+  const surprisePC = encounterCheck(stealth.roll, stealthTarget, stealthEdge);
+  const enemySurpriseCheck = encounterCheck(surpriseEnemy.roll, enemyMind, surpriseEnemy.edge ?? 'none');
+  const surprise = activeMode === 'surprise' && surprisePC && enemySurpriseCheck
     ? encounterOpposed(surprisePC, enemySurpriseCheck) : null;
   const failedSurprise = surprise?.winner === 'enemy';
   const perceptionSkill = encounterInteger(perception.skill);
   const initiativeModifier = encounterInitiativeModifier(failedSurprise, quick);
   const initiativeTarget = perceptionSkill === null ? null : perceptionSkill + initiativeModifier;
-  const initiativePC = encounterCheck(perception.roll, initiativeTarget, perception.edge);
-  const enemyInitiativeCheck = encounterCheck(initiativeEnemy.roll, enemyMind, initiativeEnemy.edge);
-  const initiative = initiativePC && enemyInitiativeCheck ? encounterOpposed(initiativePC, enemyInitiativeCheck) : null;
-  const order = surprise?.winner === 'pc' ? '기습 성공 · PC 측 선공'
-    : initiative && initiative.winner !== 'reroll' ? labels[initiative.winner] : null;
+  const showInitiative = activeMode === 'initiative' || failedSurprise;
+  const initiativePC = encounterCheck(perception.roll, initiativeTarget, initiativeEdge);
+  const enemyInitiativeCheck = encounterCheck(initiativeEnemy.roll, enemyMind, initiativeEnemy.edge ?? 'none');
+  const initiative = showInitiative && initiativePC && enemyInitiativeCheck ? encounterOpposed(initiativePC, enemyInitiativeCheck) : null;
+  const order = automaticSurprise || surprise?.winner === 'pc' ? '기습 성공 · PC 측 선공'
+    : activeMode === 'ambushed' ? labels.enemy
+      : initiative?.winner === 'pc' || initiative?.winner === 'enemy' ? labels[initiative.winner] : null;
   // A fear check waits for its Resolve roll before the step counts as done.
   const settled = order && (fearLoss === 0 || resolveCheck) ? order : null;
   // A double leaves an effect to read and a growth mark to make, so the step stays open for the player to close.
-  const doubled = [fearLoss > 0 ? resolveCheck : null, mode === 'surprise' ? surprisePC : null, initiativePC]
+  const doubled = [fearLoss > 0 ? resolveCheck : null, activeMode === 'surprise' ? surprisePC : null, showInitiative ? initiativePC : null]
     .some((check) => check && isSkillDouble(check.outcome));
   const fold = !!settled && !doubled;
   useEffect(() => { onResolved?.(settled, fold); }, [onResolved, settled, fold]);
@@ -133,15 +148,17 @@ export function EncounterStart({ creature, onResolved }: {
         <CheckField label="적 최고 Mind" value={mind} set={setMind} />
         <div className="field">
           <label htmlFor={`${id}-mode`}>조우 시작 방식</label>
-          <select id={`${id}-mode`} value={alertActive && mode === 'surprise' ? 'initiative' : mode} onChange={(event) => setMode(event.target.value as StartMode)}>
+          <select id={`${id}-mode`} value={activeMode} disabled={automaticSurprise} onChange={(event) => setMode(event.target.value as StartMode)}>
+            {automaticSurprise && <option value="shadow">Living Shadow · 자동 기습</option>}
             <option value="initiative">Initiative부터</option>
             <option value="surprise" disabled={alertActive}>PC가 기습 시도</option>
-            <option value="ambushed">적에게 기습당함</option>
+            <option value="ambushed" disabled={livingShadow}>적에게 기습당함</option>
           </select>
         </div>
       </div>
       {creature && <p className="encounter-note">{creature.name} 기본 Mind {creature.mind}. 적이 여럿이면 가장 높은 Mind를 사용하세요.</p>}
-      {pc?.hasPerk('Living Shadow') && <p className="encounter-note encounter-perk">Living Shadow Perk · 항상 기습하고, 기습당하지 않습니다.</p>}
+      {livingShadow && <p className="encounter-note encounter-perk">Living Shadow Perk · 기습당하지 않습니다.</p>}
+      {initiativeRules.notes.length > 0 && <p className="encounter-note">{initiativeRules.notes.join(' / ')}</p>}
       <div className="encounter-traits">
         <label className="encounter-option">
           <input type="checkbox" checked={alertActive} disabled={knownAlert} onChange={(event) => {
@@ -167,8 +184,9 @@ export function EncounterStart({ creature, onResolved }: {
           <div className="encounter-grid">
             <CheckField label="PC Resolve" value={resolve.skill} set={(skill) => setResolve({ ...resolve, skill })} />
             <CheckField label="Resolve D100" value={resolve.roll} roll set={(roll) => setResolve(changeCriticalRoll(resolve, roll))} />
-            <EdgeField label="Resolve 유불리" value={resolve.edge} set={(edge) => setResolve({ ...resolve, edge })} />
+            <EdgeField label="Resolve 유불리" value={resolveEdge} set={(edge) => setResolve({ ...resolve, edge })} />
           </div>
+          {resolveRules.fixed.length > 0 && <p className="encounter-note">광기 적용 후 Resolve {resolveTarget ?? '—'}.</p>}
           {resolveCheck && (
             <p className="encounter-outcome" role="status" aria-label="Resolve 결과">
               {resolveCheck.outcome === 'critical' ? '대성공 · Sanity D4+1 회복'
@@ -184,13 +202,17 @@ export function EncounterStart({ creature, onResolved }: {
         </fieldset>
       )}
 
-      {mode === 'ambushed' && (
+      {automaticSurprise && <div className="verdict" role="status" aria-label="기습 결과">
+        <b>기습 성공 · PC 측 선공</b>
+        <p className="encounter-note">Living Shadow로 자동 기습 · PC 측 첫 공격 +20.</p>
+      </div>}
+      {activeMode === 'ambushed' && (
         <div className="verdict" role="status" aria-label="기습 결과">
           <b>적 측 선공</b>
           <p className="encounter-note">적의 기습에 붙는 수치 보너스는 코어북에 명시되어 있지 않습니다.</p>
         </div>
       )}
-      {mode === 'surprise' && !alertActive && (
+      {activeMode === 'surprise' && (
         <fieldset className="encounter-check">
           <legend>기습 · Stealth 대 Mind</legend>
           <div className="encounter-grid">
@@ -198,8 +220,8 @@ export function EncounterStart({ creature, onResolved }: {
             <CheckField label="솔로 동료 수" value={followers} set={setFollowers} nonnegative />
             <CheckField label="PC 기습 D100" value={stealth.roll} roll set={(roll) => setStealth(changeCriticalRoll(stealth, roll))} />
             <CheckField label="적 기습 D100" value={surpriseEnemy.roll} roll set={(roll) => setSurpriseEnemy({ ...surpriseEnemy, roll })} />
-            <EdgeField label="PC 기습 유불리" value={stealth.edge} set={(edge) => setStealth({ ...stealth, edge })} />
-            <EdgeField label="적 기습 유불리" value={surpriseEnemy.edge} set={(edge) => setSurpriseEnemy({ ...surpriseEnemy, edge })} />
+            <EdgeField label="PC 기습 유불리" value={stealthEdge} set={(edge) => setStealth({ ...stealth, edge })} />
+            <EdgeField label="적 기습 유불리" value={surpriseEnemy.edge ?? 'none'} set={(edge) => setSurpriseEnemy({ ...surpriseEnemy, edge })} />
           </div>
           <p className="encounter-note">PC가 혼자이고 동료가 있으면 동료마다 Stealth −10.{stealthTarget !== null && ` 적용 Skill ${stealthTarget}.`}</p>
           {surprise && (
@@ -218,15 +240,15 @@ export function EncounterStart({ creature, onResolved }: {
           })} />}
         </fieldset>
       )}
-      {(mode === 'initiative' || failedSurprise || (mode === 'surprise' && alertActive)) && (
+      {showInitiative && (
         <fieldset className="encounter-check">
           <legend>Initiative · Perception 대 Mind</legend>
           <div className="encounter-grid">
             <CheckField label="PC 최고 Perception" value={perception.skill} set={(skill) => setPerception({ ...perception, skill })} />
             <CheckField label="PC Initiative D100" value={perception.roll} roll set={(roll) => setPerception(changeCriticalRoll(perception, roll))} />
             <CheckField label="적 Initiative D100" value={initiativeEnemy.roll} roll set={(roll) => setInitiativeEnemy({ ...initiativeEnemy, roll })} />
-            <EdgeField label="PC Initiative 유불리" value={perception.edge} set={(edge) => setPerception({ ...perception, edge })} />
-            <EdgeField label="적 Initiative 유불리" value={initiativeEnemy.edge} set={(edge) => setInitiativeEnemy({ ...initiativeEnemy, edge })} />
+            <EdgeField label="PC Initiative 유불리" value={initiativeEdge} set={(edge) => setPerception({ ...perception, edge })} />
+            <EdgeField label="적 Initiative 유불리" value={initiativeEnemy.edge ?? 'none'} set={(edge) => setInitiativeEnemy({ ...initiativeEnemy, edge })} />
           </div>
           <label className="encounter-option">
             <input type="checkbox" checked={quick} onChange={(event) => setQuick(event.target.checked)} /> Quick 무기 +10

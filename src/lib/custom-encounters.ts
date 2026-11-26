@@ -14,7 +14,7 @@ export interface EncounterSet {
 }
 
 const FORMAT = 'kernethalas-encounter-tables';
-const STORAGE_KEY = 'kn-play-custom-encounters-v2';
+export const PLAY_ENCOUNTER_STORAGE_KEY = 'kn-play-custom-encounters-v2';
 const LEGACY_KEY = 'kn-play-custom-encounters-v1';
 const DEFAULT_NAME = '사용자 지정 조우표';
 export const MAX_SET_NAME = 80;
@@ -37,7 +37,7 @@ export function readPlayCustomEncounterRows(value: unknown): PlayCustomEncounter
 
 export function readEncounterLibrary(campaignId?: string): EncounterSet[] {
   try {
-    const saved = localStorage.getItem(campaignStorageKey(STORAGE_KEY, campaignId));
+    const saved = localStorage.getItem(campaignStorageKey(PLAY_ENCOUNTER_STORAGE_KEY, campaignId));
     if (saved) {
       const sets = JSON.parse(saved);
       if (Array.isArray(sets)) {
@@ -57,7 +57,7 @@ export function readEncounterLibrary(campaignId?: string): EncounterSet[] {
 }
 
 export function storeEncounterLibrary(sets: EncounterSet[], campaignId?: string) {
-  try { localStorage.setItem(campaignStorageKey(STORAGE_KEY, campaignId), JSON.stringify(sets)); }
+  try { localStorage.setItem(campaignStorageKey(PLAY_ENCOUNTER_STORAGE_KEY, campaignId), JSON.stringify(sets)); }
   catch { /* the library stays available in this tab */ }
 }
 

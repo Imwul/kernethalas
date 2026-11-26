@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { titleOf } from '../../content';
+import { useCombatPosition, type CombatTiming as Timing } from '../../lib/play-combat-timing';
 import { usePlayDraftState } from '../../lib/play-draft';
 import { XRef } from '../bits';
 import { TogglePanel } from '../TogglePanel';
-import { COMBAT_ROUND_EVENT } from './PlayLingering';
 import '../../styles/play-combat-tools.css';
 
 const TIMING_LABELS = {
@@ -11,7 +11,6 @@ const TIMING_LABELS = {
   end: '자기 턴 종료',
   round: '라운드마다',
 } as const;
-type Timing = keyof typeof TIMING_LABELS;
 
 const EFFECTS = {
   bleeding: { timing: 'round', cue: '매 라운드 표시된 수치만큼 피해.' },
@@ -26,22 +25,20 @@ const EFFECTS = {
 type Effect = keyof typeof EFFECTS;
 
 type Combatant = { id: string; label: string };
-type Position = { round: number; timing: Timing; actor: string | null };
 type ReminderDraft = { actor: string; effect: Effect; timing: Timing; note: string };
 type Reminder = ReminderDraft & { id: string; checkedAt?: string };
 
 const PLAYER = { id: 'pc', label: 'PC' };
-const FIRST_ROUND: Position = { round: 1, timing: 'round', actor: null };
 const DEFAULT_REMINDER: ReminderDraft = { actor: 'pc', effect: 'bleeding', timing: 'round', note: '' };
 
 /** The current round, for the combat tool strip. Read inside the encounter's tool scope. */
 export function PlayRoundNumber() {
-  const [position] = usePlayDraftState<Position>('round-position', FIRST_ROUND);
+  const [position] = useCombatPosition();
   return <>{position.round}</>;
 }
 
 export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
-  const [position, setPosition] = usePlayDraftState<Position>('round-position', FIRST_ROUND);
+  const [position, setPosition] = useCombatPosition();
   const [actor, setActor] = usePlayDraftState('round-actor', PLAYER.id);
   const [reminders, setReminders] = usePlayDraftState<Reminder[]>('round-reminders', []);
   const [draft, setDraft] = useState<ReminderDraft>(DEFAULT_REMINDER);
@@ -82,7 +79,6 @@ export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
             <button type="button" className="btn ghost" onClick={() => setPosition({ ...position, timing: 'end', actor: currentActor })}>턴 종료</button>
             <button type="button" className="btn ghost" onClick={() => {
               setPosition((previous) => ({ round: previous.round + 1, timing: 'round', actor: null }));
-              document.dispatchEvent(new CustomEvent(COMBAT_ROUND_EVENT, { detail: position.round + 1 }));
             }}>다음 라운드</button>
           </div>
         </div>

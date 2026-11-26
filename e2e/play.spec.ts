@@ -82,7 +82,9 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
 
     if (width === 320) {
       await stages.getByRole('button', { name: '조우·전투', exact: true }).click();
-      await combat.getByRole('button', { name: '조우 다시 선택', exact: true }).click();
+      await expect(combat.getByRole('button', { name: '조우 다시 선택', exact: true })).toHaveCount(0);
+      await combat.getByRole('button', { name: '새 조우 시작', exact: true }).click();
+      await combat.getByRole('combobox', { name: '조우 방식', exact: true }).selectOption('t-encounter-b');
       await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
       await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
       await combat.getByRole('button', { name: '전투만 마치기', exact: true }).click();
@@ -90,10 +92,11 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
       await expect(wrap.getByRole('combobox', { name: '전리품 표' })).toBeVisible();
       await expect(wrap.getByRole('combobox', { name: '전리품 표' }).getByRole('option', { name: 'Necropede 처치 보상' })).toHaveCount(0);
       await stages.getByRole('button', { name: '조우·전투', exact: true }).click();
-      await combat.getByRole('button', { name: '승리 후 전투 마치기', exact: true }).click();
+      await combat.getByRole('button', { name: '전투 결과 수정', exact: true }).click();
+      await combat.getByRole('button', { name: '결과 수정 확정', exact: true }).click();
       await page.getByRole('button', { name: '저널 기록 보기', exact: true }).click();
-      await expect(journal).not.toContainText('전투 후 Toughness +3');
-      await expect(journal).not.toContainText('Crafting Supplies 1');
+      await expect(journal).toContainText('전투 후 Toughness +3');
+      await expect(journal).toContainText('Crafting Supplies 1');
     }
 
     await page.getByRole('button', { name: '이번 장소 지우기', exact: true }).click();

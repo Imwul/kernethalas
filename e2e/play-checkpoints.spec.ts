@@ -64,6 +64,7 @@ test('play checkpoints confirm changes and transfer dice, stage, gear and roll h
     expect.objectContaining({ label: '방 · 통로 모양', value: '29' }),
   ]));
 
+  await closeDrawer(page);
   await rollShape(page, '03');
   const corridor = page.getByRole('img', { name: '3번 통로 모양 예시 · 출입구 1개' });
   await expect(corridor).toBeVisible();
@@ -106,6 +107,102 @@ test('play checkpoints confirm changes and transfer dice, stage, gear and roll h
   } finally {
     await otherContext.close();
   }
+});
+
+test('an imported checkpoint previews the difference and opens a separate campaign without touching the source', async ({ page }) => {
+  const panel = await setup(page);
+  const stages = page.getByRole('navigation', { name: '플레이 단계', exact: true });
+  const stage = (name: string) => stages.getByRole('button', { name, exact: true });
+  const place = page.getByRole('textbox', { name: '장소 이름 (선택)', exact: true });
+  const explore = page.getByRole('region', { name: '장소 탐험', exact: true });
+  const light = explore.getByRole('region', { name: '입장할 때 쓸 광원', exact: true });
+  const setLight = async (amount: string) => {
+    await openPane(light, '광원 기록');
+    await light.getByRole('textbox', { name: '현재 광원 잔량', exact: true }).fill(amount);
+    await light.getByRole('button', { name: '잔량 저장', exact: true }).click();
+  };
+
+  await registerGear(page, 'Bandage', '3');
+  await rollShape(page, '29');
+  await setLight('20');
+  await enter(explore.getByRole('region', { name: '긴장 주사위', exact: true }), '긴장 주사위 굴린 값', '3');
+  await expect(light).toContainText('현재 광원 19');
+  await stage('저널').click();
+  await place.fill('낡은 계단');
+  await openDrawer(page, '저장');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'), panel.getByRole('button', { name: '현재 상태 파일로 저장', exact: true }).click(),
+  ]);
+  const exported = await readFile((await download.path())!);
+  const saved = JSON.parse(exported.toString()).checkpoint;
+  expect(saved.lightRemaining).toBe(19);
+  await closeDrawer(page);
+
+  await stage('탐험').click();
+  await setLight('6');
+  await stage('저널').click();
+  await place.fill('돌아온 묘실');
+  await registerGear(page, 'Torch', '2');
+  await openDrawer(page, '저장');
+
+  const readStorage = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage)
+    .filter((key) => /^kn-play-(room-v1|gear-v1|custom-encounters-v2|checkpoints-v1|campaigns-v1)(:|$)/.test(key))
+    .map((key) => [key, localStorage.getItem(key)])));
+  const before = await readStorage();
+  await panel.getByLabel('플레이 저장 JSON 파일', { exact: true })
+    .setInputFiles({ name: 'fork.json', mimeType: 'application/json', buffer: exported });
+  const review = reviewFor(panel);
+  const comparison = review.getByRole('table', { name: '현재와 저장 지점 비교', exact: true });
+  await expect(comparison.getByRole('row').filter({ hasText: '장소·단계' }).getByRole('cell'))
+    .toHaveText(['돌아온 묘실 · 저널', '낡은 계단 · 저널']);
+  await expect(comparison.getByRole('row').filter({ hasText: '광원' }).getByRole('cell')).toHaveText(['6칸', '19칸']);
+  await expect(comparison.getByRole('row').filter({ hasText: 'Torch' }).getByRole('cell')).toHaveText(['가방 2개', '미등록']);
+  expect(await readStorage()).toEqual(before);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+
+  const name = review.getByRole('textbox', { name: '새 캠페인 이름', exact: true });
+  const openFork = review.getByRole('button', { name: '새 캠페인으로 열기', exact: true });
+  await name.fill('기본 캠페인');
+  await openFork.click();
+  await expect(review.getByRole('alert')).toContainText('같은 이름');
+  expect(await readStorage()).toEqual(before);
+
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    let fail = true;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (fail && this === localStorage && key === 'kn-play-campaigns-v1' && value.includes('분기 원정대')) {
+        fail = false;
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      }
+      setItem.call(this, key, value);
+    };
+  });
+  await name.fill('분기 원정대');
+  await openFork.click();
+  await expect(review.getByRole('alert')).toContainText('새 캠페인을 저장할 수 없습니다');
+  expect(await readStorage()).toEqual(before);
+
+  await openFork.click();
+  await expect(page).toHaveURL(/\/play\?campaign=[0-9a-f-]+$/);
+  const branch = new URL(page.url()).searchParams.get('campaign');
+  expect(branch).not.toBe('default');
+  await expect(place).toHaveValue('낡은 계단');
+  await expect(page.getByLabel('플레이 캠페인 선택', { exact: true })).toContainText('분기 원정대');
+  await expect(page.getByRole('button', { name: '나중에 설정', exact: true })).toHaveCount(0);
+  await verifyGear(page, 'Bandage', 'Torch');
+  const branched = await readStorage();
+  expect(JSON.parse(branched[`kn-play-room-v1:${branch}`]!).history).toEqual(saved.data.history);
+  expect(JSON.parse(branched[`kn-play-custom-encounters-v2:${branch}`]!)).toEqual(saved.data.encounters);
+  for (const [key, value] of Object.entries(before)) if (key !== 'kn-play-campaigns-v1') expect(branched[key]).toBe(value);
+  await page.reload();
+  await expect(place).toHaveValue('낡은 계단');
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/play\?campaign=default$/);
+  await expect(place).toHaveValue('돌아온 묘실');
+  await openDrawer(page, '장비');
+  await expect(page.getByRole('region', { name: '현재 장비와 소모 내역' })).toContainText('Torch');
 });
 
 test('a later checkpoint retains map edits, resolved search rewards and battle round reminders', async ({ page }) => {

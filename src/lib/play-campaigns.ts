@@ -130,6 +130,45 @@ export function saveCampaignName(raw: string, id?: string): { error: string } | 
   return duplicate ? { error: '같은 이름의 캠페인이 있습니다.' } : { id: chosen, temporary: inMemory };
 }
 
+export function openSavedCampaign(raw: string, state: readonly (readonly [string, string])[]): { id: string } | { error: string } {
+  const name = cleanName(raw);
+  if (!name || name.length > CAMPAIGN_NAME_MAX) return { error: `캠페인 이름을 ${CAMPAIGN_NAME_MAX}자 이내로 입력하세요.` };
+  const registryNow = () => temporary ? snapshot() : readRegistry();
+  const duplicate = (current: Registry) => current.campaigns.some((campaign) => campaign.name === name);
+  const nameError = { error: '같은 이름의 캠페인이 있습니다.' };
+  const storageError = { error: '새 캠페인을 저장할 수 없습니다. 브라우저의 저장 공간을 확인하고 다시 시도하세요.' };
+  if (duplicate(registryNow())) return nameError;
+  const id = crypto.randomUUID();
+  const entries = state.map(([key, value]) => [campaignStorageKey(key, id), value] as const);
+  const staged: string[] = [];
+  const discard = () => {
+    for (const key of staged) {
+      try { localStorage.removeItem(key); } catch { /* only this unpublished campaign's keys were written */ }
+    }
+  };
+  let next: Registry;
+  try {
+    if (registryNow().campaigns.some((campaign) => campaign.id === id) || entries.some(([key]) => localStorage.getItem(key) !== null)) {
+      return storageError;
+    }
+    for (const [key, value] of entries) {
+      localStorage.setItem(key, value);
+      staged.push(key);
+    }
+    // Open only after every campaign-scoped record is durable. Recheck names in case another tab changed the registry.
+    const current = registryNow();
+    if (duplicate(current)) { discard(); return nameError; }
+    next = { ...current, campaigns: [...current.campaigns, { id, name, playedAt: 0 }] };
+    localStorage.setItem(REGISTRY_KEY, JSON.stringify(next));
+  } catch {
+    discard();
+    return storageError;
+  }
+  temporary = false;
+  publish(next);
+  return { id };
+}
+
 export function finishCampaignCharacterSetup(id: string) {
   return updateRegistry((current) => ({ ...current, campaigns: current.campaigns.map((campaign) => {
     if (campaign.id !== id || !campaign.needsCharacterSetup) return campaign;
