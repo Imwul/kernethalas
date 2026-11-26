@@ -12,7 +12,19 @@ export const LINGERING_CONDITIONS = [
 type Condition = typeof LINGERING_CONDITIONS[number]['id'];
 export type RestKind = 'rest' | 'camp';
 export type TrackedAbility = { id: string; name: string; used?: RestKind; reserved?: number };
-export type PlayOngoing = { conditions: Condition[]; abilities: TrackedAbility[] };
+/** levels: the X of Bleeding (X) and Poisoned (X), used for damage per combat round; outside combat each condition is 1 per place. */
+export type PlayOngoing = { conditions: Condition[]; abilities: TrackedAbility[]; levels?: Partial<Record<Condition, number>> };
+export type LingeringCondition = Condition;
+/** Conditions named in a creature action's text, with their (X) when given. */
+export function conditionsInText(text: string): { id: Condition; level: number }[] {
+  const found: { id: Condition; level: number }[] = [];
+  const bleeding = /Bleeding\s*\((\d+)\)/.exec(text);
+  if (bleeding) found.push({ id: 'bleeding', level: Number(bleeding[1]) });
+  const poisoned = /Poisoned\s*\((\d+)\)/.exec(text);
+  if (poisoned) found.push({ id: 'poisoned', level: Number(poisoned[1]) });
+  if (/Burning/.test(text)) found.push({ id: 'burning', level: 1 });
+  return found;
+}
 const EMPTY: PlayOngoing = { conditions: [], abilities: [] };
 const NO_CHANGES: PaperChange[] = [];
 const known = masteryCatalog.flatMap(({ abilities }) => abilities);
@@ -37,6 +49,8 @@ function condition(value: unknown): value is Condition {
 
 export function isPlayOngoing(value: unknown): value is PlayOngoing {
   if (!record(value) || !Array.isArray(value.conditions) || !Array.isArray(value.abilities) || value.abilities.length > 200) return false;
+  if (value.levels !== undefined && !(record(value.levels) && Object.entries(value.levels).every(([id, level]) =>
+    condition(id) && Number.isSafeInteger(level) && (level as number) >= 1 && (level as number) <= 99))) return false;
   return value.conditions.every(condition) && new Set(value.conditions).size === value.conditions.length
     && value.abilities.every((item: unknown) => record(item) && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && typeof item.name === 'string' && item.name.trim().length > 0 && item.name.length <= 80
@@ -107,9 +121,22 @@ export function usePlayOngoingEffects() {
   };
   return {
     current, trackAbility, release,
-    setCondition: (id: Condition, checked: boolean) => update((previous) => ({
-      ...previous, conditions: [...previous.conditions.filter((entry) => entry !== id), ...(checked ? [id] : [])],
-    })),
+    setCondition: (id: Condition, checked: boolean) => update((previous) => {
+      const levels = { ...previous.levels };
+      if (!checked) delete levels[id];
+      return {
+        ...previous, conditions: [...previous.conditions.filter((entry) => entry !== id), ...(checked ? [id] : [])],
+        ...(Object.keys(levels).length ? { levels } : { levels: undefined }),
+      };
+    }),
+    /** Gives the PC a condition; Bleeding and Poisoned stack their X (p.88–89), Burning does not. */
+    addCondition: (id: Condition, level = 1) => update((previous) => {
+      const before = previous.conditions.includes(id) ? previous.levels?.[id] ?? 1 : 0;
+      const next = id === 'burning' ? 1 : Math.min(99, before + level);
+      return { ...previous, conditions: [...previous.conditions.filter((entry) => entry !== id), id], levels: { ...previous.levels, [id]: next } };
+    }),
+    setLevel: (id: Condition, level: number) => update((previous) => previous.conditions.includes(id)
+      ? { ...previous, levels: { ...previous.levels, [id]: Math.max(1, Math.min(99, level)) } } : previous),
     clearUsed: (item: TrackedAbility) => update((previous) => {
       const tracked = previous.abilities.find(({ id }) => id === item.id);
       return tracked ? { ...previous, abilities: updateAbility(previous.abilities, { ...tracked, used: undefined }) } : previous;

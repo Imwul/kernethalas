@@ -25,6 +25,12 @@
   --grid-line: rgba(34, 48, 58, 0.075);
   --shadow: 0 1px 0 rgba(31, 34, 38, 0.08), 0 8px 24px -14px rgba(31, 34, 38, 0.35);
   --focus: #2e6359;
+  /* status colours: bleeding, poison, fire, fatigue, mind (≥3:1 as icon colours on paper) */
+  --st-bleed: #9b2a22;
+  --st-poison: #3d6b26;
+  --st-fire: #a4541a;
+  --st-fatigue: #6b5a2a;
+  --st-mind: #4b4f8f;
 
   /* type */
   --f-display: 'IM Fell English SC', 'IM Fell English', 'Song Myung', Georgia, serif;
@@ -76,6 +82,11 @@
     --grid-line: rgba(169, 199, 205, 0.06);
     --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px -16px rgba(0, 0, 0, 0.8);
     --focus: #8fc5b7;
+    --st-bleed: #e2766b;
+    --st-poison: #93c46f;
+    --st-fire: #e79a5a;
+    --st-fatigue: #d1b874;
+    --st-mind: #a7abe8;
     --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .8 0 0 0 0 .85 0 0 0 0 .9 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     color-scheme: dark;
   }
@@ -101,6 +112,11 @@
   --grid-line: rgba(169, 199, 205, 0.06);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px -16px rgba(0, 0, 0, 0.8);
   --focus: #8fc5b7;
+  --st-bleed: #e2766b;
+  --st-poison: #93c46f;
+  --st-fire: #e79a5a;
+  --st-fatigue: #d1b874;
+  --st-mind: #a7abe8;
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .8 0 0 0 0 .85 0 0 0 0 .9 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
@@ -2836,3 +2852,9 @@ input[aria-invalid='true'] {
 /* Play mode: its own bars replace the site tab bar on phones (search stays in the header). */
 :root[data-route='play'] { --tabbar-h: 0px; }
 :root[data-route='play'] .tabbar { display: none; }
+
+/* A single typed die result needs three characters ("100", "00"): keep those boxes short everywhere. */
+.field:has(> input[data-play-dice][inputmode='numeric']) { flex: 0 0 auto; min-inline-size: 6.5rem; }
+input[data-play-dice][inputmode='numeric'] { inline-size: 6.5rem !important; max-inline-size: 100%; }
+/* several dice typed with spaces ("3 4 5") */
+.field:has(> input[data-play-dice][inputmode='text']) { flex: 0 1 9rem; max-inline-size: 11rem; }

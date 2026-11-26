@@ -1,9 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { masteryCatalog } from '../../content/entries/masteries';
 import { damagingMasteryAbilities, readMasteryInteger } from '../../lib/mastery-play';
+import { usePlayCharacter } from '../../lib/play-character';
 import { usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { XRef } from '../bits';
 import { JournalRoll } from '../LootJournal';
+import { TogglePanel } from '../TogglePanel';
 import '../../styles/play-mastery.css';
 
 type SheetItem = { id: string; text: string };
@@ -39,6 +41,8 @@ interface AdvancementRecord {
   level: number;
   summary: string;
   changes: string[];
+  /** XP the level-up used up (XP returns to 0) */
+  xp?: number;
 }
 
 function gainedBenefit(draft: AdvancementDraft): string | null {
@@ -60,11 +64,43 @@ function gainedBenefit(draft: AdvancementDraft): string | null {
   return benefit && die !== null ? `${benefit} 최대치 +${die}` : null;
 }
 
-export function PlayAdvancement({ onSheetChange, onJournalChange }: {
+/** One-tap choices instead of a dropdown. */
+function Chips({ label, value, options, onChange }: {
+  label: string;
+  value: string;
+  options: { value: string; label: string; lang?: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="field advancement-choice"><span>{label}</span>
+      <div className="creator-filter-chips" role="group" aria-label={label}>
+        {options.map((option) => <button key={option.value} type="button" aria-pressed={value === option.value} lang={option.lang}
+          onClick={() => onChange(option.value)}>{option.label}</button>)}
+      </div>
+    </div>
+  );
+}
+
+export function PlayAdvancement({ onSheetChange, onJournalChange, onXpSpent }: {
   onSheetChange?: (items: SheetItem[]) => void;
   onJournalChange?: (line: string) => void;
+  onXpSpent?: (xp: number) => void;
 }) {
-  const [draft, setDraft] = usePlayDraftState('advancement-draft', EMPTY_DRAFT);
+  const [saved, setDraft] = usePlayDraftState('advancement-draft', EMPTY_DRAFT);
+  const pc = usePlayCharacter();
+  const [otherMastery, setOtherMastery] = useState(false);
+  // Level, XP and the Mastery's current tier come from the character tab until the player types something else.
+  const learnedTier = (id: string) => {
+    const base = pc?.character.masteries?.find((item) => item.id === id);
+    if (base) return String(base.tier);
+    return pc?.character.amulet?.id === id ? String(pc.character.amulet.tier) : '';
+  };
+  const draft = {
+    ...saved,
+    level: saved.level || pc?.level || '',
+    xp: saved.xp || (pc?.xp === undefined ? '' : String(pc.xp)),
+    tier: saved.tier || (saved.mastery ? learnedTier(saved.mastery) : ''),
+  };
   const [records, setRecords] = usePlayDraftState<AdvancementRecord[]>('advancement-records', []);
   const commit = usePlayRoll();
   const patch = (next: Partial<AdvancementDraft>) => setDraft((previous) => ({ ...previous, ...next }));
@@ -73,6 +109,36 @@ export function PlayAdvancement({ onSheetChange, onJournalChange }: {
     sheet: records.flatMap(({ changes, level }) => changes.map((text, index) => ({ id: `level-up-${level}-${index}`, text }))),
   }), [records]);
   useEffect(() => { onSheetChange?.(report.sheet); onJournalChange?.(report.journal); }, [report, onSheetChange, onJournalChange]);
+  const spent = records.reduce((total, { xp: used }) => total + (used ?? 0), 0);
+  useEffect(() => { onXpSpent?.(spent); }, [spent, onXpSpent]);
+  const own = new Set([...(pc?.character.masteries ?? []).map(({ id }) => id), ...(pc?.character.amulet ? [pc.character.amulet.id] : [])]);
+  const masteryOptions = [...masteryCatalog].sort((a, b) => Number(own.has(b.id)) - Number(own.has(a.id)));
+  const learnedIds = new Set([...(pc?.character.masteries ?? []), ...(pc?.character.amulet ? [pc.character.amulet] : [])]
+    .flatMap(({ id, tier }) => Array.from({ length: tier }, (_, index) => `${id}:${index + 1}`)));
+  const learnedDamaging = damagingMasteryAbilities.filter(({ id }) => learnedIds.has(id));
+  const updateCharacter = () => {
+    if (!pc || level === null) return;
+    const patchCharacter: Parameters<typeof pc.update>[0] = { level: Math.min(99, level + 1) };
+    if (mastery && nextAbility) {
+      const base = pc.character.masteries ?? [];
+      if (base.some(({ id }) => id === mastery.id)) {
+        patchCharacter.masteries = base.map((item) => item.id === mastery.id ? { id: item.id, tier: nextAbility.tier } : item);
+      } else if (pc.character.amulet?.id === mastery.id || draft.tier === '0') {
+        patchCharacter.amulet = { id: mastery.id, tier: nextAbility.tier };
+      } else if (base.length < 2) patchCharacter.masteries = [...base, { id: mastery.id, tier: nextAbility.tier }];
+    }
+    if (draft.benefit === 'Sanity' && draft.die !== null && pc.character.sanityMax !== undefined) {
+      patchCharacter.sanityMax = pc.character.sanityMax + draft.die;
+      if (pc.character.sanity !== undefined) patchCharacter.sanity = pc.character.sanity + draft.die;
+    }
+    pc.update(patchCharacter);
+    const raise = (name: string, raw: string) => {
+      const score = readMasteryInteger(raw, 0, 80);
+      if (score !== null) pc.setSkill(name, Math.min(80, score + 5));
+    };
+    if (draft.benefit === 'Skill' && draft.skill) raise(draft.skill, draft.skillScore);
+    if (draft.benefit === 'Resistance') for (const id of RESISTANCES) raise(id, draft.resistances[id]);
+  };
 
   const level = readMasteryInteger(draft.level, 1, Number.MAX_SAFE_INTEGER - 1);
   const xp = readMasteryInteger(draft.xp);
@@ -109,40 +175,34 @@ export function PlayAdvancement({ onSheetChange, onJournalChange }: {
       {((draft.level && level === null) || (draft.xp && xp === null)) && <p className="field-err" role="alert">레벨은 1 이상, XP는 0 이상의 정수로 입력하세요.</p>}
       {xp !== null && xp < 1000 && <p className="mastery-note" role="status">레벨업까지 {(1000 - xp).toLocaleString('ko-KR')} XP 남았습니다.</p>}
       {eligible && <>
-        <div className="mastery-form-fields">
-          <label className="field"><span>Ability Point 사용</span>
-            <select value={draft.mastery} onChange={(event) => patch({ mastery: event.target.value, tier: '' })}>
-              <option value="">새 포인트 보관</option>
-              {masteryCatalog.map(({ id, name }) => <option value={id} key={id}>{name}</option>)}
-            </select>
-          </label>
-          {mastery && <label className="field"><span>시트에서 마지막으로 연 Tier</span>
-            <select value={draft.tier} onChange={(event) => patch({ tier: event.target.value })}>
-              <option value="" disabled>선택</option><option value="0">Amulet · 아직 해금하지 않음</option>
-              {mastery.abilities.map(({ tier: number, name }) => <option value={number} key={number}>Tier {number} · {name}</option>)}
-            </select>
-          </label>}
-        </div>
+        <Chips label="Ability Point 사용" value={draft.mastery} onChange={(id) => patch({ mastery: id, tier: '' })} options={[
+          { value: '', label: '새 포인트 보관' },
+          ...masteryOptions.filter(({ id }) => own.has(id)).map(({ id, name }) => ({ value: id, label: `${name} · Tier ${learnedTier(id)}`, lang: 'en' })),
+          ...(draft.mastery && !own.has(draft.mastery) ? [{ value: draft.mastery, label: mastery?.name ?? draft.mastery, lang: 'en' }] : []),
+        ]} />
+        <TogglePanel label="다른 Mastery" open={otherMastery} onOpenChange={setOtherMastery}>
+          <Chips label="다른 Mastery" value={draft.mastery} onChange={(id) => { patch({ mastery: id, tier: '' }); setOtherMastery(false); }}
+            options={masteryOptions.filter(({ id }) => !own.has(id)).map(({ id, name }) => ({ value: id, label: name, lang: 'en' }))} />
+        </TogglePanel>
+        {mastery && !own.has(mastery.id) && <Chips label="시트에서 마지막으로 연 Tier" value={draft.tier} onChange={(value) => patch({ tier: value })} options={[
+          { value: '0', label: 'Amulet · 아직 없음' },
+          ...mastery.abilities.map(({ tier: number, name }) => ({ value: String(number), label: `Tier ${number} · ${name}` })),
+        ]} />}
         {nextAbility && <p className="mastery-rule"><strong>Tier {nextAbility.tier} · <span lang="en">{nextAbility.name}</span></strong><span>{nextAbility.text}</span></p>}
         {mastery && tier === 5 && <p className="mastery-note">Tier 5까지 열었습니다. 다른 Mastery를 고르거나 포인트를 보관하세요.</p>}
-        <div className="mastery-form-fields">
-          <label className="field"><span>레벨업 혜택 하나</span>
-            <select value={draft.benefit} onChange={(event) => patch({ benefit: event.target.value as Benefit, die: null })}>
-              <option value="" disabled>선택</option>
-              {Object.entries(ROLLED_BENEFITS).map(([name, dice]) => <option value={name} key={name}>{name} +{dice}</option>)}
-              <option value="능력 피해">배운 피해 능력 피해 +1</option><option value="Skill">Skill 하나 +5</option>
-              <option value="Resistance">Resistance 세 가지 +5</option>
-            </select>
-          </label>
-          {draft.benefit === '피해 풀' && <label className="field"><span>물리 피해 유형</span><select value={draft.type} onChange={(event) => patch({ type: event.target.value })}>
-            <option value="">선택</option>{DAMAGE_TYPES.map((type) => <option key={type}>{type}</option>)}
-          </select></label>}
-        </div>
+        <Chips label="레벨업 혜택 하나" value={draft.benefit} onChange={(benefit) => patch({ benefit: benefit as Benefit, die: null,
+          ...(benefit === 'Skill' ? { skill: '', skillScore: '' } : {}),
+          ...(benefit === 'Resistance' && pc ? { resistances: { Endurance: pc.skill('Endurance'), Resolve: pc.skill('Resolve'), Spellward: pc.skill('Spellward') } } : {}) })}
+          options={[
+            ...Object.entries(ROLLED_BENEFITS).map(([name, dice]) => ({ value: name, label: `${name} +${dice}` })),
+            { value: '능력 피해', label: '배운 피해 능력 +1' }, { value: 'Skill', label: 'Skill 하나 +5' }, { value: 'Resistance', label: 'Resistance 셋 +5' },
+          ]} />
+        {draft.benefit === '피해 풀' && <Chips label="물리 피해 유형" value={draft.type} onChange={(type) => patch({ type })}
+          options={DAMAGE_TYPES.map((type) => ({ value: type, label: type, lang: 'en' }))} />}
         {dice && <JournalRoll die={dice} label={`${draft.benefit} 증가량`} value={draft.die} onValue={(die) => patch({ die })} />}
         {draft.benefit === 'Skill' && <div className="mastery-form-fields">
-          <label className="field"><span>올릴 Skill</span><select value={draft.skill} onChange={(event) => patch({ skill: event.target.value, skillScore: '' })}>
-            <option value="">선택</option>{SKILLS.map((skill) => <option key={skill}>{skill}</option>)}
-          </select></label>
+          <Chips label="올릴 Skill" value={draft.skill} onChange={(skill) => patch({ skill, skillScore: pc?.skill(skill) ?? '' })}
+            options={SKILLS.map((skill) => ({ value: skill, label: pc?.skill(skill) ? `${skill} ${pc.skill(skill)}` : skill, lang: 'en' }))} />
           <label className="field"><span>현재 기본 Skill</span><input autoComplete="off" inputMode="numeric" value={draft.skillScore} onChange={(event) => patch({ skillScore: event.target.value })}
             aria-invalid={!!draft.skillScore && readMasteryInteger(draft.skillScore, 0, 80) === null || undefined} placeholder="0–80" /></label>
           {readMasteryInteger(draft.skillScore) === 80 && <p className="mastery-note">이 Skill은 상한 80에 도달했습니다.</p>}
@@ -154,19 +214,22 @@ export function PlayAdvancement({ onSheetChange, onJournalChange }: {
           </label>)}
           <p className="mastery-note">각 Resistance는 상한 80을 적용합니다.</p>
         </div>}
-        {draft.benefit === '능력 피해' && <label className="field"><span>시트에서 배운 피해 능력</span>
-          <select value={draft.ability} onChange={(event) => patch({ ability: event.target.value })}>
-            <option value="">선택</option>
-            {damagingMasteryAbilities.map(({ id, name, mastery: abilityMastery }) => <option value={id} key={id}>{name} · {abilityMastery}</option>)}
-          </select>
-        </label>}
+        {draft.benefit === '능력 피해' && (learnedDamaging.length ? <Chips label="시트에서 배운 피해 능력" value={draft.ability}
+          onChange={(ability) => patch({ ability })} options={learnedDamaging.map(({ id, name }) => ({ value: id, label: name, lang: 'en' }))} />
+          : <label className="field"><span>시트에서 배운 피해 능력</span>
+            <select value={draft.ability} onChange={(event) => patch({ ability: event.target.value })}>
+              <option value="">선택</option>
+              {damagingMasteryAbilities.map(({ id, name, mastery: abilityMastery }) => <option value={id} key={id}>{name} · {abilityMastery}</option>)}
+            </select>
+          </label>)}
         {!unlocksBattleForm && <label className="mastery-tick"><input type="checkbox" disabled={ownsBattleForm} checked={draft.battleForm || ownsBattleForm}
           onChange={(event) => patch({ battleForm: event.target.checked })} />이미 Battle Form을 배움 · Toughness +2</label>}
         {recorded && <p className="field-err" role="status">이번 장소에 같은 레벨업 기록이 있습니다.</p>}
         {changes && !recorded && <div className="mastery-result">
           <ul aria-label="시트에 옮길 레벨업 결과">{changes.map((line) => <li key={line}>{line}</li>)}</ul>
           <button className="btn primary" type="button" onClick={() => commit(() => {
-            setRecords((previous) => [...previous, { level, changes, summary: `레벨업 · ${changes.join(' · ')}` }]);
+            setRecords((previous) => [...previous, { level, changes, summary: `레벨업 · ${changes.join(' · ')}`, xp }]);
+            updateCharacter();
             setDraft(EMPTY_DRAFT);
           })}>레벨업 기록</button>
         </div>}

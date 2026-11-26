@@ -131,11 +131,13 @@ const ROOT_FIELDS: Record<string, Validator> = {
   [PLAY_EFFECTS_SLOT]: isPlayOngoing, [PLAY_EFFECT_CHANGES_SLOT]: list(paperChange),
   [PLAY_PENDING_ROLLS_SLOT]: isPlayPendingRolls, [SKILL_PRESETS_SLOT]: isSkillPresetRecord, [PLAY_CHARACTER_SLOT]: isPlayCharacter,
   confirmedBreather: isText, confirmedCamp: isText,
+  lingeringAtEntry: list(oneOf(['bleeding', 'burning', 'poisoned'])),
 };
 
 // The most heavily structured child records are read as arrays or objects in the Play views.
 // Plain leaf preferences and future fields can be carried through the format as bounded JSON.
 const SCOPED_FIELDS: Record<string, Validator> = {
+  'sheet-log': list(paperChange),
   'entry-tension': nullable(tension),
   'breather-tension-check': nullable(tension),
   'force-tension': recordOf(tension),

@@ -2,6 +2,7 @@ import type { creatureDefenses } from '../content/creature-defenses';
 import { calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, listedDamageReactions, splitPcDamage, type DamageReactions, type DamageType } from '../lib/damage';
 import { usePlayDraftState } from '../lib/play-draft';
 import { XRef } from './bits';
+import { PerkNote } from './PerkNote';
 import { TogglePanel } from './TogglePanel';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import '../styles/damage-calculator.css';
@@ -113,6 +114,7 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
                 <option value={3}>특수 치명타 ×3</option>
               </select>
             </label>
+            {!pc && critical > 1 && <PerkNote perk="Precision Striker">치명타 피해를 다시 굴릴 수 있습니다.</PerkNote>}
             <label className="field"><span>대상 부위 Armor</span>
               <input value={armorText} onChange={(event) => setArmorOverride(event.target.value)} disabled={bypass}
                 inputMode="numeric" aria-invalid={!bypass && armorText !== '' && armor === null || undefined} placeholder="직접 입력" />

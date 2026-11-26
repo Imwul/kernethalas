@@ -7,6 +7,8 @@ import { rollDie, tableSides } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { automaticRollSides, readOracleValue, rollTable } from '../../lib/oracle';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
+import { USE_ABILITY_EVENT } from './PlayCharacter';
+import { CombatLingeringAlert } from './PlayLingering';
 import type { PaperChange } from '../../lib/play-inventory';
 import { CreatureCombatCard } from '../CreatureCombatCard';
 import { EncounterStart } from '../EncounterStart';
@@ -207,6 +209,12 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
   const toolKey = selected ? lineup.encounterId ?? 'encounter' : 'lookup';
   const tool: CombatTool | null = Object.hasOwn(toolPanes, toolKey) ? toolPanes[toolKey] : selected ? 'start' : null;
   const setTool = (next: CombatTool | null) => setToolPanes((previous) => ({ ...previous, [toolKey]: next }));
+  useEffect(() => {
+    // "전투에서 쓰기" on the character tab's tree opens this fight's Mastery pane.
+    const open = () => setToolPanes((previous) => ({ ...previous, [toolKey]: 'mastery' }));
+    document.addEventListener(USE_ABILITY_EVENT, open);
+    return () => document.removeEventListener(USE_ABILITY_EVENT, open);
+  }, [setToolPanes, toolKey]);
   const order = startOrder[toolKey];
   // Once the turn order is settled the start step folds away (once per encounter), so the enemy card's turn tools sit right under the lineup.
   const settleStart = useCallback((summary: string | null, fold: boolean) => {
@@ -421,6 +429,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, onCreatu
           )}
         </div>
       )}
+      {fighting && <CombatLingeringAlert />}
       <div className="play-combat-toolbox">
         <PlayStrip label="전투 진행 도구" prefix={toolStrip} value={tool} onChange={setTool} items={toolItems} />
         {selected && profile && <>

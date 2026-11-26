@@ -1,0 +1,11 @@
+.status-icon { flex: none; fill: currentColor; vertical-align: -0.15em; }
+.status-icon.is-bleeding { color: var(--st-bleed); }
+.status-icon.is-poisoned { color: var(--st-poison); }
+.status-icon.is-burning { color: var(--st-fire); }
+.status-icon.is-exhaustion { color: var(--st-fatigue); }
+.status-icon.is-sanity,
+.status-icon.is-madness { color: var(--st-mind); }
+.status-icon.is-level { color: var(--copper-ink); }
+.status-icon.is-death { color: var(--oxblood-ink); }
+/* label + icon pairs */
+.status-label { display: inline-flex; align-items: center; gap: 4px; }

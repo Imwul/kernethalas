@@ -110,7 +110,8 @@ export function AtlasPage({ id }: { id: string }) {
           <BenchButton id={p.id} />
         </div>
       </header>
-      <p className="summary atlas-summary">{p.summary}</p>
+      {/* The creator's step diagram already shows this order. */}
+      {p.id !== 'p-new-run' && <p className="summary atlas-summary">{p.summary}</p>}
       {p.id === 'p-explore-room' && <ExplorationTools />}
       {Tool && <Tool />}
       {p.id === 'p-attack' && <AttackComparison />}

@@ -10,6 +10,8 @@ import { pooledDie, resolveAttack, type CheckResult, type RollResult } from '../
 import { encounterInteger } from '../../lib/encounter-start';
 import { abilityRoll, describeMasteryAbility, readMasteryInteger, type MasteryAbility } from '../../lib/mastery-play';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { USE_ABILITY_EVENT } from './PlayCharacter';
+import { ExhaustionHealNote } from './ExhaustionHealNote';
 import { abilityRestLimit, usePlayOngoingEffects } from '../../lib/play-effects';
 import { gearCount, type PaperChange } from '../../lib/play-inventory';
 import { DamageTypeGuide } from '../DamageTypeGuide';
@@ -294,6 +296,7 @@ function AbilityForm({ ability, targets, records, onRecord }: {
         {ability.follow && <span className="mastery-note">{ability.follow}</span>}
         {ability.sustained && <span className="mastery-note">유지하는 동안 최대 Aether가 줄어듭니다. 전투 밖에서 해제할 수 있습니다.</span>}
       </div>
+      {/Wounds|Health를? \d|회복/.test(ability.text) && <ExhaustionHealNote />}
       {passive && <p className="mastery-note">배운 패시브 효과를 종이 시트에 반영합니다.</p>}
       {!passive && <>
         <div className="mastery-form-fields">
@@ -393,11 +396,22 @@ export function PlayMastery({ targets = NO_TARGETS, onSheetChange, onJournalChan
   const chosen = visible.find(({ id }) => id === abilityId);
   const ability = chosen && describeMasteryAbility(chosen);
   const sheet = usePlayCharacter();
-  const learned = (sheet?.character.masteries ?? []).flatMap(({ id, tier: last }) => {
+  const amulet = sheet?.character.amulet;
+  const learned = [...(sheet?.character.masteries ?? []), ...(amulet && amulet.tier > 0 ? [amulet] : [])].flatMap(({ id, tier: last }) => {
     const entry = masteryCatalog.find((item) => item.id === id);
     return entry ? [{ entry, last, abilities: entry.abilities.filter((item) => item.tier <= last) }] : [];
   });
   const pick = (id: string, last: number, ability: string) => { setMasteryId(id); setTier(String(last)); setAbilityId(ability); };
+  useEffect(() => {
+    const use = (event: Event) => {
+      const { masteryId: id, tier: last, abilityId: ability } = (event as CustomEvent<{ masteryId: string; tier: number; abilityId: string }>).detail ?? {};
+      if (typeof id === 'string' && Number.isSafeInteger(last) && typeof ability === 'string') {
+        setMasteryId(id); setTier(String(last)); setAbilityId(ability);
+      }
+    };
+    document.addEventListener(USE_ABILITY_EVENT, use);
+    return () => document.removeEventListener(USE_ABILITY_EVENT, use);
+  }, [setMasteryId, setTier, setAbilityId]);
   const selects = (
     <div className="mastery-form-fields">
       <label className="field"><span>종이 시트의 Mastery</span>

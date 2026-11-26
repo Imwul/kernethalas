@@ -154,7 +154,10 @@
 .play-tray-flag { inline-size: 7px; block-size: 7px; border-radius: 50%; background: var(--oxblood-ink); }
 
 @container play-desk (width < 720px) {
-  .play-bar { flex-wrap: nowrap; gap: 0; }
+  .play-bar { flex-wrap: wrap; gap: 0; }
+  .play-nav { min-inline-size: 0; }
+  /* warnings take their own row under the stage tabs instead of squeezing them */
+  .play-alerts { flex: 1 0 100%; order: 3; padding: 4px 0; border-block-start: 1px solid var(--rule-soft); }
   .play-nav { flex: 1 1 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .play-nav button { padding-inline: 2px; font-size: 13px; }
   .play-tray { flex: none; border-inline-start: 1px solid var(--rule); }

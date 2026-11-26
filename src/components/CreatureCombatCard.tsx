@@ -21,6 +21,7 @@ import type { CombatSummonControls } from './CreatureSummonRoll';
 import { DamageCalculator } from './DamageCalculator';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import { EncounterStart } from './EncounterStart';
+import { ApplyConditions } from './play/PlayLingering';
 import '../styles/creature-combat.css';
 
 const PC_HIT_TABLE = tableById.get('t-hit-humanoid')!;
@@ -56,6 +57,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const { value: combatSkill, unknown: unknownCS } = adjustment.stats.combatSkill;
   const action = creatureActionTable(creature, entry);
   const selectedAction = actionValue === null ? undefined : creature.actions.find(({ min, max }) => min <= actionValue && actionValue <= max);
+  const selectedActionText = actionValue === null ? undefined : action.rows.find(({ min, max }) => min <= actionValue && actionValue <= max)?.ko;
   const actionScope = `action-follow-up-${actionRevision}`;
   const hit = creatureHitTable(creature, entry, adjustment.armorBonuses);
   const hitDie = (pcTarget ? PC_HIT_TABLE : hit)?.dice;
@@ -121,6 +123,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
               checkTab.current?.focus();
             }}>적 공격 판정</button>
           )}
+          {selectedActionText && <ApplyConditions key={`${actionScope}:apply`} text={selectedActionText} />}
           {selectedAction && selectedAction.tag !== 'Physical' && (
             <PlayDraftScope name={actionScope} key={actionScope}>
               <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} summons={summons} />

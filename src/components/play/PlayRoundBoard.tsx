@@ -3,6 +3,7 @@ import { titleOf } from '../../content';
 import { usePlayDraftState } from '../../lib/play-draft';
 import { XRef } from '../bits';
 import { TogglePanel } from '../TogglePanel';
+import { COMBAT_ROUND_EVENT } from './PlayLingering';
 import '../../styles/play-combat-tools.css';
 
 const TIMING_LABELS = {
@@ -79,9 +80,10 @@ export function PlayRoundBoard({ targets }: { targets: readonly Combatant[] }) {
           <div className="play-round-buttons" role="group" aria-label="전투 시점">
             <button type="button" className="btn ghost" onClick={() => setPosition({ ...position, timing: 'start', actor: currentActor })}>턴 시작</button>
             <button type="button" className="btn ghost" onClick={() => setPosition({ ...position, timing: 'end', actor: currentActor })}>턴 종료</button>
-            <button type="button" className="btn ghost" onClick={() => setPosition((previous) => ({
-              round: previous.round + 1, timing: 'round', actor: null,
-            }))}>다음 라운드</button>
+            <button type="button" className="btn ghost" onClick={() => {
+              setPosition((previous) => ({ round: previous.round + 1, timing: 'round', actor: null }));
+              document.dispatchEvent(new CustomEvent(COMBAT_ROUND_EVENT, { detail: position.round + 1 }));
+            }}>다음 라운드</button>
           </div>
         </div>
         <div className="play-round-rules">

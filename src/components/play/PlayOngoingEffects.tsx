@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { encounterInteger } from '../../lib/encounter-start';
 import { LINGERING_CONDITIONS, ongoingAbilityId, usePlayOngoingEffects, type RestKind } from '../../lib/play-effects';
 import { XRef } from '../bits';
+import { StatusIcon } from '../StatusIcon';
 import '../../styles/play-ongoing.css';
 
 export function PlayOngoingEffects() {
@@ -19,7 +20,8 @@ export function PlayOngoingEffects() {
         <fieldset className="play-ongoing-conditions">
           <legend>남아 있는 상태</legend>
           {LINGERING_CONDITIONS.map(({ id, label }) => (
-            <label key={id}><input type="checkbox" checked={current.conditions.includes(id)} onChange={(event) => setCondition(id, event.target.checked)} />{label}</label>
+            <label key={id}><input type="checkbox" checked={current.conditions.includes(id)} onChange={(event) => setCondition(id, event.target.checked)} />
+              <StatusIcon kind={id} />{label}{id !== 'burning' && current.conditions.includes(id) && (current.levels?.[id] ?? 1) > 1 ? ` (${current.levels?.[id]})` : ''}</label>
           ))}
         </fieldset>
         {current.conditions.length > 0 && <p>다음 방 · Health −{current.conditions.length} · Armor 무시{current.conditions.includes('poisoned') && ' · 중독 1은 Poison'}</p>}

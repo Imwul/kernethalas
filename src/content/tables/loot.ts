@@ -198,7 +198,7 @@ export const lootTables: OracleTable[] = [
       r(1, 2, '썩은 음식과 옷(쓸모없음).'),
       r(3, 3, 'Crafting Supplies D4.'),
       r(4, 4, 'Candle D4.'),
-      r(5, 5, 'Lore Book.', 'Lore Book', { next: [n('t-lore-books')] }),
+      r(5, 5, 'Lore Book (발견 XP +10).', 'Lore Book', { next: [n('t-lore-books')] }),
       r(6, 7, '보석·장신구.', 'Gems & Jewelry', { next: [n('t-gems')] }),
       r(8, 8, 'Pouch.', 'Pouch'),
       r(9, 9, 'Flare D4.'),

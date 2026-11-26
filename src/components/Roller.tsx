@@ -107,7 +107,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
             setManual(e.target.value);
             if (invalid) setInvalid(false);
           }}
-          placeholder={sides === 100 ? '1–100/00' : `1–${sides}`}
+          placeholder={sides === 100 ? '1–100' : `1–${sides}`}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? `${id}-error` : undefined}
         />

@@ -49,7 +49,7 @@ export function JournalRoll({ label, value, onValue, resultText, breakdown, ...s
       }}>
         <div className="field">
           <label htmlFor={id}>직접 굴린 값</label><PlayDieHint dice={dice} sides={sides} />
-          <input id={id} inputMode="numeric" {...field} autoComplete="off" value={typed} placeholder={sides === 100 ? '1–100 / 00' : `1–${sides}`}
+          <input id={id} inputMode="numeric" {...field} autoComplete="off" value={typed} placeholder={sides === 100 ? '1–100' : `1–${sides}`}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined} onChange={(event) => {
               setTyped(event.target.value);
               setInvalid(false);

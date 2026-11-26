@@ -1,0 +1,41 @@
+.edge-field { min-width: 0; }
+.edge-label { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
+.edge-toggle {
+  display: inline-grid;
+  grid-template-columns: 40px minmax(2.75em, auto) 40px;
+  align-items: stretch;
+  width: fit-content;
+  min-height: 40px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+.edge-btn {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: 600 20px/1 var(--f-ui);
+  cursor: pointer;
+}
+.edge-btn:hover { background: var(--bone); color: var(--ink); }
+.edge-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.edge-minus { border-inline-end: 1px solid var(--rule-soft); }
+.edge-plus { border-inline-start: 1px solid var(--rule-soft); }
+.edge-minus[aria-pressed='true'] { background: var(--oxblood-wash); color: var(--oxblood-ink); }
+.edge-plus[aria-pressed='true'] { background: var(--copper-wash); color: var(--copper-ink); }
+.edge-state {
+  display: grid;
+  place-items: center;
+  padding-inline: 6px;
+  color: var(--faded);
+  font: 13px/1.2 var(--f-ui);
+  white-space: nowrap;
+}
+.edge-toggle[data-edge='advantage'] .edge-state { color: var(--copper-ink); font-weight: 700; }
+.edge-toggle[data-edge='disadvantage'] .edge-state { color: var(--oxblood-ink); font-weight: 700; }
+@media (pointer: coarse) {
+  .edge-toggle { grid-template-columns: 44px minmax(2.75em, auto) 44px; min-height: 44px; }
+}

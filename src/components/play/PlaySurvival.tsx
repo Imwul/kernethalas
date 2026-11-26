@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef } from 'react';
+import { EdgeToggle } from '../EdgeToggle';
 import { entryById } from '../../content';
 import { d100FromValue, resolveCheck, type CheckResult, type Edge } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
@@ -9,7 +10,9 @@ import { gearCount, type PaperChange } from '../../lib/play-inventory';
 import { formatSkillBreakdown, skillBreakdown, type SkillModifier } from '../../lib/play-skill';
 import { isGrowthSkill, skillGrowthKey, skillGrowthName, useClearSkillGrowth, usePendingSkillGrowth, useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
+import { StatusIcon } from '../StatusIcon';
 import { JournalRoll } from '../LootJournal';
+import { ExhaustionHealNote } from './ExhaustionHealNote';
 import { SkillAdjustments } from './SkillAdjustments';
 import '../../styles/play-survival.css';
 
@@ -62,13 +65,7 @@ function CheckInputs({ label, value, result, onChange }: {
           <input value={value.target} placeholder="예 45" aria-invalid={invalid || undefined}
             onChange={(event) => onChange({ ...value, target: event.target.value, roll: null })} />
         </label>
-        <label className="field"><span>유불리</span>
-          <select value={value.edge} onChange={(event) => onChange({ ...value, edge: event.target.value as Edge, roll: null })}>
-            <option value="none">없음</option>
-            <option value="advantage">Advantage</option>
-            <option value="disadvantage">Disadvantage</option>
-          </select>
-        </label>
+        <EdgeToggle value={value.edge} onChange={(edge) => onChange({ ...value, edge, roll: null })} />
       </div>
       <SkillAdjustments skill={label} base={value.target} onBase={(target) => onChange({ ...value, target, roll: null })}
         modifiers={value.modifiers ?? []} onModifiers={(modifiers) => onChange({ ...value, modifiers, roll: null })} />
@@ -130,12 +127,13 @@ function TreatmentTool({ healedHere, onRecord }: { healedHere: boolean; onRecord
   return (
     <section className="survival-card" aria-label="지속 피해와 붕대 처치">
       <h3>지속 피해와 붕대 처치</h3>
+      <ExhaustionHealNote />
       <fieldset className="survival-conditions">
         <legend>전투 후 남은 상태</legend>
         {CONDITIONS.map(({ id, label }) => (
           <label key={id}><input type="checkbox" checked={conditions.includes(id)} onChange={(event) => {
             setCondition(id, event.target.checked);
-          }} />{label}</label>
+          }} /><StatusIcon kind={id} />{label}</label>
         ))}
       </fieldset>
       <div className="survival-preview" role="status" aria-label="다음 방 지속 피해">
@@ -333,8 +331,10 @@ function GrowthTool({ recorded, onRecord }: { recorded: string[]; onRecord: Save
   );
 }
 
-export function PlaySurvival({ pane, onPane, onReport }: {
+export function PlaySurvival({ pane, onPane, onReport, only = false }: {
   pane: SurvivalPane;
+  /** show just the given pane (the field treatment between places) */
+  only?: boolean;
   onPane: (pane: SurvivalPane) => void;
   onReport: (report: SurvivalReport) => void;
 }) {
@@ -352,11 +352,11 @@ export function PlaySurvival({ pane, onPane, onReport }: {
 
   return (
     <section className="play-survival" aria-label="치료·성장 도구">
-      <div className="seg survival-nav" role="group" aria-label="치료·성장 선택">
+      {!only && <div className="seg survival-nav" role="group" aria-label="치료·성장 선택">
         <button type="button" aria-controls={`${paneId}-treatment`} aria-pressed={pane === 'treatment'} onClick={() => onPane('treatment')}>붕대·지속 피해</button>
         <button type="button" aria-controls={`${paneId}-rot`} aria-pressed={pane === 'rot'} onClick={() => onPane('rot')}>부패병</button>
         <button type="button" aria-controls={`${paneId}-growth`} aria-pressed={pane === 'growth'} onClick={() => onPane('growth')}>기술 성장</button>
-      </div>
+      </div>}
       <div id={`${paneId}-treatment`} hidden={pane !== 'treatment'}><TreatmentTool onRecord={onRecord} healedHere={records.some(({ kind, key }) => kind === 'treatment' && key === 'heal')} /></div>
       <div id={`${paneId}-rot`} hidden={pane !== 'rot'}><RotTool onRecord={onRecord} /></div>
       <div id={`${paneId}-growth`} hidden={pane !== 'growth'}><GrowthTool onRecord={onRecord} recorded={records.filter(({ kind }) => kind === 'growth').flatMap(({ key }) => key ?? [])} /></div>

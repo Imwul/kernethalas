@@ -1,4 +1,5 @@
 import { useEffect, useId } from 'react';
+import { EdgeToggle } from './EdgeToggle';
 import type { CreatureRecord } from '../content/entries/creatures';
 import type { CheckResult, Edge } from '../lib/dice';
 import { encounterCheck, encounterFear, encounterInitiativeModifier, encounterInteger, encounterOpposed } from '../lib/encounter-start';
@@ -35,7 +36,7 @@ function CheckField({ label, value, set, roll = false, nonnegative = false }: {
       {roll && <PlayDieHint dice="D100" sides={100} />}
       <input id={id} value={value} inputMode={roll || nonnegative ? 'numeric' : 'text'}
         {...(roll ? field : {})}
-        onChange={(event) => set(event.target.value)} placeholder={roll ? '1–100 / 00' : undefined}
+        onChange={(event) => set(event.target.value)} placeholder={roll ? '1–100' : undefined}
         aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined} />
       {roll && <PlayZeroKey onInput={() => set('00')} />}
       {invalid && <p id={`${id}-error`} className="field-err">
@@ -46,17 +47,7 @@ function CheckField({ label, value, set, roll = false, nonnegative = false }: {
 }
 
 function EdgeField({ label, value, set }: { label: string; value: Edge; set: (value: Edge) => void }) {
-  const id = useId();
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <select id={id} value={value} onChange={(event) => set(event.target.value as Edge)}>
-        <option value="none">없음</option>
-        <option value="advantage">Advantage</option>
-        <option value="disadvantage">Disadvantage</option>
-      </select>
-    </div>
-  );
+  return <EdgeToggle label={label} value={value} onChange={set} />;
 }
 
 function CriticalEffect({ skill, check }: { skill: 'Initiative' | 'Stealth'; check: CheckResult | null }) {
@@ -150,6 +141,7 @@ export function EncounterStart({ creature, onResolved }: {
         </div>
       </div>
       {creature && <p className="encounter-note">{creature.name} 기본 Mind {creature.mind}. 적이 여럿이면 가장 높은 Mind를 사용하세요.</p>}
+      {pc?.hasPerk('Living Shadow') && <p className="encounter-note encounter-perk">Living Shadow Perk · 항상 기습하고, 기습당하지 않습니다.</p>}
       <div className="encounter-traits">
         <label className="encounter-option">
           <input type="checkbox" checked={alertActive} disabled={knownAlert} onChange={(event) => {

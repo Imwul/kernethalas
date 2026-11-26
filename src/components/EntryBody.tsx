@@ -11,6 +11,10 @@ import { RulingNote } from './RulingNote';
 import { UsageDieTool } from './UsageDieTool';
 import { Link } from '../lib/router';
 import { Cite, Notes, Relations, VChip, XRef } from './bits';
+import { masteryCatalog } from '../content/entries/masteries';
+import { MASTERY_BRIEFS } from '../content/mastery-briefs';
+import { usePlayCharacter } from '../lib/play-character';
+import { MasteryTree } from './MasteryTree';
 
 export function EntryBody({ e, compact = false, hideTitle = false, actions }: { e: Entry; compact?: boolean; hideTitle?: boolean; actions?: ReactNode }) {
   const cat = CATEGORY_LABEL[e.category];
@@ -22,6 +26,10 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
   const hasRelated = !!(e.related.length || e.tables?.length || e.procedures?.length);
   // Original wording from the owner's local overlay (never in public builds), shown under the Korean.
   const original = isMastery ? undefined : entrySource(e.id);
+  const masteryInfo = isMastery ? masteryCatalog.find(({ id }) => id === e.id) : undefined;
+  const pc = usePlayCharacter();
+  const learnedTier = !masteryInfo || !pc ? 0 : [...(pc.character.masteries ?? []), ...(pc.character.amulet ? [pc.character.amulet] : [])]
+    .find(({ id }) => id === masteryInfo.id)?.tier ?? 0;
   const abilityOriginal = (label: string) => isMastery ? masterySource(e.id, label.split(' · ').slice(1).join(' · ')) : undefined;
   return (
     <article className="folio reference-folio">
@@ -68,7 +76,14 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
               <ol className="steps">{e.resolution.map((item, index) => <li key={index}>{item}</li>)}</ol>
             </div>
           ) : null}
-          {e.outcomes?.length ? (
+          {isMastery && masteryInfo ? (
+            <div className="block">
+              <h3>Feature와 능력</h3>
+              {MASTERY_BRIEFS[masteryInfo.id] && <p className="mastery-list-tags">{MASTERY_BRIEFS[masteryInfo.id].tags.map((tag) => <span key={tag}>{tag}</span>)}</p>}
+              <MasteryTree mastery={masteryInfo} learned={learnedTier} plain={learnedTier === 0} full
+                label={learnedTier ? `${masteryInfo.name} 테크트리 · 내 캐릭터 Tier ${learnedTier}` : undefined} />
+            </div>
+          ) : e.outcomes?.length ? (
             <div className="block">
               <h3>{isMastery ? 'Feature와 능력' : e.kind === 'trait' || e.kind === 'term' ? '항목' : '결과와 효과'}</h3>
               <dl className={`outcomes${isMastery ? ' tiers' : ''}`}>

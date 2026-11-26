@@ -16,6 +16,9 @@
 }
 .physical-check-form > .field { flex: 1 1 7.5rem; min-width: 0; max-inline-size: 12rem; }
 .physical-check-form > .physical-check-weapon { flex-basis: 11rem; max-inline-size: 16rem; }
+/* the value box and the −/+ toggle take only the room they need, so the D100 box follows right after */
+.physical-check-form > label.field:first-child { flex: 0 0 7.5rem; }
+.physical-check-form > .edge-field { flex: 0 0 auto; }
 .physical-check-form :is(input, select, button) { min-height: 44px; }
 .physical-check-form :is(input, select) { width: 100%; min-width: 0; }
 .physical-check-actions, .physical-check-result { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s1) var(--s2); }
@@ -25,3 +28,6 @@
 .physical-check-result > .readout { font-size: 1.45rem; }
 .physical-check-critical { flex: 1 0 100%; display: grid; min-width: 0; gap: var(--s1); }
 .physical-check-critical:empty { display: none; }
+
+/* Exhaustion / Perk / Madness notes sit on their own line under the inputs */
+.physical-check-exhausted { flex: 1 0 100%; order: 9; margin: 0; color: var(--oxblood-ink); font: 600 13px/1.5 var(--f-ui); }

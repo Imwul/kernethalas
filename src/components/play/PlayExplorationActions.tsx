@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { EdgeToggle } from '../EdgeToggle';
 import { tableById } from '../../content';
 import type { TableRow } from '../../content/schema';
 import { d100FromValue, resolveCheck, rollDie, type Edge } from '../../lib/dice';
@@ -12,6 +13,7 @@ import { usePlayCharacter } from '../../lib/play-character';
 import { gearCount, type GearEffect, type PaperChange } from '../../lib/play-inventory';
 import { useRecordSkillCritical } from '../../lib/skill-growth';
 import { XRef } from '../bits';
+import { FieldCare } from './PlayLingering';
 import { LockTrapTool, type PlayLockReport } from '../LockTrapTool';
 import { JournalRoll } from '../LootJournal';
 import { PhysicalSkillRoll, SkillCriticalDetails, skillCheckSucceeded } from '../PhysicalSkillRoll';
@@ -33,7 +35,7 @@ export interface ExplorationActionReport {
   darknessRolls: number[];
 }
 
-export type ExplorationAction = 'door' | 'environment' | 'scavenge' | 'deep';
+export type ExplorationAction = 'door' | 'environment' | 'scavenge' | 'deep' | 'care';
 
 export interface ExplorationActionsHandle {
   open: (action: ExplorationAction, mapExit?: string) => void;
@@ -289,7 +291,11 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
           { id: 'scavenge' as const, label: '방 뒤지기', badge: scavengeLimit > 1 ? `${searchesUsed}/${scavengeLimit}` : undefined },
           { id: 'deep' as const, label: '깊은 수색' },
         ] : []),
+        { id: 'care' as const, label: '붕대 치료' },
       ]} />
+      <PlayStripPane prefix={panelId} id="care" open={pane === 'care'}>
+        {pane === 'care' && <div className="play-explore-action-body"><FieldCare /></div>}
+      </PlayStripPane>
       <PlayStripPane prefix={panelId} id="door" open={pane === 'door'}>
         <div className="play-explore-action-body">
           {mapLocation && onMapDoorSave && <section className="play-door-map" aria-label="종이 지도 출입구 연결">
@@ -441,11 +447,14 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const [spoils, setSpoils] = useState('');
   const [spoilsItem, setSpoilsItem] = useState('');
   const [spoilsGear, setSpoilsGear] = useState<GearEffect>();
-  const savedScavenge = usePlayCharacter()?.skill('Scavenge') ?? '';
+  const pc = usePlayCharacter();
+  const savedScavenge = pc?.skill('Scavenge') ?? '';
+  // Madness 5 makes Scavenging Demanding (−10) per result (p.91); it starts in the adjustments and stays editable.
+  const madnessPenalty = pc?.madness.scavenging ?? 0;
   const skill = draftSkill ?? check?.skill ?? savedScavenge;
   const rawRoll = draftRoll ?? (check ? String(check.roll) : '');
   const edge = draftEdge ?? check?.edge ?? 'none';
-  const modifiers = draftModifiers ?? check?.modifiers ?? [];
+  const modifiers = draftModifiers ?? check?.modifiers ?? (madnessPenalty ? [{ reason: '난이도', amount: `-${madnessPenalty}` }] : []);
   const breakdown = skillBreakdown(skill, modifiers);
   const confirmedSkill = check && skillBreakdown(check.skill, check.modifiers);
   const checkOutcome = check && confirmedSkill ? resolveCheck(d100FromValue(check.roll), confirmedSkill.total, check.edge) : null;
@@ -506,13 +515,11 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
       }}>
         <label className="field"><span>Scavenge 수치</span><input value={skill} inputMode="text"
           onChange={(event) => setSkill(event.target.value)} placeholder="예: 55" /></label>
-        <label className="field"><span>유불리</span><select value={edge} onChange={(event) => setEdge(event.target.value as Edge)}>
-          <option value="none">없음</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option>
-        </select></label>
+        <EdgeToggle value={edge} onChange={setEdge} />
         <div className="field"><label htmlFor={`${id}-scavenge-roll`}>Scavenge D100</label><PlayDieHint dice="D100" sides={100} />
           <input id={`${id}-scavenge-roll`} value={rawRoll} inputMode="numeric" {...diceField}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-scavenge-error` : undefined}
-          onChange={(event) => { setRoll(event.target.value); setInvalid(false); }} placeholder="1–100/00" /></div>
+          onChange={(event) => { setRoll(event.target.value); setInvalid(false); }} placeholder="1–100" /></div>
         <div className="physical-check-actions">
           <PlayZeroKey onInput={() => { setRoll('00'); setInvalid(false); }} />
           <button className="btn ghost" type="submit">판정</button>
@@ -521,6 +528,8 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
         <SkillAdjustments skill="Scavenge" base={skill} onBase={setSkill} modifiers={modifiers} onModifiers={setModifiers} />
         {invalid && <p className="field-err" id={`${id}-scavenge-error`} role="alert">Skill 정수와 1–100 사이의 주사위(또는 00)를 입력하세요.</p>}
       </form>
+      {!check && madnessPenalty > 0 && <p className="play-explore-note">광기 · 뒤지기 −{madnessPenalty} 기본 적용</p>}
+      {allowsTable && pc?.hasPerk('Scavenger') && <p className="play-explore-note">Scavenger Perk · 표 결과를 D4만큼 올리거나 내릴 수 있음</p>}
       {checkOutcome && <div className="play-explore-note" role="status">
         뒤지기 {CHECK_LABELS[checkOutcome.outcome]}
         <SkillCriticalDetails skill="Scavenge" outcome={checkOutcome.outcome} />

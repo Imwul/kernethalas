@@ -1,4 +1,6 @@
 import { useId, useRef, useState, type Ref } from 'react';
+import { EdgeToggle } from './EdgeToggle';
+import { exhaustionDisadvantage } from '../lib/character-progress';
 import { procById } from '../content';
 import { d100FromValue, resolveCheck, resolveOpposed, type Edge } from '../lib/dice';
 import { resolvePhysicalAttack, type AttackDefenseMode } from '../lib/attack-defense';
@@ -79,18 +81,11 @@ function Side({ label, s, set, disabled, rollRef, field, editableSkill }: {
             onChange={(e) => set({ skill: e.target.value })} />
           {invalidSkill && <p className="field-err" id={`${id}-skill-error`}>보정한 Skill을 정수로 입력하세요.</p>}
         </div>
-        <div className="field">
-          <label htmlFor={`${id}-edge`}><span className="sr-only">{label} </span>유불리</label>
-          <select id={`${id}-edge`} value={s.edge} onChange={(e) => set({ edge: e.target.value as Edge })}>
-            <option value="none">없음</option>
-            <option value="advantage">Advantage</option>
-            <option value="disadvantage">Disadvantage</option>
-          </select>
-        </div>
+        <EdgeToggle label={<><span className="sr-only">{label} </span>유불리</>} value={s.edge} onChange={(edge) => set({ edge })} />
         <div className="field">
           <label htmlFor={`${id}-roll`}><span className="sr-only">{label} </span>D100</label>
           <PlayDieHint dice="D100" sides={100} />
-          <input id={`${id}-roll`} ref={rollRef} inputMode="numeric" value={s.rollv} placeholder="1–100/00" {...field}
+          <input id={`${id}-roll`} ref={rollRef} inputMode="numeric" value={s.rollv} placeholder="1–100" {...field}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-roll-error` : undefined}
             onChange={(e) => changeRoll(e.target.value)} />
           <PlayZeroKey onInput={() => changeRoll('00')} />
@@ -148,9 +143,11 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const importedSkill = enemySkill == null ? '' : String(enemySkill + (enemyAttacks ? 10 : 0));
   const noRoll = { rollv: '', edge: 'none' as const };
   const pcSheet = creature ? pcCharacter : null;
-  const a = { ...noRoll, skill: creature && enemyAttacks ? importedSkill : pcSheet ? pcSheet.attackSkill : attackOnly ? '' : '60',
+  // Exhaustion 16–20: the PC's side starts at Disadvantage (p.90).
+  const exhausted = !!pcSheet && exhaustionDisadvantage(pcSheet.exhaustion);
+  const a = { ...noRoll, ...(exhausted && !enemyAttacks ? { edge: 'disadvantage' as const } : {}), skill: creature && enemyAttacks ? importedSkill : pcSheet ? pcSheet.attackSkill : attackOnly ? '' : '60',
     ...(pcSheet && !enemyAttacks && pcSheet.character.weapon ? { growthSkill: pcSheet.character.weapon } : {}), ...inputs[aKey] };
-  const b = { ...noRoll, skill: creature && !enemyAttacks ? importedSkill : pcSheet ? pcSheet.defenseSkill : attackOnly ? '' : '50',
+  const b = { ...noRoll, ...(exhausted && enemyAttacks ? { edge: 'disadvantage' as const } : {}), skill: creature && !enemyAttacks ? importedSkill : pcSheet ? pcSheet.defenseSkill : attackOnly ? '' : '50',
     ...(pcSheet && enemyAttacks && pcSheet.character.defense ? { growthSkill: pcSheet.character.defense } : {}), ...inputs[bKey] };
   const setSide = (key: SideId, patch: Partial<SideState>) =>
     setInputs((current) => ({ ...current, [key]: { ...current[key], ...patch } }));

@@ -6,6 +6,7 @@ import { readOracleValue } from '../lib/oracle';
 import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { XRef } from './bits';
+import { PerkNote } from './PerkNote';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { TensionTool, type TensionResult } from './TensionTool';
 import { PlayDieHint } from './play/PlayDieHints';
@@ -358,6 +359,7 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
     <section className="lock-trap-step" aria-label="잠긴 대상 열기">
       <h3>잠긴 대상 열기</h3>
       {openedReport && <p className="lock-trap-note" role="status">개방 성공 · XP +10</p>}
+      {openedReport && container && <PerkNote perk="Lucky Find">용기를 열 때마다 D20₵을 얻습니다.</PerkNote>}
       {!embedded && openedReport && container && (
         <div className="lock-trap-links"><XRef id="t-deep-search">깊은 수색으로 찾은 용기 보상</XRef></div>
       )}

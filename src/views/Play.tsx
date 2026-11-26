@@ -40,7 +40,17 @@ import {
 import { isQuickUseEntry, type PaperChange } from '../lib/play-inventory';
 import { hasRestoreUndo } from '../lib/site-backup';
 import { SKILL_PRESETS_SLOT } from '../lib/play-skill';
-import { PLAY_CHARACTER_SLOT, type PlayCharacter as PlayCharacterRecord } from '../lib/play-character';
+import {
+  CharacterRoomContext, PLAY_CHARACTER_SLOT, XP_TO_LEVEL, currentProgress, foldRoomProgress, isPlayCharacter, madnessEffects,
+  type PlayCharacter as PlayCharacterRecord,
+} from '../lib/play-character';
+import { goalCounts, roomProgress } from '../lib/character-progress';
+import { startingGearToLedger, type GearLine } from '../lib/character-creation';
+import { CHARACTER_LOG_SLOT } from '../components/play/PlayExhaustion';
+import { ExhaustionHealNote } from '../components/play/ExhaustionHealNote';
+import { LINGERING_ENTRY_SLOT, LingeringEntryAlert } from '../components/play/PlayLingering';
+import { StatusIcon, type StatusKind } from '../components/StatusIcon';
+import { CHARACTER_SECTION_EVENT, LEVEL_UP_EVENT, USE_ABILITY_EVENT, type CharacterSection } from '../components/play/PlayCharacter';
 import { navigate, useLocation } from '../lib/router';
 import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
 import '../styles/play.css';
@@ -138,6 +148,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const requestedCreature = search.get(BESTIARY_CREATURE_PARAM);
   const bestiaryCreature = requestedCreature && creatureById.has(requestedCreature) ? requestedCreature : null;
   const gear = useGearLedger();
+  const applyStartingGear = (lines: GearLine[]) =>
+    gear.change((ledger) => startingGearToLedger(ledger, lines, `creation:${crypto.randomUUID()}`));
   const pendingGrowth = usePendingSkillGrowth();
   const skillCriticalHistory = useSkillCriticalHistory();
   const [active, setActive] = usePlayDraftState<StageId>('active', 'explore');
@@ -161,6 +173,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [equipmentSheet, setEquipmentSheet] = useState<PaperChange[]>([]);
   const [advancementReport, setAdvancementReport] = useState('');
   const [advancementSheet, setAdvancementSheet] = useState<PaperChange[]>([]);
+  const [xpSpent, setXpSpent] = useState(0);
   const [masteryReports, setMasteryReports] = usePlayDraftState<Record<string, string>>('masteryReports', {});
   const [masterySheet, setMasterySheet] = usePlayDraftState<Record<string, PaperChange[]>>('masterySheet', {});
   const [battleSheet, setBattleSheet] = usePlayDraftState<Record<string, PaperChange[]>>('battleSheet', {});
@@ -271,6 +284,26 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     if (!drawerDocked()) setDrawer(null);
   };
   const goToRollHistory = () => openDrawer('history', 'play-roll-log-title');
+  const openCharacterSection = (section: CharacterSection) => {
+    openDrawer('character');
+    requestAnimationFrame(() => document.dispatchEvent(new CustomEvent(CHARACTER_SECTION_EVENT, { detail: section })));
+  };
+  const goToLevelUp = () => {
+    closeOverlayDrawer();
+    selectStage('wrapup');
+    requestAnimationFrame(() => wrapUp.current?.open('advancement'));
+  };
+  useEffect(() => {
+    // The character tab's shortcuts: record a level-up, or use a learned ability in the current fight.
+    const levelUp = () => goToLevelUp();
+    const useAbility = () => { closeOverlayDrawer(); selectStage('combat'); };
+    document.addEventListener(LEVEL_UP_EVENT, levelUp);
+    document.addEventListener(USE_ABILITY_EVENT, useAbility);
+    return () => {
+      document.removeEventListener(LEVEL_UP_EVENT, levelUp);
+      document.removeEventListener(USE_ABILITY_EVENT, useAbility);
+    };
+  });
   useEffect(() => {
     // A correction for a roll recorded inside the drawer (domain dice, gear) opens its pane.
     const open = (event: Event) => {
@@ -416,17 +449,22 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     setEquipmentSheet([]);
     setAdvancementReport('');
     setAdvancementSheet([]);
+    setXpSpent(0);
     setDarkness(null);
     setActionDarkness([]);
     setBreatherDarkness(null);
     setBreatherTension(null);
   };
-  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides, nextTimeline = timeline) => {
+  const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides, nextTimeline = timeline, carry = true) => {
+    // Moving on folds this place's XP and Exhaustion into the character; clearing the place drops them.
+    const saved = draft.slots[PLAY_CHARACTER_SLOT];
+    const character = isPlayCharacter(saved) && carry ? foldRoomProgress(saved, progress) : saved;
     draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
       roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth,
       [PAPER_MAP_SLOT]: paperMap, [PLAY_TIMELINE_SLOT]: nextTimeline, [PLAY_EFFECTS_SLOT]: ongoing,
       [PLAY_PENDING_ROLLS_SLOT]: pendingRolls, [SKILL_PRESETS_SLOT]: draft.slots[SKILL_PRESETS_SLOT] ?? {},
-      ...(draft.slots[PLAY_CHARACTER_SLOT] ? { [PLAY_CHARACTER_SLOT]: draft.slots[PLAY_CHARACTER_SLOT] } : {}) });
+      [LINGERING_ENTRY_SLOT]: carry ? ongoing.conditions : draft.slots[LINGERING_ENTRY_SLOT] ?? [],
+      ...(character ? { [PLAY_CHARACTER_SLOT]: character } : {}) });
     resetReports();
     focusStage('explore');
   };
@@ -482,6 +520,9 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     { label: '메모', value: note.trim() },
   ].filter(({ value }) => value);
   const journal = facts.map(({ label, value }) => `${label} ${value}`).join(' / ');
+  const characterLogSlot = draft.slots[CHARACTER_LOG_SLOT];
+  const characterLog: PaperChange[] = Array.isArray(characterLogSlot) ? characterLogSlot.filter((item): item is PaperChange =>
+    !!item && typeof item === 'object' && typeof item.id === 'string' && typeof item.text === 'string') : [];
   const sheet = [
     ...(exploration?.sheet ?? []),
     ...completedBattles.flatMap(([id]) => battleSheet[id] ?? []),
@@ -490,6 +531,34 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     ...advancementSheet,
     ...ongoingChanges,
     ...Object.entries(masterySheet).flatMap(([id, items]) => items.map((item) => ({ ...item, id: `${id}:${item.id}` }))),
+    ...characterLog,
+  ];
+  const pcRecord = draft.slots[PLAY_CHARACTER_SLOT];
+  const pcMadness = madnessEffects(isPlayCharacter(pcRecord) ? pcRecord.madness : []);
+  const defeatedForGoals = Object.values(battles).flatMap((battle) => battle.defeatedTargets ?? []).flatMap(({ creatureId }) => {
+    const creature = creatureById.get(creatureId);
+    return creature ? [{ types: creature.types, overseer: creature.group === 'overseer' }] : [];
+  });
+  const progress = roomProgress(sheet, xpSpent, { xpLoss: pcMadness.xpLoss, extraSanityLoss: pcMadness.extraSanityLoss,
+    goals: goalCounts({ defeated: defeatedForGoals, sheet,
+      darkness: (darkness !== null ? 1 : 0) + actionDarkness.length + (breatherDarkness !== null ? 1 : 0) }) });
+  const pcNow = isPlayCharacter(pcRecord) ? currentProgress(pcRecord, progress) : null;
+  type Alert = { id: string; label: string; level: string; icon: StatusKind; onClick: () => void };
+  const characterAlerts: Alert[] = [
+    ...ongoing.conditions.map((id) => {
+      const label = LINGERING_CONDITIONS.find((item) => item.id === id)?.label ?? id;
+      const level = id !== 'burning' && (ongoing.levels?.[id] ?? 1) > 1 ? ` ${ongoing.levels?.[id]}` : '';
+      return { id, label: `${label}${level}`, level: 'danger', icon: id, onClick: () => openDrawer('ongoing') };
+    }),
+    ...(!pcNow ? [] : [
+      ...((pcNow.exhaustion ?? 0) >= 21 || pcMadness.dead
+        ? [{ id: 'dead', label: '사망 확인', level: 'danger', icon: 'death' as const, onClick: () => openCharacterSection('state') }] : []),
+      ...(pcNow.sanity === 0 ? [{ id: 'madness', label: 'Sanity 0 · 광기', level: 'danger', icon: 'madness' as const, onClick: () => openCharacterSection('state') }] : []),
+      ...(pcNow.exhaustion !== undefined && pcNow.exhaustion >= 11 && pcNow.exhaustion <= 20
+        ? [{ id: 'exhaustion', label: pcNow.exhaustion >= 16 ? `Exh ${pcNow.exhaustion} · 판정 불리` : `Exh ${pcNow.exhaustion} · 회복 절반`,
+          level: pcNow.exhaustion >= 16 ? 'danger' : 'warn', icon: 'exhaustion' as const, onClick: () => openCharacterSection('state') }] : []),
+      ...(pcNow.xp !== undefined && pcNow.xp >= XP_TO_LEVEL ? [{ id: 'level', label: '레벨업 가능', level: 'good', icon: 'level' as const, onClick: goToLevelUp }] : []),
+    ]),
   ];
   const gearChanges = sheet.filter((item) => item.gear);
   const postedGear = roomLedgerId ? gear.ledger.entries.flatMap((entry) => {
@@ -542,7 +611,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const activeOngoing = ongoing.conditions.length + ongoing.abilities.length;
   const characterLevel = (draft.slots[PLAY_CHARACTER_SLOT] as PlayCharacterRecord | undefined)?.level;
   const drawerTabs: DrawerTab<DrawerId>[] = [
-    { id: 'character', label: '캐릭터', title: '캐릭터 기본값', badge: characterLevel ? `Lv${characterLevel}` : undefined, content: <PlayCharacter /> },
+    { id: 'character', label: '캐릭터', title: '캐릭터 기본값', badge: characterLevel ? `Lv${characterLevel}` : undefined, content: <PlayCharacter onApplyGear={applyStartingGear} /> },
     { id: 'history', label: '이력', title: '굴림 이력', badge: draft.history.length || undefined,
       content: <PlayRollHistory key={revision} paperCommitted={paperCommitted} onCorrection={goToRecordedField} /> },
     { id: 'gear', label: '장비', title: '장비 장부', badge: gear.ledger.items.length || undefined,
@@ -571,6 +640,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   ];
 
   return (
+    <CharacterRoomContext.Provider value={progress}>
     <div className="play-desk" ref={desk} data-physical-first={physicalFirst || undefined} data-drawer={drawer ?? undefined}
       onKeyDownCapture={advanceDiceFocus}>
       <header className="play-header">
@@ -595,7 +665,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       {confirmReset && (
         <div className="play-reset" id="play-reset" role="group" aria-label="새 장소 확인">
           <p>이번 장소의 입력과 굴림 결과를 저널에 남기지 않고 지웁니다. 기록을 남기고 넘어가려면 저널의 다음 장소를 누르세요.</p>
-          <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(false), domain.id, initialTension)}>지우고 새로 시작</button>
+          <button className="btn primary" type="button" onClick={() => resetRoom(storeDomain(false), domain.id, initialTension, timeline, false)}>지우고 새로 시작</button>
           <button className="btn ghost" type="button" onClick={() => setConfirmReset(false)}>취소</button>
         </div>
       )}
@@ -616,6 +686,10 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
             <DrawerTabLabel label="장부" flag={needsBackup ? '백업 필요' : undefined} />
           </button>
         </div>
+        {characterAlerts.length > 0 && <div className="play-alerts" role="group" aria-label="캐릭터 경고">
+          {characterAlerts.map(({ id, label, level, icon, onClick }) => <button key={id} type="button" className="play-alert-chip" data-level={level}
+            onClick={onClick}><StatusIcon kind={icon} />{label}</button>)}
+        </div>}
       </div>
 
       <div className="play-layout">
@@ -623,9 +697,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           <section className="play-stage" id="play-stage-explore" aria-labelledby="play-explore" hidden={active !== 'explore'}>
             {stageHeading('explore')}
             <EffectNotice effects={effects} types={EXPLORE_EFFECTS} />
-            {ongoing.conditions.length > 0 && <p className="play-effect-note">
-              다음 방 · {LINGERING_CONDITIONS.filter(({ id }) => ongoing.conditions.includes(id)).map(({ label }) => label).join(' · ')} · Health −{ongoing.conditions.length} · Armor 무시
-            </p>}
+            <LingeringEntryAlert />
             {!!domain.retreats?.length && (
               <section className="play-reentries" aria-label="후퇴했던 장소">
                 <h3>후퇴했던 장소</h3>
@@ -666,6 +738,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           </section>
           <section className="play-stage" id="play-stage-wrapup" aria-labelledby="play-wrapup" hidden={active !== 'wrapup'}>
             {stageHeading('wrapup')}
+            <ExhaustionHealNote />
             <EffectNotice effects={effects} types={REST_EFFECTS} />
             {completedBattles.length > 1 && (
               <label className="field play-wrap-battle"><span>정리할 전투</span>
@@ -691,7 +764,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                     <PlayEquipment key={`equipment-${revision}`} inventory={gear.ledger.items} onSheetChange={setEquipmentSheet} onJournalChange={setEquipmentReport} />
                   </PlayDraftScope> },
                   { id: 'advancement', label: 'XP·레벨업', content: <PlayDraftScope root name="advancement">
-                    <PlayAdvancement key={`advancement-${revision}`} onSheetChange={setAdvancementSheet} onJournalChange={setAdvancementReport} />
+                    <PlayAdvancement key={`advancement-${revision}`} onSheetChange={setAdvancementSheet} onJournalChange={setAdvancementReport}
+                      onXpSpent={setXpSpent} />
                   </PlayDraftScope> },
                 ]} />
             </PlayDraftScope>
@@ -779,5 +853,6 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
         </aside>
       </div>
     </div>
+    </CharacterRoomContext.Provider>
   );
 }
