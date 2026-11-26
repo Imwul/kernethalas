@@ -138,6 +138,10 @@
   border-block: 1px solid var(--rule);
   background: var(--bone);
 }
+/* wide bars: stage tabs | character values and warnings | ledger buttons on the right edge
+   (kept here, before the narrow-desk rules below, so those can move the warnings to their own row) */
+.play-bar > .play-alerts { order: 1; margin-inline-start: auto; }
+.play-bar > .play-tray { order: 2; }
 .play-nav { display: flex; flex-wrap: wrap; min-width: 0; }
 .play-nav button, .play-tray button {
   display: inline-flex;

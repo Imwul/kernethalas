@@ -174,9 +174,6 @@
 
 /* Character warnings beside the drawer buttons: tap to open the matching section or tool */
 .play-alerts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
-/* wide bars: stage tabs | character values and warnings | ledger buttons on the right edge */
-.play-bar > .play-alerts { order: 1; margin-inline-start: auto; }
-.play-bar > .play-tray { order: 2; }
 .play-alert-chip {
   display: inline-flex;
   align-items: center;

@@ -29,6 +29,8 @@ test('intermediate mobile widths keep the campaign menu in bounds and the drawer
   await page.keyboard.press('Escape');
   await expect(drawer).toBeHidden();
   await page.getByRole('button', { name: '저널', exact: true }).click();
+  // the stage switch moves focus into the journal a frame later; let it land before focusing the footer link
+  await expect(page.locator('#play-stage-journal').locator(':focus')).toHaveCount(1);
   const sources = page.getByRole('link', { name: '출처 · 수록 범위 · 검증 현황' });
   await sources.focus();
   await expect.poll(async () => {
