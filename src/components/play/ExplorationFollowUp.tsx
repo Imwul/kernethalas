@@ -1,9 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { tableById } from '../../content';
 import type { RollResult } from '../../lib/dice';
-import { followUpSteps, type FollowAnswers, type FollowStep } from '../../lib/exploration-follow-up';
+import { followUpSteps, type FollowAnswers, type FollowStep, type RequiredExplorationRoll } from '../../lib/exploration-follow-up';
 import { journalRow } from '../../lib/loot-journal';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftScope, usePlayDraftState } from '../../lib/play-draft';
 import type { GearEffect } from '../../lib/play-inventory';
 import { XRef } from '../bits';
 import { PhysicalSkillRoll, skillCheckSucceeded } from '../PhysicalSkillRoll';
@@ -16,9 +16,10 @@ import '../../styles/exploration-follow-up.css';
 export interface FollowUpReport {
   items: ActionSheetItem[];
   darkness: number | null;
+  required: RequiredExplorationRoll[];
 }
 
-export const EMPTY_FOLLOW_UP: FollowUpReport = { items: [], darkness: null };
+export const EMPTY_FOLLOW_UP: FollowUpReport = { items: [], darkness: null, required: [] };
 const EMPTY_STEPS: FollowStep[] = [];
 type LootResult = { text: string; gear?: GearEffect };
 
@@ -40,6 +41,7 @@ export function ExplorationFollowUp({ kind, row, darknessEffectCount, onReport, 
   onEnvironmentTrap?: () => void;
 }) {
   const clear = useClearPlayDraftScope();
+  const scope = usePlayDraftScope();
   const [answers, setAnswers] = usePlayDraftState<FollowAnswers>('answers', {});
   const [rolls, setRolls] = usePlayDraftState<Record<string, RollResult>>('rolls', {});
   const [loot, setLoot] = useState<Record<string, LootResult>>({});
@@ -69,9 +71,24 @@ export function ExplorationFollowUp({ kind, row, darknessEffectCount, onReport, 
       }
       return text ? [{ id: `${kind}-${row}-${step.id}`, text, gear }] : [];
     });
-    if (nestedDarkness !== null) items.push(...nested.items.map((item) => ({ ...item, id: `${kind}-${row}-${item.id}` })));
-    return { items, darkness: nestedDarkness };
-  }, [kind, row, loot, nested, nestedDarkness, rolls, values, visible]);
+    const required = visible.flatMap<RequiredExplorationRoll>((step) => {
+      if (kind === 'darkness' && step.kind === 'check' && !values[step.id]) {
+        return [{ label: `${step.skill} D100`, field: `${scope}${encodeURIComponent(step.id)}/skill-roll` }];
+      }
+      if (kind === 'darkness' && step.kind === 'roll' && rolls[step.id]?.expr !== diceFor(step, values)) {
+        return [{ label: `${step.label} ${diceFor(step, values)}`, field: `${scope}dice:${step.label}` }];
+      }
+      if (step.kind === 'table' && step.table === 't-growing-darkness' && !values[step.id]) {
+        return [{ label: '짙어지는 어둠 D100', field: `${scope}${encodeURIComponent(step.id)}/oracle:${step.table}` }];
+      }
+      return [];
+    });
+    if (nestedDarkness !== null) {
+      items.push(...nested.items.map((item) => ({ ...item, id: `${kind}-${row}-${item.id}` })));
+      required.push(...nested.required);
+    }
+    return { items, darkness: nestedDarkness, required };
+  }, [kind, row, loot, nested, nestedDarkness, rolls, scope, values, visible]);
   useEffect(() => { onReport(report); }, [onReport, report]);
 
   const applyAnswer = (id: string, value: string | number) => {

@@ -3,7 +3,7 @@ import type { OracleTable, TableRow } from '../content/schema';
 import { d100FromValue } from '../lib/dice';
 import { automaticRollSides, oracleRowsAvailable, readOracleValue, rollTable } from '../lib/oracle';
 import { tableRowSource } from '../lib/overlay';
-import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { CopyButton, XRef } from './bits';
 import { IDie } from './icons';
@@ -32,11 +32,12 @@ interface Props {
 export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, rollLabel, sourceForRow, showUnrolledViewToggle,
   hideViewToggle = false, beforeRoll, roomShape, afterResult, play = false }: Props) {
   const id = useId();
-  const [manual, setManual] = useState('');
+  const key = `oracle:${t.id}`;
+  const [manual, setManual] = usePlayRollInput(key);
   const [invalid, setInvalid] = useState(false);
   const [history, setHistory] = usePlayDraftState<number[]>(`oracle-history:${t.id}`, []);
   const commitRoll = usePlayRoll();
-  const field = usePlayRollField(`oracle:${t.id}`, t.ko, t.dice, value !== null, sides === 100);
+  const field = usePlayRollField(key, t.ko, t.dice, value !== null && !manual, sides === 100);
   const canRoll = automaticRollSides(t) !== null;
   const row = value === null ? undefined : t.rows.find((r) => value >= r.min && value <= r.max);
   const showViewMode = !hideViewToggle && (value !== null || showUnrolledViewToggle);
@@ -51,6 +52,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
       setHistory((h) => [n, ...h].slice(0, 12));
       onValue(n);
     }, { label: t.ko, dice: t.dice, value: sides === 100 && n === 100 ? '00' : String(n), source, field: field['data-play-roll-field'] });
+    setManual('');
   };
   const copyText = row ? [
     `[${t.en}, ${t.dice}: ${value}] ${showLabel(t, row) ? row.label + ' — ' : ''}${row.ko}`,
@@ -77,7 +79,7 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
             </button>
           )}
           {value !== null && (
-            <button className="btn ghost" type="button" onClick={() => onValue(null)}>
+            <button className="btn ghost" type="button" onClick={() => { onValue(null); setManual(''); setInvalid(false); }}>
               지우기
             </button>
           )}
@@ -98,7 +100,6 @@ export function Roller({ t, sides, value, onValue, only, onOnly, onShowRow, roll
           return;
         }
         rollValue(number, 'manual');
-        setManual('');
       }}>
         <div className="oracle-manual-label"><label htmlFor={id}>직접 굴린 값</label><PlayDieHint dice={t.dice} sides={sides} /></div>
         <input

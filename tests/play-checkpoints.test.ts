@@ -3,6 +3,8 @@ import { CHECKPOINT_MAX_BYTES, exportPlayCheckpoint, parsePlayCheckpoint, type P
 import { newDomainProgress } from '../src/lib/domain-progress';
 import { newPlayDomain } from '../src/lib/play-domain';
 import { EMPTY_DOOR_INVESTIGATION } from '../src/lib/lock-trap';
+import { archiveMapClueSources, clueRollProvenance, mapClueSourceChanged } from '../src/lib/paper-map-clues';
+import type { PaperMapLocation } from '../src/lib/paper-map';
 
 function checkpoint(): PlayCheckpoint {
   return {
@@ -50,6 +52,32 @@ describe('play checkpoint files', () => {
       saved.data.slots.paperMap = [{ ...first, clues: invalid }, second];
       expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
     }
+  });
+
+  test('retains exact clue provenance and freezes changed sources when leaving a visit', () => {
+    const saved = checkpoint();
+    Object.assign(saved.data.slots, { roomLedgerId: 'visit-one', 'explore/event-roll': 55, 'explore/map-clue-event': 'original' });
+    const { slots } = saved.data;
+    const clue = { id: 'clue-1', text: '이벤트 메모', source: 'event', status: 'confirmed', provenance: clueRollProvenance(slots, 'event') } as const;
+    const places: PaperMapLocation[] = [{ domainId: 1, paperId: 'B-07', area: 'room', note: '', tags: [], clues: [clue] }];
+    slots.paperMap = places;
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+    expect(mapClueSourceChanged(clue, slots)).toBe(false);
+
+    slots['explore/map-clue-event'] = 'same-value-replacement';
+    expect(mapClueSourceChanged(clue, slots)).toBe(true);
+    const archived = archiveMapClueSources(places, slots);
+    const recorded = archived[0].clues?.[0];
+    expect(recorded?.text).toBe(clue.text);
+    expect(recorded?.provenance?.changed).toBe(true);
+    const detached = { roomLedgerId: 'visit-two', 'explore/event-roll': 55, 'explore/map-clue-event': 'original' };
+    expect(recorded && mapClueSourceChanged(recorded, detached)).toBe(true);
+    expect(mapClueSourceChanged(clue, detached)).toBe(false);
+
+    slots.paperMap = archived;
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toEqual(saved);
+    slots['explore/map-clue-event'] = { malformed: true };
+    expect(parsePlayCheckpoint(exportPlayCheckpoint(saved))).toBeNull();
   });
 
   test('round-trips paper records and a bounded summon roll', () => {

@@ -3,6 +3,7 @@ import { gearCount, type GearEffect } from './play-inventory';
 
 type Answer = 'success' | 'failure' | string | number;
 export type FollowAnswers = Partial<Record<string, Answer>>;
+export type RequiredExplorationRoll = { label: string; field: string };
 type Condition = (answers: FollowAnswers) => boolean;
 type FollowAction =
   | { kind: 'check'; id: string; skill: string }

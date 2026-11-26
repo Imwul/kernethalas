@@ -88,6 +88,16 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
       await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
       await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
       await combat.getByRole('button', { name: '전투만 마치기', exact: true }).click();
+      const battlePicker = page.getByRole('combobox', { name: '정리할 전투' });
+      const recoveryInput = wrap.getByRole('group', { name: '전투 후 Toughness 회복 D4', exact: true })
+        .getByRole('textbox', { name: '직접 굴린 값', exact: true });
+      const latestBattle = await battlePicker.inputValue();
+      await recoveryInput.fill('2');
+      await battlePicker.selectOption({ index: 0 });
+      await expect(recoveryInput).toHaveValue('');
+      await expect(wrap.getByRole('group', { name: '전투 후 Toughness 회복 D4', exact: true })).toContainText('Toughness +3');
+      await battlePicker.selectOption(latestBattle);
+      await expect(recoveryInput).toHaveValue('2');
       await wrap.getByRole('button', { name: '전리품', exact: true }).click();
       await expect(wrap.getByRole('combobox', { name: '전리품 표' })).toBeVisible();
       await expect(wrap.getByRole('combobox', { name: '전리품 표' }).getByRole('option', { name: 'Necropede 처치 보상' })).toHaveCount(0);

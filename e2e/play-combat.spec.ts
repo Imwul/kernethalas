@@ -15,6 +15,13 @@ test('play combat accepts a physical Overseer roll and supports Korean creature 
   await expect(combat.getByRole('region', { name: '전투 카드' })).toHaveCount(0);
 
   await overseer.fill('5');
+  await method.selectOption('t-encounter-b');
+  await expect(combat.getByRole('textbox', { name: 'D20 결과' })).toHaveValue('');
+  await method.selectOption('t-overseer');
+  await expect(overseer).toHaveValue('5');
+  await page.reload();
+  await expect(overseer).toHaveValue('5');
+  await expect(combat.getByRole('region', { name: '전투 카드' })).toHaveCount(0);
   await overseer.press('Enter');
   const heading = combat.getByRole('heading', { name: 'Infernal Archon' });
   await expect(heading).toBeFocused();
@@ -25,6 +32,7 @@ test('play combat accepts a physical Overseer roll and supports Korean creature 
 
   await combat.getByRole('button', { name: '조우 다시 선택' }).click();
   await expect(method).toBeFocused();
+  await expect(overseer).toHaveValue('');
   await method.selectOption('search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('네크로피드');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();

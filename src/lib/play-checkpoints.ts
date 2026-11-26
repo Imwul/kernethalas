@@ -5,14 +5,14 @@ import { MAX_SET_NAME, PLAY_ENCOUNTER_STORAGE_KEY, readPlayCustomEncounterRows, 
 import { DAMAGE_TYPES } from './damage';
 import { DICE_CHAIN } from './dice';
 import { isPaperMapDoorReport, isPaperMapDoorReports, isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
-import { isPaperMapClues, type PaperMapClue } from './paper-map-clues';
+import { isClueRollId, isPaperMapClues, MAP_CLUE_ROLL_SLOTS, type PaperMapClue } from './paper-map-clues';
 import { campaignStorageKey, openSavedCampaign, PLAY_ROOM_STORAGE_KEY } from './play-campaigns';
 import { isPlayOngoing, LINGERING_ENTRY_SLOT, LINGERING_RECORDED_SLOT, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT } from './play-effects';
 import { ARMOR_DICE, GEAR_LOCATIONS, GEAR_WEIGHTS, gearKey, isGearLedger, PLAY_GEAR_STORAGE_KEY, showIntegrity, type GearLedger } from './play-inventory';
 import { RETREAT_RETURN_SLOT } from './play-domain';
 import { isPlayLight, PLAY_LIGHT_SLOT } from './play-light';
 import { isPlaySession, PLAY_SESSION_SLOT } from './play-session';
-import { readPlayRollHistory, safePlaySlot, type PlayRollEntry } from './play-roll-history';
+import { PLAY_ROLL_INPUT_LIMIT, readPlayRollHistory, safePlaySlot, type PlayRollEntry } from './play-roll-history';
 import { isPlayPendingRolls, PLAY_PENDING_ROLLS_SLOT } from './play-pending-rolls';
 import { isSkillModifierList, isSkillPresetRecord, SKILL_PRESETS_SLOT } from './play-skill';
 import { isPlayCharacter, MADNESS_TIMING_SLOT, PLAY_CHARACTER_SLOT, SURVIVOR_BASELINE_SLOT } from './play-character';
@@ -177,6 +177,7 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   })) })),
   'sheet-log': list(paperChange),
   'entry-tension': nullable(tension),
+  'tension-selected': nullable(tensionDie),
   'entry-light-mode': oneOf(['lit', 'dark', 'exempt']),
   'entry-light-resolve': nullable(oneOf(['critical', 'success', 'failure', 'fumble'])),
   'entry-dark-check': nullable(confirmedSkill),
@@ -185,6 +186,9 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'action-tension': list(shape({ id: isText, result: tension, darkness: nullable(isD100), followUpId: optional(isText) })),
   'finished-doors': list(shape({ text: isText, sheet: list(paperChange) })),
   'place-description': shape({ room: nullable(isD100), corridor: nullable(between(1, 20)) }),
+  [MAP_CLUE_ROLL_SLOTS.event]: nullable(isClueRollId),
+  [MAP_CLUE_ROLL_SLOTS.room]: nullable(isClueRollId),
+  [MAP_CLUE_ROLL_SLOTS.corridor]: nullable(isClueRollId),
   'place-choice': oneOf(['shape', ...PLACE_TYPES]),
   'room-tile': nullable(shape({ roll: isD100, turns: between(0, 3), entrance: nullable(between(0, 8)),
     marks: recordOf(oneOf(['unexplored', 'checked', 'locked'])) })),
@@ -215,6 +219,8 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'start-enemy-surprise': encounterRoll,
   'start-enemy-initiative': encounterRoll,
   'scavenge-check': nullable(shape({ skill: isText, roll: isD100, edge: oneOf(EDGE), modifiers: optional(isSkillModifierList), madness: optional(between(0, 1000)) })),
+  'scavenge-pending-edge': nullable(oneOf(EDGE)),
+  'scavenge-pending-modifiers': nullable(isSkillModifierList),
   'door-map-exit': textWithLimit(53),
   'door-manual-exit': textWithLimit(48),
   'resumed-door': nullable((value) => isPaperMapDoorReport(value) && !!value.deferred),
@@ -338,6 +344,8 @@ function validSlot(key: string, data: unknown) {
   }
   if (scoped && leaf.startsWith('oracle-history:')) return list(isPositive)(data);
   if (leaf.startsWith('skill-pending:')) return pendingSkill(data);
+  if (leaf.startsWith('roll-input:')) return nullable(textWithLimit(PLAY_ROLL_INPUT_LIMIT))(data);
+  if (leaf.startsWith('tension-selected:')) return nullable(tensionDie)(data);
   if (scoped && leaf.startsWith('spoils-revealed:')) return nullable(isBoolean)(data);
   if (scoped && leaf.startsWith('attack-effect:')) return isAttackFollowUp(data);
   return true;

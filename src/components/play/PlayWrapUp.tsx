@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo
 import { tableById, titleOf } from '../../content';
 import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import { creatureSpoilsTables } from '../../lib/creature-combat';
+import type { RequiredExplorationRoll } from '../../lib/exploration-follow-up';
 import { journalRow } from '../../lib/loot-journal';
 import { usePlayCharacter } from '../../lib/play-character';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
@@ -45,6 +46,7 @@ interface Props {
   breatherDarknessEffectCount?: number;
   onBreatherTensionChange?: (sides: TensionDie | null) => void;
   onBreatherDarknessChange?: (roll: number | null) => void;
+  onRequiredRolls?: (rolls: RequiredExplorationRoll[]) => void;
   onBreatherAmbush?: () => void;
   /** Desk tools that belong with the rest stop (trade, advancement) share the pane row. */
   extraPanes?: { id: string; label: string; content: ReactNode }[];
@@ -98,12 +100,13 @@ export function PlayWrapUp({
   creature, combatEnded, battleId = 'battle', victoryCreatures, victoryLabels, victoryXp, onBattleJournalChange, onJournalChange, onSheetChange,
   inventory = [], supplies = EMPTY_SUPPLIES, nextRoomLightCost = 1, onContinue, onOpenGear,
   onCampEncounter, campEncounterResolved, campDarkness, campAttunementBlocked,
-  afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush,
+  afterBreatherCheck = false, breatherTension = 8, breatherDarknessEffectCount, onBreatherTensionChange, onBreatherDarknessChange, onBreatherAmbush, onRequiredRolls,
   extraPanes = [], handleRef,
 }: Props) {
   const paneId = useId();
   const pendingGrowth = usePendingSkillGrowth();
   const draft = usePlayDraft();
+  const scope = usePlayDraftScope();
   const pc = usePlayCharacter();
   const commit = usePlayRoll();
   const ongoing = usePlayOngoingEffects();
@@ -183,6 +186,13 @@ export function PlayWrapUp({
   const darknessRow = extraCheck && breatherCheck?.darkness ? journalRow('t-growing-darkness', darknessRoll) : undefined;
   const darknessForDomain = darknessRow ? darknessRoll : null;
   const darknessItems = darknessRow ? darknessFollow.items : EMPTY_FOLLOW_UP.items;
+  const pendingBreatherRolls = useMemo<RequiredExplorationRoll[]>(() => {
+    if (!extraCheck) return [];
+    if (!breatherCheck) return [{ label: '숨 고르기 · 긴장 주사위', field: `${scope}tension` }];
+    if (breatherCheck.darkness && darknessRoll === null) return [{ label: '숨 고르기 · 짙어지는 어둠 D100',
+      field: `${scope}journal:${titleOf('t-growing-darkness').ko}` }];
+    return darknessRow ? darknessFollow.required.map((roll) => ({ ...roll, label: `숨 고르기 · ${roll.label}` })) : [];
+  }, [extraCheck, breatherCheck, darknessRoll, scope, darknessRow, darknessFollow.required]);
   const nextTension = !breather ? null : extraCheck
     ? breatherCheck && (!breatherCheck.darkness || darknessRow) ? breatherCheck.nextDie : null
     : lowered;
@@ -235,6 +245,7 @@ export function PlayWrapUp({
 
   useEffect(() => { onBreatherDarknessChange?.(darknessForDomain); }, [onBreatherDarknessChange, darknessForDomain]);
   useEffect(() => { onBreatherTensionChange?.(nextTension); }, [onBreatherTensionChange, nextTension]);
+  useEffect(() => { onRequiredRolls?.(pendingBreatherRolls); }, [onRequiredRolls, pendingBreatherRolls]);
   useEffect(() => { onBattleJournalChange?.(battleLine); }, [onBattleJournalChange, battleLine]);
   const journalLine = onBattleJournalChange ? sharedLine : [battleLine, sharedLine].filter(Boolean).join(' · ');
   useEffect(() => { onJournalChange(journalLine); }, [journalLine, onJournalChange]);
@@ -429,9 +440,9 @@ export function PlayWrapUp({
       </div>
       {combatEnded && (
         <div className="play-wrap-slot" id={`${paneId}-recovery`} hidden={active !== 'recovery'}>
-          <JournalRoll key={battleId} die="D4" label="전투 후 Toughness 회복" value={recovery} onValue={setRecovery}
+          <JournalRoll key={battleId} die="D4" label="전투 후 Toughness 회복" rollContext={battleId} value={recovery} onValue={setRecovery}
             resultText={recovery !== null ? `Toughness +${recovery}` : undefined} />
-          {bosses.map(({ id, name }) => <JournalRoll key={`${battleId}:${id}`} die="D4" label={`${name} 처치 후 Sanity 회복`}
+          {bosses.map(({ id, name }) => <JournalRoll key={`${battleId}:${id}`} die="D4" label={`${name} 처치 후 Sanity 회복`} rollContext={`${battleId}:${id}`}
             value={sanity[id] ?? null} onValue={(value) => setSanity((previous) => ({ ...previous, [id]: value }))}
             resultText={sanity[id] ? `Sanity +${sanity[id]}` : undefined} />)}
           <section className="play-wrap-armor" aria-label="사용한 방어구 내구도">

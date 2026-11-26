@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { parseDice, pooledDie, rollDie, type RollResult } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import '../styles/loot-journal.css';
@@ -24,13 +24,14 @@ export function PhysicalDiceRoll({ label, dice, value, onValue, resultText, pool
   pool?: DamagePoolOptions;
 }) {
   const id = useId();
-  const [typed, setTyped] = useState('');
+  const fieldKey = `dice:${label}`;
+  const [typed, setTyped] = usePlayRollInput(`${fieldKey}:${dice}`);
   const [invalid, setInvalid] = useState(false);
   const commit = usePlayRoll();
   const terms = dice.split(/\+(?=\s*\d*d)/i).map(parseDice);
   const parsed = terms.filter((term) => term !== null);
   const allowZero = parsed.length === 1 && parsed[0].count === 1 && parsed[0].sides === 100;
-  const field = usePlayRollField(`dice:${label}`, label, dice, value?.expr === dice, allowZero);
+  const field = usePlayRollField(fieldKey, label, dice, value?.expr === dice && !typed, allowZero);
   if (parsed.length !== terms.length) return null;
   const sides = parsed.flatMap((term) => Array.from({ length: term.count }, () => term.sides));
   const mod = parsed.reduce((total, term) => total + term.mod, 0);

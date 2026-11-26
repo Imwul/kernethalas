@@ -36,7 +36,7 @@ export function PlayFightArmor({ items, rolls, onRoll, onReport }: {
         </select>
       </label>}
       {selected && die ? <>
-        <UsageDieTool key={selected.id} rule="armor-integrity" progress={{ die, recorded, onRoll: (value) => {
+        <UsageDieTool key={selected.id} rule="armor-integrity" progress={{ itemId: selected.id, die, recorded, onRoll: (value) => {
           onRoll({ ...rolls, [selected.id]: { name: selected.name, die, value } });
         } }} />
         {recorded && <button className="btn ghost play-wrap-clear" type="button" onClick={() => {

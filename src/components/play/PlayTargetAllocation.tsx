@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { readOracleValue } from '../../lib/oracle';
-import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../../lib/play-draft';
 import { targetAllocation } from '../../lib/target-allocation';
 import { XRef } from '../bits';
 import { PlayDieHint } from './PlayDieHints';
@@ -15,14 +15,15 @@ export function PlayTargetAllocation({ targets }: { targets: { id: string; label
   const [allies, setAllies] = usePlayDraftState('allies', '0');
   const [plan, setPlan] = usePlayDraftState<{ picks: string[]; assignments: Record<string, string> }>('plan', { picks: [], assignments: {} });
   const { picks, assignments } = plan;
-  const [value, setValue] = useState('');
+  const fieldKey = 'target-tiebreaker';
+  const [value, setValue] = usePlayRollInput(fieldKey);
   const [error, setError] = useState('');
   const commitRoll = usePlayRoll();
   const pcCount = memberCount(pcs, 1);
   const allyCount = memberCount(allies, 0);
   const allocation = pcCount === null || allyCount === null ? null : targetAllocation(targets.length, pcCount, allyCount, picks);
   const dice = `D${allocation?.sides ?? 0}`;
-  const diceField = usePlayRollField('target-tiebreaker', '적 배분 후보 선택', dice, !allocation?.remaining);
+  const diceField = usePlayRollField(fieldKey, '적 배분 후보 선택', dice, !allocation?.remaining && !value);
   const reset = () => {
     setPlan({ picks: [], assignments: {} });
     setValue('');

@@ -1,5 +1,6 @@
-import { expect, test, type Locator } from '@playwright/test';
-import { detectTrap } from './helpers/skill-roll';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openDrawer } from './helpers/play-desk';
+import { detectTrap, skillRoll } from './helpers/skill-roll';
 
 async function roll(scope: Locator, label: string, value: string) {
   const field = scope.getByRole('textbox', { name: label, exact: true });
@@ -7,12 +8,16 @@ async function roll(scope: Locator, label: string, value: string) {
   await field.press('Enter');
 }
 
-test('the session card reopens a suspended door and focuses its roll offline', async ({ page, context }) => {
+async function prepareOffline(page: Page) {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+}
+
+test('the session card reopens a suspended door and focuses its roll offline', async ({ page, context }) => {
+  await prepareOffline(page);
 
   const explore = page.getByRole('region', { name: '장소 탐험', exact: true });
   await explore.getByRole('button', { name: '방', exact: true }).click();
@@ -71,6 +76,86 @@ test('the session card reopens a suspended door and focuses its roll offline', a
   await reminder.getByRole('button', { name: '완료 표시', exact: true }).click();
   await reopened.reload();
   await expect(reminder).toBeHidden();
+});
+
+test('typed Breather dice survive an offline pause without applying recovery before confirmation', async ({ page, context }) => {
+  await prepareOffline(page);
+  const breather = (tab: Page) => tab.getByRole('group', { name: '숨 고르기 회복 D10', exact: true });
+  const input = (tab: Page) => breather(tab).getByRole('textbox', { name: '직접 굴린 값', exact: true });
+  await page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '휴식·정리', exact: true }).click();
+  await page.getByRole('region', { name: '휴식과 전리품 정리' }).getByRole('button', { name: '숨 고르기', exact: true }).click();
+  await input(page).fill('7');
+  await expect(breather(page).getByRole('status')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '오늘 여기까지', exact: true }).click();
+  await page.getByRole('button', { name: '이 지점에서 멈추기', exact: true }).click();
+  await page.close();
+  await context.setOffline(true);
+  const reopened = await context.newPage({ viewport: { width: 320, height: 800 } });
+  await reopened.goto('/play');
+  await reopened.getByRole('button', { name: '여기서 이어하기', exact: true }).click();
+  await expect(input(reopened)).toBeFocused();
+  await expect(input(reopened)).toHaveValue('7');
+  await expect(breather(reopened).getByRole('status')).toHaveCount(0);
+  await breather(reopened).getByRole('button', { name: '확인', exact: true }).click();
+  await expect(breather(reopened).getByRole('status')).toContainText('Toughness +9');
+  await expect(input(reopened)).toHaveValue('');
+  await reopened.reload();
+  await expect(breather(reopened).getByRole('status')).toContainText('Toughness +9');
+
+  const drawer = await openDrawer(reopened, '이력');
+  const history = drawer.getByRole('region', { name: '이번 장소 굴림 이력', exact: true });
+  await expect(history.getByRole('button', { name: /숨 고르기 회복 D10 7 수정 미리보기$/ })).toHaveCount(1);
+});
+
+test('resuming a forced door offline keeps the pending die and finishes required Tension before moving', async ({ page, context }) => {
+  await prepareOffline(page);
+  const stage = (tab: Page, name: string) => tab.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name, exact: true });
+  const region = (tab: Page | Locator, name: string) => tab.getByRole('region', { name, exact: true });
+  const explore = region(page, '장소 탐험');
+  await explore.getByRole('button', { name: '방', exact: true }).click();
+  await roll(region(explore, '긴장 주사위'), '긴장 주사위 굴린 값', '3');
+  await roll(region(explore, '조우 판정'), '직접 굴린 값', '1');
+  await roll(region(explore, '이벤트'), '직접 굴린 값', '55');
+  const actions = region(explore, '선택 탐험 행동');
+  await actions.getByRole('button', { name: '문·함정 조사', exact: true }).click();
+  await actions.getByRole('combobox', { name: '조사할 대상', exact: true }).selectOption('present');
+  const door = region(actions, '문 조사');
+  await detectTrap(door);
+  await roll(door, '함정 여부 D10', '6');
+  await roll(door, '잠김 여부 D20', '15');
+  await door.getByLabel('개방 방법', { exact: true }).selectOption('force');
+  await skillRoll(door, '강제 개방 판정', 'Athletics', 50, 38);
+  const force = (tab: Page) => region(tab, '강제 개방 긴장 굴림');
+  const resultInput = (tab: Page) => force(tab).getByRole('textbox', { name: '긴장 주사위 굴린 값', exact: true });
+  await force(page).getByRole('combobox', { name: '긴장 주사위 크기' }).selectOption('4');
+  await resultInput(page).fill('3');
+  await stage(page, '저널').click();
+  const nextPlace = (tab: Page) => region(tab, '이번 장소 기록').getByRole('button', { name: '다음 장소', exact: true });
+  await nextPlace(page).click();
+  const blocked = region(page, '이동 전에 마칠 판정');
+  await blocked.getByRole('button', { name: '문 강제 개방 · 긴장 주사위', exact: true }).click();
+  await expect(resultInput(page)).toBeFocused();
+  await expect(resultInput(page)).toHaveValue('3');
+
+  await page.getByRole('button', { name: '오늘 여기까지', exact: true }).click();
+  await page.getByRole('button', { name: '이 지점에서 멈추기', exact: true }).click();
+  await page.close();
+  await context.setOffline(true);
+  const reopened = await context.newPage({ viewport: { width: 320, height: 800 } });
+  await reopened.goto('/play');
+  await reopened.getByRole('button', { name: '여기서 이어하기', exact: true }).click();
+  await expect(resultInput(reopened)).toBeFocused();
+  await expect(resultInput(reopened)).toHaveValue('3');
+  await expect(force(reopened).getByRole('combobox', { name: '긴장 주사위 크기' })).toHaveValue('4');
+  await expect(force(reopened).getByRole('status')).not.toContainText('D4 결과');
+  await force(reopened).getByRole('button', { name: '긴장 주사위 확인' }).click();
+  await expect(force(reopened).getByRole('status')).toContainText('다음 긴장 주사위 D4');
+  await stage(reopened, '저널').click();
+  await expect(region(reopened, '이동 전에 마칠 판정')).toHaveCount(0);
+  await nextPlace(reopened).click();
+  await expect(region(reopened, '장소 탐험').getByRole('button', { name: '방', exact: true })).toBeVisible();
+  await expect(force(reopened)).toHaveCount(0);
 });
 
 test('a previously saved session keeps its note when old print data is present', async ({ page }) => {

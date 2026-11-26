@@ -30,13 +30,13 @@ export function domainName({ name, id }: PlayDomainRecord) {
   return name.trim() || `도메인 ${id}`;
 }
 
-function InfluenceInputs({ label, value, onChange }: { label: string; value: InfluenceRoll; onChange: (next: InfluenceRoll) => void }) {
+function InfluenceInputs({ label, value, onChange, context }: { label: string; value: InfluenceRoll; onChange: (next: InfluenceRoll) => void; context?: string }) {
   return (
     <div className="play-domain-rolls">
-      <JournalRoll tableId={INFLUENCE_TABLE.id} label={label} value={value.roll} resultText={influenceText(value)}
+      <JournalRoll tableId={INFLUENCE_TABLE.id} label={label} rollContext={context} value={value.roll} resultText={influenceText(value)}
         onValue={(roll) => onChange({ roll, damageRoll: null })} />
       {value.roll === 6 && (
-        <JournalRoll tableId={DAMAGE_TYPE_TABLE.id} label="Resistant 피해 유형" value={value.damageRoll}
+        <JournalRoll tableId={DAMAGE_TYPE_TABLE.id} label="Resistant 피해 유형" rollContext={context} value={value.damageRoll}
           onValue={(damageRoll) => onChange({ ...value, damageRoll })} />
       )}
     </div>
@@ -147,7 +147,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, overseerK
           ))}</ul> : <p className="play-empty">이 도메인에 지속되는 어둠 효과가 없습니다.</p>}
         </div>
         {!defeated && extraInfluences.map((effect) => (
-          <InfluenceInputs key={effect.id} label={`어둠 ${effect.roll} 추가 영향력`} value={domain.extra[effect.id] ?? EMPTY_INFLUENCE}
+          <InfluenceInputs key={effect.id} context={effect.id} label={`어둠 ${effect.roll} 추가 영향력`} value={domain.extra[effect.id] ?? EMPTY_INFLUENCE}
             onChange={(roll) => onUpdate({ extra: { ...domain.extra, [effect.id]: roll } })} />
         ))}
         <div className="play-refs"><XRef id="overseer-influence" /><XRef id="growing-darkness" /></div>

@@ -32,12 +32,14 @@ import { BESTIARY_CREATURE_PARAM } from '../lib/bestiary-encounter';
 import { formatCombatDamage, readCombatDamageRecords } from '../lib/combat-damage-records';
 import { creatureSpoilsTables } from '../lib/creature-combat';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
+import type { RequiredExplorationRoll } from '../lib/exploration-follow-up';
 import { introEncounterCreature, nameDomainDiscoveries, newDomainProgress } from '../lib/domain-progress';
 import { PlayDraftProvider, PlayDraftScope, usePlayDraft, usePlayDraftState } from '../lib/play-draft';
 import { usePlayCampaignId } from '../lib/play-campaigns';
 import type { PlayCheckpointData } from '../lib/play-checkpoints';
 import { LINGERING_CONDITIONS, LINGERING_ENTRY_SLOT, PLAY_EFFECT_CHANGES_SLOT, PLAY_EFFECTS_SLOT, readPlayOngoing } from '../lib/play-effects';
 import { PAPER_MAP_SLOT, paperMapKey, type PaperMapLocation } from '../lib/paper-map';
+import { archiveMapClueSources } from '../lib/paper-map-clues';
 import { PLAY_PENDING_ROLLS_SLOT, type PendingPlayRoll } from '../lib/play-pending-rolls';
 import { playAction, playRollStage, type PlayRollEntry } from '../lib/play-roll-history';
 import { carrySessionIntent, EMPTY_SESSION, isPlaySession, PLAY_SESSION_SLOT, SESSION_INTENT_LIMIT, shortSessionText,
@@ -182,7 +184,15 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const lastRollField = useRef<Partial<Record<StageId, string>>>({});
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [moveBlocked, setMoveBlocked] = useState(false);
+  const moveWarning = useRef<HTMLElement>(null);
   const [exploration, setExploration] = useState<ExplorationReport | null>(null);
+  const [requiredRestRolls, setRequiredRestRolls] = useState<RequiredExplorationRoll[]>([]);
+  const requiredMoveRolls = [
+    ...(exploration?.required ?? []).map((roll) => ({ ...roll, stage: 'explore' as const })),
+    ...requiredRestRolls.map((roll) => ({ ...roll, stage: 'wrapup' as const })),
+  ];
+  useEffect(() => { if (!requiredMoveRolls.length) setMoveBlocked(false); }, [requiredMoveRolls.length]);
   const [battles, setBattles] = usePlayDraftState<Record<string, Battle>>('battles', {});
   const [retreatReturnId] = usePlayDraftState<string | null>(RETREAT_RETURN_SLOT, null);
   const [combatId, setCombatId] = usePlayDraftState('combat', 'place');
@@ -289,10 +299,14 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     return names.join(', ') || (battle.primaryId ? creatureById.get(battle.primaryId)?.name : undefined) || '조우';
   };
 
-  const focusStage = (id: StageId) => requestAnimationFrame(() => {
+  const focusStage = (id: StageId, offset?: number) => requestAnimationFrame(() => {
     const heading = headings.current[id];
-    heading?.focus({ preventScroll: true });
-    heading?.scrollIntoView({ block: 'start' });
+    const focused = document.activeElement;
+    // Preserve an input that received focus in the destination before this frame.
+    if (!heading || focused?.matches('input, textarea, select') && heading.closest('.play-stage')?.contains(focused)) return;
+    heading.focus({ preventScroll: true });
+    if (offset === undefined) heading.scrollIntoView({ block: 'start' });
+    else window.scrollBy({ top: heading.getBoundingClientRect().top + offset });
   });
   const selectStage = (id: StageId) => {
     const heading = headings.current[active];
@@ -302,13 +316,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const goTo = (id: StageId, rememberPosition = false) => {
     const offset = rememberPosition ? stagePositions.current[id] : undefined;
     selectStage(id);
-    if (offset === undefined) focusStage(id);
-    else requestAnimationFrame(() => {
-      const heading = headings.current[id];
-      if (!heading) return;
-      heading.focus({ preventScroll: true });
-      window.scrollBy({ top: heading.getBoundingClientRect().top + offset });
-    });
+    focusStage(id, offset);
   };
   const drawerDocked = () => (desk.current?.clientWidth ?? 0) >= DOCKED_DRAWER_WIDTH;
   const openDrawer = (id: DrawerId, focus?: string) => {
@@ -547,6 +555,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     setRevision((previous) => previous + 1);
     setConfirmReset(false);
     setExploration(null);
+    setRequiredRestRolls([]);
     setWrapSummary('');
     setSheetShared([]);
     setEquipmentReport('');
@@ -561,6 +570,15 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   };
   const resetRoom = (nextDomains: PlayDomainRecord[], nextDomain: number, tension: TensionSides,
     { discard = false, retreat }: { discard?: boolean; retreat?: RetreatedEncounter } = {}) => {
+    if (!discard && requiredMoveRolls.length) {
+      closeOverlayDrawer();
+      setMoveBlocked(true);
+      requestAnimationFrame(() => {
+        moveWarning.current?.focus({ preventScroll: true });
+        moveWarning.current?.scrollIntoView({ block: 'center' });
+      });
+      return;
+    }
     // Moving on folds this place's XP and Exhaustion into the character; clearing the place drops them.
     const carry = !discard;
     const saved = draft.slots[PLAY_CHARACTER_SLOT];
@@ -569,7 +587,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     const nextTimeline = carry ? archiveCurrentPlace() : timeline;
     draft.replaceRoom({ domains: nextDomains, domainId: nextDomain, roomNumber: roomNumber + 1,
       roomLedgerId: crypto.randomUUID(), initialTension: tension, [SKILL_GROWTH_SLOT]: pendingGrowth,
-      [PAPER_MAP_SLOT]: paperMap, [PLAY_TIMELINE_SLOT]: nextTimeline, [PLAY_EFFECTS_SLOT]: ongoing,
+      [PAPER_MAP_SLOT]: archiveMapClueSources(paperMap, draft.slots, discard), [PLAY_TIMELINE_SLOT]: nextTimeline, [PLAY_EFFECTS_SLOT]: ongoing,
       [PLAY_PENDING_ROLLS_SLOT]: pendingRolls, [SKILL_PRESETS_SLOT]: draft.slots[SKILL_PRESETS_SLOT] ?? {},
       [PLAY_LIGHT_SLOT]: light && { remaining: light.remaining, included: [] },
       [PLAY_SESSION_SLOT]: carrySessionIntent(session),
@@ -879,6 +897,18 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
 
       <div className="play-layout">
         <div className="play-main">
+          {requiredMoveRolls.length > 0 && (active === 'journal' || moveBlocked) && (
+            <section className="play-reset play-move-warning" aria-label="이동 전에 마칠 판정" ref={moveWarning} tabIndex={-1}>
+              <h3>이동 전에 마칠 판정</h3>
+              <p>이미 시작한 행동의 남은 굴림을 입력한 뒤 이동할 수 있습니다.</p>
+              <div className="play-header-actions">
+                {requiredMoveRolls.map(({ field, label, stage: targetStage }) => <button key={field} type="button" className="btn ghost" onClick={() => {
+                  setMoveBlocked(false);
+                  goToRecordedField({ stage: targetStage, field });
+                }}>{label}</button>)}
+              </div>
+            </section>
+          )}
           <section className="play-stage" id="play-stage-explore" aria-labelledby="play-explore" hidden={active !== 'explore'}>
             {stageHeading('explore')}
             <EffectNotice effects={effects} types={EXPLORE_EFFECTS} />
@@ -961,6 +991,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                 afterBreatherCheck={hasEffect(15)} breatherTension={exploreTension ?? initialTension}
                 breatherDarknessEffectCount={preBreatherEffects.length}
                 onBreatherTensionChange={setBreatherTension} onBreatherDarknessChange={setBreatherDarkness}
+                onRequiredRolls={setRequiredRestRolls}
                 onBreatherAmbush={() => startCombat('encounter', 'breather')}
                 onJournalChange={setWrapSummary} onBattleJournalChange={reportBattleLine} onSheetChange={reportSheet}
                 extraPanes={[

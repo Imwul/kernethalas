@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { campaignStorageKey, PLAY_ROOM_STORAGE_KEY, usePlayCampaignId } from './play-campaigns';
 import {
-  appendPlayRoll, getSlot, planRollCorrection, playRollRequirements, playRollStage, readPlayRollHistory, safePlaySlot, sameSlot,
+  appendPlayRoll, getSlot, planRollCorrection, PLAY_ROLL_INPUT_LIMIT, playRollRequirements, playRollStage, readPlayRollHistory, safePlaySlot, sameSlot,
   type PlayRollDetails, type PlayRollEntry, type PlaySlots, type SlotValue,
 } from './play-roll-history';
 
@@ -254,6 +254,19 @@ export function usePlayRoll() {
   const commit = useContext(Draft)?.commitRoll;
   const scope = useContext(Scope);
   return useCallback((action: () => void, details?: PlayRollDetails) => (commit ?? directly)(action, details, scope), [commit, scope]);
+}
+
+/** Keeps physical dice text separate from the confirmed roll in the same tool scope. */
+export function usePlayRollInput(key: string): readonly [string, (value: string) => void];
+export function usePlayRollInput(key: string, empty: null): readonly [string | null, (value: string | null) => void];
+export function usePlayRollInput(key: string, empty: '' | null = ''):
+  readonly [string, (value: string) => void] | readonly [string | null, (value: string | null) => void] {
+  const field = key.replaceAll('%', '%25').replaceAll('/', '%2F');
+  const [stored, setStored] = usePlayDraftState<string | null>(`roll-input:${field}`, empty);
+  const setValue = useCallback((value: string | null) => {
+    setStored(value === null ? empty : value.slice(0, PLAY_ROLL_INPUT_LIMIT));
+  }, [empty, setStored]);
+  return [typeof stored === 'string' ? stored : empty, setValue] as const;
 }
 
 export function usePlayRollField(key: string, label: string, dice: string, completed: boolean, allowZero = false) {

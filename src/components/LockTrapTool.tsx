@@ -6,7 +6,7 @@ import { forceOpeningBonus, lockpickDifficulty, LOCK_THRESHOLDS, trapInvestigati
 import { readOracleValue } from '../lib/oracle';
 import { usePlayCharacter } from '../lib/play-character';
 import { pcCheckModifiers } from '../lib/play-check-modifiers';
-import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { PlayDraftScope, usePlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { matchingGear, type GearLedger } from '../lib/play-inventory';
 import { skillBreakdown } from '../lib/play-skill';
@@ -27,12 +27,13 @@ export interface PlayLockReport {
   opened: boolean;
   lockpicks: number;
   xp: number;
-  pendingTension: boolean;
+  pendingTension: PendingForce | null;
   investigation: DoorInvestigation;
 }
 
-interface OpeningResult { opened: boolean; pickFailures: number; forceFailures: number; pendingTension: boolean }
-const EMPTY_OPENING_RESULT: OpeningResult = { opened: false, pickFailures: 0, forceFailures: 0, pendingTension: false };
+type PendingForce = { attempt: string; scope: string };
+interface OpeningResult { opened: boolean; pickFailures: number; forceFailures: number; pendingTension: PendingForce | null }
+const EMPTY_OPENING_RESULT: OpeningResult = { opened: false, pickFailures: 0, forceFailures: 0, pendingTension: null };
 type TrapReport = { text: string; xp: number; progress: TrapInvestigationProgress | null };
 const EMPTY_TRAP_REPORT: TrapReport = { text: '', xp: 0, progress: null };
 
@@ -194,10 +195,11 @@ function TrapRoll({ label, sides, value, inputRef, onChange, confirm = false }: 
   confirm?: boolean;
 }) {
   const id = useId();
-  const [draft, setDraft] = useState<string | null>(null);
+  const key = `trap:${label}`;
+  const [draft, setDraft] = usePlayRollInput(key, null);
   const [submittedInvalid, setSubmittedInvalid] = useState(false);
   const commitRoll = usePlayRoll();
-  const input = usePlayRollField(`trap:${label}`, label, `D${sides}`, readOracleValue(value, sides) !== null);
+  const input = usePlayRollField(key, label, `D${sides}`, readOracleValue(value, sides) !== null && !draft);
   const field = confirm ? draft ?? value : value;
   const invalid = submittedInvalid || field.trim() !== '' && readOracleValue(field.trim(), sides) === null;
   const apply = (roll: number, source: PlayRollDetails['source']) => {
@@ -353,6 +355,7 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   attemptKey: string;
 }) {
   const id = useId();
+  const scope = usePlayDraftScope();
   const [method, setMethod] = usePlayDraftState('method', 'pick');
   const [opened, setOpened] = usePlayDraftState('opened', false);
   const [pickFailures, setPickFailures] = usePlayDraftState('pick-failures', embedded?.resume?.pickFailures ?? 0);
@@ -368,8 +371,9 @@ function LockResponse({ container, embedded, onReport, attemptKey }: {
   const openedReport = opened && tensionReady;
   const completedForceFailures = forceFailures + (forceResult === 'failure' && tensionReady ? 1 : 0);
   useEffect(() => {
-    onReport?.({ opened: openedReport, pickFailures, forceFailures: completedForceFailures, pendingTension: !tensionReady });
-  }, [onReport, openedReport, pickFailures, completedForceFailures, tensionReady]);
+    onReport?.({ opened: openedReport, pickFailures, forceFailures: completedForceFailures,
+      pendingTension: tensionReady ? null : { attempt, scope } });
+  }, [onReport, openedReport, pickFailures, completedForceFailures, tensionReady, attempt, scope]);
   const applyPick = (value: Outcome) => {
     if (value === 'success') setOpened(true);
     else setPickFailures((previous) => previous + 1);

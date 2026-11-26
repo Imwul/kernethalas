@@ -26,6 +26,10 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   await tie.press('Enter');
   await expect(allocation.getByRole('alert')).toContainText('다시 굴립니다');
   await tie.fill('2');
+  await page.reload();
+  await openPane(combat, '적 배분');
+  await expect(tie).toHaveValue('2');
+  await expect(allocation.getByRole('group', { name: '개별 적 배정' })).toHaveCount(0);
   await tie.press('Enter');
   await expect(allocation.getByRole('definition')).toHaveText(['2마리', '1마리', '2마리']);
   await allocation.getByRole('combobox', { name: 'Necropede 1 상대' }).selectOption('ally-1');

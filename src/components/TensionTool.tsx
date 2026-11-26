@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { XRef } from './bits';
 import { PlayDieHint } from './play/PlayDieHints';
@@ -19,21 +19,23 @@ export interface TensionResult {
   darkness: boolean;
 }
 
-export function TensionTool({ onResult, showDarknessLink = true, initialSides = 8, value }: {
+export function TensionTool({ onResult, showDarknessLink = true, initialSides = 8, value, rollContext }: {
   onResult?: (result: TensionResult) => void;
   showDarknessLink?: boolean;
   initialSides?: TensionDie;
   value?: TensionResult | null;
+  rollContext?: string;
 } = {}) {
   const id = useId();
-  const [selected, setSelected] = useState<TensionDie | null>(null);
-  const [manual, setManual] = useState('');
+  const suffix = rollContext ? `:${rollContext}` : '';
+  const [selected, setSelected] = usePlayDraftState<TensionDie | null>(`tension-selected${suffix}`, null);
+  const [manual, setManual] = usePlayRollInput(`tension${suffix}`);
   const [invalid, setInvalid] = useState(false);
   const [localResult, setLocalResult] = useState<TensionResult | null>(null);
   const commitRoll = usePlayRoll();
   const result = value === undefined ? localResult : value;
   const sides = selected ?? result?.sides ?? initialSides;
-  const field = usePlayRollField('tension', '긴장 주사위', `D${sides}`, !!result);
+  const field = usePlayRollField('tension', '긴장 주사위', `D${sides}`, !!result && !manual);
   const apply = (die: TensionDie, rolled: number, source: PlayRollDetails['source']) => {
     const next = { sides: die, value: rolled, nextDie: rolled <= 2 ? NEXT_DIE[die] : die, darkness: die === 4 && rolled <= 2 };
     commitRoll(() => {

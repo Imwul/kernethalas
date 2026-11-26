@@ -7,7 +7,7 @@ import { rollDie, tableSides } from '../../lib/dice';
 import { encounterInteger } from '../../lib/encounter-start';
 import { automaticRollSides, readOracleValue, rollTable } from '../../lib/oracle';
 import { combatToolsScope } from '../../lib/play-combat-timing';
-import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
+import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../../lib/play-draft';
 import { USE_ABILITY_EVENT } from './PlayCharacter';
 import { CombatLingeringAlert } from './PlayLingering';
 import type { GearItem, PaperChange } from '../../lib/play-inventory';
@@ -95,13 +95,14 @@ interface EncounterRollProps {
 
 function EncounterRoll({ table, customSetId, completed = false, submitLabel, onResult }: EncounterRollProps) {
   const inputId = useId();
-  const [manual, setManual] = useState('');
+  const fieldKey = `encounter-roll-${table?.id ?? customSetId}`;
+  const [manual, setManual] = usePlayRollInput(fieldKey);
   const [error, setError] = useState('');
   const commitRoll = usePlayRoll();
   const dice = table?.dice ?? 'D20';
   const sides = tableSides(dice);
   const label = table?.ko ?? '사용자 지정 조우표';
-  const field = usePlayRollField(`encounter-roll-${table?.id ?? customSetId}`, label, dice, completed);
+  const field = usePlayRollField(fieldKey, label, dice, completed && !manual);
 
   const apply = (value: number | null, source: 'manual' | 'app') => {
     if (value === null) {

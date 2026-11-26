@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { CAMP_ACTIVITIES, CAMP_BARRICADE, campTotals, resolveCampCheck, type CampActivityId, type CampQuantities } from '../lib/camp';
 import { rollDie } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import { LINGERING_CONDITIONS, usePlayOngoingEffects, type LingeringCondition } from '../lib/play-effects';
 import { GEAR_LOCATIONS, gearCount, gearKey, type GearItem, type PaperChange } from '../lib/play-inventory';
 import { XRef } from './bits';
@@ -105,7 +105,7 @@ function recoveryAmounts(benefit: CampBenefit, lostToughness: string, sanityDie:
 export function CampCalculator({ onEncounter, encounterResolved, domainDarkness, attunementBlocked, inventory, onReport }: CampProps = {}) {
   const id = useId();
   const [draft, setDraft] = usePlayDraftState('camp-plan', INITIAL_CAMP);
-  const [manual, setManual] = useState<string | null>(null);
+  const [manual, setManual] = usePlayRollInput('camp-check', null);
   const [invalidRoll, setInvalidRoll] = useState(false);
   const commitRoll = usePlayRoll();
   const { current, removeConditions } = usePlayOngoingEffects();
@@ -128,7 +128,7 @@ export function CampCalculator({ onEncounter, encounterResolved, domainDarkness,
   const treatment = useMemo(() => lockedTreatment ? treated : sleep ? NO_CONDITIONS
     : LINGERING_CONDITIONS.filter(({ id }) => draft.treatConditions?.includes(id) && current.conditions.includes(id)).map(({ id }) => id),
   [lockedTreatment, treated, sleep, draft.treatConditions, current.conditions]);
-  const campRollField = usePlayRollField('camp-check', '야영 판정', 'D20', roll !== null);
+  const campRollField = usePlayRollField('camp-check', '야영 판정', 'D20', roll !== null && !manual);
   const extraCheck = readInteger(other, true);
   const { plan, result, rangeError, planKey } = useMemo(() => {
     const counts: CampQuantities = {};

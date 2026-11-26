@@ -5,10 +5,12 @@ import type { OracleTable } from '../../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, roomShapeForRoll, type EncounterPlace } from '../../content/tables/exploration';
 import type { CheckOutcome } from '../../lib/dice';
 import { DEFAULT_DOMAIN_PROGRESS, domainPlaceLabel, introEncounterCreature, markDomainPlace, removeDomainMark, stepDomainDie, type DomainProgress } from '../../lib/domain-progress';
+import type { RequiredExplorationRoll } from '../../lib/exploration-follow-up';
 import { RETREAT_AMBUSH_ID } from '../../lib/play-domain';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftScope, usePlayDraftState, usePlayRoll } from '../../lib/play-draft';
 import { LINGERING_RECORDED_SLOT } from '../../lib/play-effects';
 import { capturePaperMapTile, paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
+import { clueRollProvenance, MAP_CLUE_ROLL_SLOTS } from '../../lib/paper-map-clues';
 import { gearCount, type GearLedger } from '../../lib/play-inventory';
 import { EMPTY_SUPPLIES, afterLightCost, lightRemaining, readPlayLight, type PlaySupplies } from '../../lib/play-light';
 import { rowTitle } from '../../lib/oracle';
@@ -41,6 +43,7 @@ export interface ExplorationReport {
   encounter: 'encounter' | 'overseer' | 'none' | null;
   actions?: string;
   sheet?: ActionSheetItem[];
+  required: RequiredExplorationRoll[];
 }
 
 interface Props {
@@ -112,13 +115,14 @@ const PLAY_ENCOUNTERS = {
   corridor: encounterTable('corridor'),
 };
 
-const EMPTY_ACTIONS: ExplorationActionReport = { text: '', sheet: [], nextTension: null, darknessRolls: [] };
+const EMPTY_ACTIONS: ExplorationActionReport = { text: '', sheet: [], nextTension: null, darknessRolls: [], required: [] };
 
 export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJournal, finishedSources, initialTension = 8, lightCost = 1, supplies = EMPTY_SUPPLIES, onOpenGear,
   onDarknessChange, onActionDarknessChange, darknessEffectCount, onTrader,
   domainProgress = DEFAULT_DOMAIN_PROGRESS, onDomainProgress, domainPlaceId = '1', domainPlaceName,
   domainDestinations, domainDefeated, onLeaveDomain, paperMapDomain = 1, paperMap = EMPTY_PAPER_MAP, onPaperMapChange, gearLedger, retreatArrival }: Props) {
   const paperMapRef = useRef<PlayPaperMapHandle>(null);
+  const scope = usePlayDraftScope();
   const [revisit, setRevisit] = usePlayDraftState('revisit', false);
   const [choice, setChoice] = usePlayDraftState<PlaceChoice>('place-choice', 'shape');
   const [shapeRoll, setShapeRoll] = usePlayDraftState<number | null>('shape-roll', null);
@@ -127,6 +131,9 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
   const [paperLocation, setPaperLocation] = usePlayDraftState('paper-map-key', '');
   const [resumeExit, setResumeExit] = usePlayDraftState('paper-map-resume-exit', '');
   const [descriptions, setDescriptions] = usePlayDraftState<Record<EncounterPlace, number | null>>('place-description', { room: null, corridor: null });
+  const [, setEventClueRoll] = usePlayDraftState<string | null>(MAP_CLUE_ROLL_SLOTS.event, null);
+  const [, setRoomClueRoll] = usePlayDraftState<string | null>(MAP_CLUE_ROLL_SLOTS.room, null);
+  const [, setCorridorClueRoll] = usePlayDraftState<string | null>(MAP_CLUE_ROLL_SLOTS.corridor, null);
   const [lair, setLair] = usePlayDraftState('lair', false);
   const [arrival, setArrival] = usePlayDraftState<'lair' | 'exit' | null>('domain-arrival', null);
   const [fixedIntroRoom, setFixedIntroRoom] = usePlayDraftState('intro-fixed-room', false);
@@ -215,6 +222,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
     ? `D100 ${eventRoll} · ${rowTitle(eventRow)}` : null;
   const resolvedDarkness = darknessRow ? darknessFollow : EMPTY_FOLLOW_UP;
   const resolvedEvent = eventRow ? eventFollow : EMPTY_FOLLOW_UP;
+  const entryDarknessPending = !!tension?.darkness && darknessRoll === null;
   const eventLairEffect = eventRoll === 86 && resolvedEvent.items.some(({ id }) => id === 'event-86-lair');
   const loweredLair = !domainProgress.lair ? stepDomainDie(domainProgress, 1) : domainProgress;
   const priorDarknessRolls = useMemo(() => [darknessRow ? darknessRoll : null, resolvedEvent.darkness]
@@ -228,6 +236,12 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
 
   useEffect(() => {
     onReport({ area: place, place: placeReport, shape: shapeReport, description: descriptionReport, nextTension,
+      required: [
+        ...(place && entryDarknessPending ? [{ label: '입장 · 짙어지는 어둠 D100', field: `${scope}oracle:t-growing-darkness` }] : []),
+        ...resolvedDarkness.required.map((roll) => ({ ...roll, label: `입장 어둠 · ${roll.label}` })),
+        ...resolvedEvent.required.map((roll) => ({ ...roll, label: `이벤트 · ${roll.label}` })),
+        ...actions.required,
+      ],
       darkness: darknessReport ? [darknessReport, ...resolvedDarkness.items.map(({ text }) => text)].join(' · ') : null,
       event: eventReport ? [eventReport, ...resolvedEvent.items.map(({ text }) => text)].join(' · ') : null,
       encounter: encounterReport, actions: [
@@ -244,7 +258,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
         ...roomDamage,
         ...resolvedDarkness.items, ...resolvedEvent.items, ...actions.sheet,
       ] });
-  }, [onReport, place, placeReport, shapeReport, descriptionReport, nextTension, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
+  }, [onReport, place, placeReport, shapeReport, descriptionReport, nextTension, entryDarknessPending, scope, darknessReport, eventReport, encounterReport, roomLightCost, tension, actions, resolvedDarkness, resolvedEvent,
     firstEntry, domainProgress.lair?.id, domainProgress.exit?.id, domainPlaceId, namedPlace, mapNote, roomDamage, darkCheck, darkResolve, darkSanityLoss]);
   useEffect(() => { onDarknessChange?.(darknessReport ? darknessRoll : null); }, [onDarknessChange, darknessReport, darknessRoll]);
   useEffect(() => {
@@ -264,6 +278,12 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
       setEventFollow(EMPTY_FOLLOW_UP);
     }
     setEventRoll(value);
+    setEventClueRoll(value === null ? null : crypto.randomUUID());
+  };
+  const applyDescription = (area: EncounterPlace, value: number | null) => {
+    setDescriptions((previous) => ({ ...previous, [area]: value }));
+    const setClueRoll = area === 'room' ? setRoomClueRoll : setCorridorClueRoll;
+    setClueRoll(value === null ? null : crypto.randomUUID());
   };
   const startEncounter = (source?: string) => {
     const scriptedEnemy = source === `event-${eventRoll}` && eventRow?.next?.some(({ id }) => creatureById.has(id));
@@ -452,7 +472,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
           {mayRollEvent && (
             <PlayRoll label="이벤트" table={EVENT_TABLE} value={eventRoll} onValue={applyEvent} condense
               afterResult={onPaperMapChange && eventReport && <button className="btn ghost" type="button" onClick={() =>
-                paperMapRef.current?.pinClue({ source: 'event', text: eventReport })}>이벤트를 단서로 남기기</button>} />
+                paperMapRef.current?.pinClue({ source: 'event', text: eventReport, provenance: clueRollProvenance(slots, 'event') })}>이벤트를 단서로 남기기</button>} />
           )}
           <PlayDraftScope name="event-follow">
             <ExplorationFollowUp key={eventRoll} kind="event" row={eventRow?.min}
@@ -504,9 +524,10 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
                 badge: descriptionRoll !== null ? `D100 ${descriptionRoll}` : undefined }]} />
             <PlayStripPane prefix={descriptionId} id="description" open={descriptionOpen}>
               <PlayRoll label={`${placeLabel} 환경 묘사 굴림`} table={PLACE_DESCRIPTIONS[place]}
-                value={descriptionRoll} onValue={(roll) => setDescriptions((previous) => ({ ...previous, [place]: roll }))}
+                value={descriptionRoll} onValue={(roll) => applyDescription(place, roll)}
                 afterResult={onPaperMapChange && description && <button className="btn ghost" type="button" onClick={() =>
-                  paperMapRef.current?.pinClue({ source: 'description', text: description.ko })}>환경 묘사를 단서로 남기기</button>} />
+                  paperMapRef.current?.pinClue({ source: 'description', text: description.ko,
+                    provenance: clueRollProvenance(slots, place) })}>환경 묘사를 단서로 남기기</button>} />
             </PlayStripPane>
           </div>}
           {entryNextTension && (!retreatArrival || returnCompleted) && <div className="play-explore-step" role="group" aria-labelledby={actionsHeading}>

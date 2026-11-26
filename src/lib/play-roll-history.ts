@@ -24,6 +24,7 @@ export type PlayRollEntry = PlayRollDetails & {
 };
 
 export const PLAY_HISTORY_LIMIT = 40;
+export const PLAY_ROLL_INPUT_LIMIT = 2048;
 const SHARED_LISTS = new Set(['pendingSkillGrowth', 'skillCriticalHistory']);
 const STAGES = new Set(['explore', 'combat', 'wrapup', 'journal']);
 const EXPLORE = 'explore/';

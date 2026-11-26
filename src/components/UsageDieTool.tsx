@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { rollDie, tableSides } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
-import { usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import { resolveUsageDie, USAGE_DIE_PROFILES, type UsageDie, type UsageDieRule } from '../lib/usage-die';
 import { XRef } from './bits';
 import { IDie } from './icons';
@@ -13,6 +13,7 @@ interface Props {
   /** The caller shows the title above the card (play desk step headings). */
   hideTitle?: boolean;
   progress?: {
+    itemId?: string;
     die: UsageDie;
     recorded?: { die: UsageDie; value: number };
     onRoll: (value: number) => void;
@@ -23,14 +24,15 @@ export function UsageDieTool({ rule, onReport, progress, hideTitle = false }: Pr
   const profile = USAGE_DIE_PROFILES[rule];
   const id = useId();
   const [selectedDie, setDie] = usePlayDraftState<UsageDie | null>(`${rule}-die`, profile.start);
-  const [manual, setManual] = useState('');
   const [selectedValue, setValue] = usePlayDraftState<number | null>(`${rule}-value`, null);
   const [invalid, setInvalid] = useState(false);
   const commitRoll = usePlayRoll();
   const die = progress ? progress.recorded?.die ?? progress.die : selectedDie;
   const value = progress ? progress.recorded?.value ?? null : selectedValue;
   const sides = die === null ? null : tableSides(die);
-  const field = usePlayRollField(`usage:${rule}`, profile.title, die ?? '', value !== null);
+  const fieldKey = `usage:${rule}`;
+  const [manual, setManual] = usePlayRollInput(progress?.itemId ? `${fieldKey}:${progress.itemId}:${die}` : fieldKey);
+  const field = usePlayRollField(fieldKey, profile.title, die ?? '', value !== null && !manual);
   const result = die && value !== null ? resolveUsageDie(rule, die, value) : null;
   const report = !result ? '' : result.kind === 'trigger' ? result.title : `방어구 내구도 ${result.next}${result.kind === 'unchanged' ? ' 유지' : '로 하락'}`;
   useEffect(() => { onReport?.(report); }, [onReport, report]);

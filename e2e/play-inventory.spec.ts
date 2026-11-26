@@ -31,6 +31,7 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   const gear = page.getByRole('region', { name: '현재 장비와 소모 내역' });
   await openDrawer(page, '장비');
   await register(gear, 'Leather Armor', '1', 'D8');
+  await register(gear, 'Spare Armor', '1', 'D8');
   await closeDrawer(page);
   await go('조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
@@ -47,7 +48,16 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   await enterDie(wrap.getByRole('group', { name: 'Infernal Archon 처치 후 Sanity 회복 D4' }), '3');
   const worn = wrap.getByRole('combobox', { name: '이번 전투에 사용한 장부 방어구' });
   await worn.selectOption({ label: 'Leather Armor · D8' });
-  await enterDie(wrap.getByRole('region', { name: '방어구 내구도 굴림' }), '1');
+  const armor = wrap.getByRole('region', { name: '방어구 내구도 굴림' });
+  const pending = armor.getByRole('textbox', { name: '직접 굴린 값', exact: true });
+  await pending.fill('1');
+  await worn.selectOption({ label: 'Spare Armor · D8' });
+  await expect(pending).toHaveValue('');
+  await worn.selectOption({ label: 'Leather Armor · D8' });
+  await page.reload();
+  await expect(pending).toHaveValue('1');
+  await expect(armor.getByRole('status')).toHaveText('');
+  await pending.press('Enter');
   await page.getByRole('button', { name: '저널 기록 보기', exact: true }).click();
   const journal = page.getByRole('region', { name: '이번 장소 기록' });
   await expect(journal).toContainText('Sanity +3');

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EncounterPlace } from '../../content/tables/exploration';
 import { paperMapKey, type PaperMapLocation } from '../../lib/paper-map';
+import { usePlayDraft } from '../../lib/play-draft';
 import {
-  cluesAtLocation, MAP_CLUE_LIMIT, MAP_CLUE_SOURCES, MAP_CLUE_STATUSES, MAP_CLUE_TEXT_LIMIT,
+  cluesAtLocation, mapClueSourceChanged, MAP_CLUE_LIMIT, MAP_CLUE_SOURCES, MAP_CLUE_STATUSES, MAP_CLUE_TEXT_LIMIT,
   type MapClueCapture, type MapClueStatus, type PaperMapClue,
 } from '../../lib/paper-map-clues';
 import '../../styles/play-paper-clues.css';
@@ -12,12 +13,14 @@ const EMPTY_CLUE: Draft = { text: '', source: 'note', status: 'hypothesis', rela
 type LocatedClue = ReturnType<typeof cluesAtLocation>[number];
 
 function ClueDetails({ clue, origin, incoming }: LocatedClue) {
+  const sourceChanged = mapClueSourceChanged(clue, usePlayDraft()?.slots);
   return <div className="play-clue-detail">
     <div className="play-clue-meta">
       <strong data-hypothesis={clue.status === 'hypothesis' || undefined}>{MAP_CLUE_STATUSES[clue.status]}</strong>
       <span>{MAP_CLUE_SOURCES[clue.source]}</span>
       {incoming ? <span>{origin.paperId}에서 연결</span> : clue.relatedPaperId && <span>연결 장소 {clue.relatedPaperId}</span>}
     </div>
+    {sourceChanged && <p className="play-clue-source-changed">원본 굴림 변경됨 · 재확인 필요</p>}
     <p>{clue.text}</p>
   </div>;
 }
@@ -56,6 +59,7 @@ export function PlayPaperClues({ area, domainId, active, locations, capture, onC
   const [removing, setRemoving] = useState(false);
   const textInput = useRef<HTMLTextAreaElement>(null);
   const locationInput = useRef<HTMLInputElement>(null);
+  const slots = usePlayDraft()?.slots;
   const chosenId = active?.paperId ?? paperId.trim();
   const chosenKey = paperMapKey(chosenId);
   const clues = active ? cluesAtLocation(active, locations) : [];
@@ -100,7 +104,7 @@ export function PlayPaperClues({ area, domainId, active, locations, capture, onC
       const related = locations.find(({ paperId }) => paperMapKey(paperId) === paperMapKey(draft.relatedPaperId)
         && paperMapKey(paperId) !== chosenKey);
       const clue: PaperMapClue = { id: edit?.id ?? crypto.randomUUID(), text, source: draft.source, status: draft.status,
-        ...(related ? { relatedPaperId: related.paperId } : {}) };
+        ...(related ? { relatedPaperId: related.paperId } : {}), ...(draft.provenance ? { provenance: draft.provenance } : {}) };
       onSave({ ...(saved ?? { domainId, paperId: chosenId, area, note: '', tags: [] }),
         clues: edit ? previous.map((item) => item.id === edit.id ? clue : item) : [...previous, clue] });
       clear();
@@ -135,6 +139,7 @@ export function PlayPaperClues({ area, domainId, active, locations, capture, onC
         {edit && <button type="button" className="btn ghost" onClick={clear}>편집 취소</button>}
         {edit && <button type="button" className="linkbtn" onClick={() => setRemoving(true)} disabled={removing}>단서 지우기</button>}
       </div>
+      {mapClueSourceChanged(draft, slots) && <p className="play-clue-source-changed">원본 굴림 변경됨 · 재확인 필요</p>}
       {edit && active && removing && <div className="play-clue-actions" role="group" aria-label="단서 삭제 확인">
         <button type="button" className="btn primary" onClick={() => {
           onSave({ ...active, clues: (active.clues ?? []).filter(({ id }) => id !== edit.id) });

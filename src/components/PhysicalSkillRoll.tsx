@@ -62,8 +62,8 @@ export function PhysicalSkillRoll({ label, skill, modifier = 0, randomDifficulty
   const commitRoll = usePlayRoll();
   const recordCritical = useRecordSkillCritical();
   const [confirmed, setConfirmed] = usePlayDraftState<{ inputs: Inputs; result: CheckResult } | null>(slot, null);
-  const field = usePlayRollField(slot, label, 'D100', !!confirmed, true);
   const [draft, setDraft] = usePlayDraftState<Partial<Inputs>>(`skill-pending:${slot}`, {});
+  const field = usePlayRollField(slot, label, 'D100', !!confirmed && !draft.roll, true);
   const [invalid, setInvalid] = useState(false);
   const pc = usePlayCharacter();
   const own = context !== 'npc' ? pc : null;

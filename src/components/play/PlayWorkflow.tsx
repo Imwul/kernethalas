@@ -54,8 +54,9 @@ function focusControl(control: HTMLElement) {
 }
 
 function findRollField(root: HTMLElement | null, field: string) {
-  return Array.from(root?.querySelectorAll<HTMLElement>(FIELD) ?? [])
-    .find((element) => element.dataset.playRollField === field && !element.matches(':disabled'))
+  const enabled = Array.from(root?.querySelectorAll<HTMLElement>(`${FIELD}:not(:disabled)`) ?? []);
+  return enabled.find((element) => element.dataset.playRollField === field)
+    ?? enabled.find((element) => element.dataset.playRollLegacyField === field)
     ?? root?.querySelector<HTMLElement>(`select[data-play-attack-field="${CSS.escape(field)}"]:not(:disabled)`) ?? undefined;
 }
 

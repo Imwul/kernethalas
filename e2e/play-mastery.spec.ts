@@ -100,7 +100,16 @@ test('compound spell dice and Sustained activation keep separate paper Aether ch
   const resistance = target.getByRole('textbox', { name: '직접 굴린 D100' });
   await resistance.fill('78');
   await resistance.press('Enter');
-  await physicalRoll(target, 'Infernal 피해 D6+D4', '5 3');
+  const damage = target.getByRole('group', { name: 'Infernal 피해 D6+D4', exact: true });
+  const pending = damage.getByRole('textbox', { name: '직접 굴린 값', exact: true });
+  await pending.fill('5 ');
+  await page.reload();
+  await openPane(combat, 'Mastery·마법');
+  await expect(pending).toHaveValue('5 ');
+  await expect(damage.getByRole('status')).toHaveCount(0);
+  await pending.fill('5 3');
+  await pending.press('Enter');
+  await expect(pending).toHaveValue('');
   // Damage Pool: one die counts, the highest by default, and the player may pick another.
   await expect(target).toContainText('Infernal 피해 5');
   await target.getByRole('radio', { name: /^3/ }).check();

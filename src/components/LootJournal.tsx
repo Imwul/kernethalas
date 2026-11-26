@@ -3,7 +3,7 @@ import { tableById } from '../content';
 import { rollDie, tableSides } from '../lib/dice';
 import { journalPropertyText, journalRarity, journalRow, journalRowName, potionJournalLine, propertyCount } from '../lib/loot-journal';
 import { automaticRollSides, readOracleValue, rollTable } from '../lib/oracle';
-import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
+import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../lib/play-draft';
 import type { PlayRollDetails } from '../lib/play-roll-history';
 import { gearCount, type GearEffect } from '../lib/play-inventory';
 import { CopyButton, XRef } from './bits';
@@ -18,12 +18,12 @@ type JournalRollProps = {
   resultText?: string;
   breakdown?: string;
   fieldKey?: string;
+  rollContext?: string;
   once?: boolean;
 } & ({ tableId: string; label?: string } | { die: 'D4' | 'D6' | 'D10' | 'D20' | 'D100'; label: string });
 
-export function JournalRoll({ label, value, onValue, resultText, breakdown, fieldKey, once = false, ...source }: JournalRollProps) {
+export function JournalRoll({ label, value, onValue, resultText, breakdown, fieldKey, rollContext, once = false, ...source }: JournalRollProps) {
   const id = useId();
-  const [typed, setTyped] = useState('');
   const [invalid, setInvalid] = useState(false);
   const submitted = useRef(false);
   const commitRoll = usePlayRoll();
@@ -31,7 +31,11 @@ export function JournalRoll({ label, value, onValue, resultText, breakdown, fiel
   const dice = table?.dice ?? ('die' in source ? source.die : '');
   const sides = tableSides(dice);
   const action = label ?? table?.ko ?? '주사위';
-  const field = usePlayRollField(fieldKey ?? `journal:${action}`, action, dice, value !== null, sides === 100);
+  const key = fieldKey ?? `journal:${action}`;
+  const suffix = rollContext ? `:${rollContext}` : '';
+  const [typed, setTyped] = usePlayRollInput(`${key}${suffix}:${dice}`);
+  const field = usePlayRollField(`${key}${suffix}`, action, dice, value !== null && !typed, sides === 100);
+  const legacyField = suffix ? field['data-play-roll-field'].slice(0, -suffix.length) : undefined;
   if (sides === null) return null;
   const row = table && journalRow(table.id, value);
   const canRoll = !table || automaticRollSides(table) !== null;
@@ -54,7 +58,8 @@ export function JournalRoll({ label, value, onValue, resultText, breakdown, fiel
       }}>
         <div className="field">
           <label htmlFor={id}>직접 굴린 값</label><PlayDieHint dice={dice} sides={sides} />
-          <input id={id} inputMode="numeric" {...field} autoComplete="off" value={typed} placeholder={sides === 100 ? '1–100' : `1–${sides}`}
+          <input id={id} inputMode="numeric" {...field} data-play-roll-legacy-field={legacyField} autoComplete="off" value={typed}
+            placeholder={sides === 100 ? '1–100' : `1–${sides}`}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined} onChange={(event) => {
               setTyped(event.target.value);
               setInvalid(false);
@@ -156,7 +161,7 @@ function PotionJournal({ onJournalChange }: { onJournalChange?: JournalResult })
           setAgeRoll(null);
         }} resultText={potion && journalRowName(potion)} />
       )}
-      {potion && <JournalRoll key={kindRoll} tableId="t-potion-aging" value={ageRoll} onValue={setAgeRoll} />}
+      {potion && <JournalRoll key={kindRoll} tableId="t-potion-aging" rollContext={String(kindRoll)} value={ageRoll} onValue={setAgeRoll} />}
       {aging?.next && <div className="loot-refs">{aging.next.map(({ id }) => <XRef key={id} id={id} />)}</div>}
       {text && <JournalLine text={text} />}
     </section>
@@ -242,10 +247,10 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
         {item && <button type="button" className="btn ghost" onClick={() => resetItem(EMPTY_MAGIC_DRAFT)}>새 아이템</button>}
       </div>
       <JournalRoll tableId="t-item" value={draft.item} onValue={(roll) => resetItem({ ...EMPTY_MAGIC_DRAFT, item: roll })} />
-      {baseId && <JournalRoll key={`${draft.item}-base`} tableId={baseId} value={draft.base} onValue={(roll) => {
+      {baseId && <JournalRoll key={`${draft.item}-base`} tableId={baseId} rollContext={String(draft.item)} value={draft.base} onValue={(roll) => {
         resetItem({ ...EMPTY_MAGIC_DRAFT, item: draft.item, base: roll, peculiarity: draft.peculiarity });
       }} />}
-      {detailId && <JournalRoll key={`${base?.min}-detail`} tableId={detailId} value={draft.detail} onValue={(roll) => {
+      {detailId && <JournalRoll key={`${base?.min}-detail`} tableId={detailId} rollContext={`${draft.item}:${draft.base}`} value={draft.detail} onValue={(roll) => {
         resetItem({ ...EMPTY_MAGIC_DRAFT, item: draft.item, base: draft.base, detail: roll, peculiarity: draft.peculiarity });
       }} />}
       {lookups.length > 0 && <div className="loot-refs">{lookups.map(({ id }) => <XRef key={id} id={id} />)}</div>}
@@ -280,15 +285,15 @@ function MagicItemJournal({ onJournalChange }: { onJournalChange?: JournalResult
           }} resultText={rarity && `${rarity} · 속성 ${propertyCount(rarity)}개`} />}
           {rarity && propertySlots.map(({ selected, followUpId, fixedD10, effect }, index) => (
             <div className="loot-property" key={`${rarity}-${index}`}>
-              <JournalRoll tableId={propertiesId} label={`속성 ${index + 1}`} value={selected?.value ?? null}
+              <JournalRoll tableId={propertiesId} label={`속성 ${index + 1}`} rollContext={rarity} value={selected?.value ?? null}
                 onValue={(value) => changeProperty(index, { value, detail: null })}
                 resultText={effect} />
               {selected && followUpId && (
-                <JournalRoll key={`${selected.value}-${followUpId}`} tableId={followUpId} value={selected.detail}
+                <JournalRoll key={`${selected.value}-${followUpId}`} tableId={followUpId} rollContext={`${rarity}:${index}:${selected.value}`} value={selected.detail}
                   onValue={(detail) => changeProperty(index, { ...selected, detail })} />
               )}
               {selected && fixedD10 && (
-                <JournalRoll key={selected.value} die="D10" label="속성 수치" value={selected.detail}
+                <JournalRoll key={selected.value} die="D10" label="속성 수치" rollContext={`${rarity}:${index}:${selected.value}`} value={selected.detail}
                   onValue={(detail) => changeProperty(index, { ...selected, detail })} />
               )}
             </div>

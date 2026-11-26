@@ -3,13 +3,13 @@ import { EdgeToggle } from '../EdgeToggle';
 import { tableById } from '../../content';
 import type { TableRow } from '../../content/schema';
 import { d100FromValue, resolveCheck, rollDie, type Edge } from '../../lib/dice';
-import { followUpSteps } from '../../lib/exploration-follow-up';
+import { followUpSteps, type RequiredExplorationRoll } from '../../lib/exploration-follow-up';
 import { EMPTY_DOOR_INVESTIGATION, type LockTarget } from '../../lib/lock-trap';
 import { readOracleValue } from '../../lib/oracle';
 import { paperMapKey, type PaperMapDoorReport, type PaperMapLocation } from '../../lib/paper-map';
 import { activeDarkness } from '../../lib/play-domain';
 import { pcCheckModifiers } from '../../lib/play-check-modifiers';
-import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField } from '../../lib/play-draft';
+import { PlayDraftScope, usePlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField, usePlayRollInput } from '../../lib/play-draft';
 import { usePlayCharacter } from '../../lib/play-character';
 import { gearCount, type GearEffect, type GearLedger, type PaperChange } from '../../lib/play-inventory';
 import { useRecordSkillCritical } from '../../lib/skill-growth';
@@ -34,6 +34,7 @@ export interface ExplorationActionReport {
   sheet: ActionSheetItem[];
   nextTension: TensionDie | null;
   darknessRolls: number[];
+  required: RequiredExplorationRoll[];
 }
 
 export type ExplorationAction = 'door' | 'environment' | 'scavenge' | 'deep' | 'care';
@@ -107,6 +108,14 @@ function tensionResolved(roll?: ActionRoll) {
   return !!roll && (!roll.result.darkness || roll.darkness !== null);
 }
 
+function actionName(id: string) {
+  return id === 'deep' ? '깊은 수색' : id.startsWith('container-') ? '용기 강제 개방' : '문 강제 개방';
+}
+
+function darknessScope(id: string) {
+  return `action-darkness-${id}`;
+}
+
 function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetItem[] {
   return [
     ...(report?.lockpicks ? [{ id: `${prefix}-lockpicks`, text: `Lockpick −${report.lockpicks}`, gear: gearCount('Lockpick', -report.lockpicks) }] : []),
@@ -116,6 +125,7 @@ function lockSheet(prefix: string, report: PlayLockReport | null): ActionSheetIt
 
 export function PlayExplorationActions({ room, actionsRef, initialSides, darknessEffectCount = 0, priorDarknessRolls = NO_DARKNESS_ROLLS, onReport, onCombat,
   scavengeLimit = 1, finishedSources, mapLocation, mapExits = 0, onMapDoorSave, resumeExit, onResumeHandled, gearLedger }: Props) {
+  const scope = usePlayDraftScope();
   const [rolls, setRolls] = usePlayDraftState<ActionRoll[]>('action-tension', []);
   const [pane, setPane] = usePlayDraftState<ExplorationAction | null>('action-pane', null);
   const [searchAttempt, setSearchAttempt] = usePlayDraftState('scavenge-selected', 1);
@@ -135,7 +145,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   const [lootText, setLootText] = useState('');
   const [lootItem, setLootItem] = useState('');
   const [lootGear, setLootGear] = useState<GearEffect>();
-  const [followUps, setFollowUps] = useState<Record<string, ActionSheetItem[]>>({});
+  const [followUps, setFollowUps] = useState<Record<string, FollowUpReport>>({});
   const [savedDoorMessage, setSavedDoorMessage] = useState('');
   const [deferForm, setDeferForm] = useState(false);
   const [deferPaperId, setDeferPaperId] = useState('');
@@ -184,7 +194,8 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
   }), [panelId, room, setPane, setMapExit]);
 
   const doorPresent = door === 'present' || door === 'roll' && doorRoll !== null && doorRoll <= 5;
-  const readyDeep = room && deepStarted && tensionResolved(rolls.find(({ id }) => id === 'deep'));
+  const deepRoll = rolls.find(({ id }) => id === 'deep');
+  const readyDeep = room && deepStarted && tensionResolved(deepRoll);
   const openContainer = readyDeep && containerReport?.opened;
   const contents = openContainer ? rowAt(CONTAINER_TABLE.rows, contentsRoll) : undefined;
   const hasLoot = contents?.next?.some(({ id }) => id === 't-container-loot');
@@ -249,14 +260,38 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       return [{ id, key: `${id}-${followUpId ?? darkness}`, darkness, row, count, followUp: !!followUpSteps('darkness', row.min, count) }];
     });
   }, [rolls, darknessEffectCount, priorDarknessRolls]);
-  const reportFollowUp = useCallback((key: string, { items }: FollowUpReport) => {
-    setFollowUps((current) => JSON.stringify(current[key] ?? []) === JSON.stringify(items) ? current : { ...current, [key]: items });
+  const reportFollowUp = useCallback((key: string, result: FollowUpReport) => {
+    setFollowUps((current) => JSON.stringify(current[key]) === JSON.stringify(result) ? current : { ...current, [key]: result });
   }, []);
   const searchNumbers = useMemo(() => Array.from({ length: scavengeLimit }, (_, index) => index + 1), [scavengeLimit]);
   const searchesUsed = searchNumbers.filter((number) => scavenge[number]?.used).length;
   const activeSearch = scavenge[currentSearch];
   const nextSearch = activeSearch?.used && !activeSearch.needsEncounter
     ? searchNumbers.find((number) => !scavenge[number]?.used) : undefined;
+  const required = useMemo(() => {
+    const pending: RequiredExplorationRoll[] = [];
+    const include = (id: string, tensionScope: string, rollScope = tensionScope) => {
+      const roll = rolls.find((result) => result.id === id);
+      if (!roll) pending.push({ label: `${actionName(id)} · 긴장 주사위`, field: `${tensionScope}tension` });
+      else if (!tensionResolved(roll)) pending.unshift({ label: `${actionName(id)} · 짙어지는 어둠 D100`,
+        field: `${rollScope}${encodeURIComponent(darknessScope(id))}/oracle:t-growing-darkness` });
+    };
+    if (activeDoor?.pendingTension) {
+      const { scope: lockScope, attempt } = activeDoor.pendingTension;
+      include(`${doorKey}-${attempt}`, lockScope);
+    }
+    if (room && deepStarted) include('deep', `${scope}deep-tension/`, scope);
+    if (activeContainer?.pendingTension) {
+      const { scope: lockScope, attempt } = activeContainer.pendingTension;
+      include(`container-${attempt}`, lockScope);
+    }
+    const finalRoll = rolls.at(-1);
+    const waitingForDarkness = finalRoll && !tensionResolved(finalRoll);
+    const available = waitingForDarkness ? pending.filter(({ field }) => !field.endsWith('/tension')) : pending;
+    return [...(available.length ? available : pending), ...darknessRecords.flatMap(({ id, key }) => (followUps[key]?.required ?? []).map((roll) => ({
+      ...roll, label: `${actionName(id)} · ${roll.label}`,
+    })))];
+  }, [activeContainer, activeDoor, darknessRecords, deepStarted, doorKey, followUps, rolls, room, scope]);
   const report = useMemo<ExplorationActionReport>(() => ({
     text: [
       ...finishedDoors.map(({ text }) => text),
@@ -270,7 +305,7 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       activeContainer?.text,
       contents ? `용기 ${hasLoot && lootText ? lootText : contents.ko}` : '',
       ...darknessRecords.map(({ darkness, key, row }) => [
-        `행동 후 짙어지는 어둠 D100 ${darkness} · ${row.ko}`, ...(followUps[key] ?? []).map(({ text }) => text),
+        `행동 후 짙어지는 어둠 D100 ${darkness} · ${row.ko}`, ...(followUps[key]?.items ?? []).map(({ text }) => text),
       ].join(' · ')),
     ].filter(Boolean).join(' / '),
     sheet: [
@@ -288,11 +323,12 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       }) : []),
       ...(room && deepStarted ? [{ id: 'deep-exhaustion', text: '깊은 수색 · Exhaustion +2' }] : []),
       ...(hasLoot && lootItem ? [{ id: 'container-loot', text: lootItem, gear: lootGear }] : []),
-      ...darknessRecords.flatMap(({ key }) => (followUps[key] ?? []).map((item) => ({ ...item, id: `${key}-${item.id}` }))),
+      ...darknessRecords.flatMap(({ key }) => (followUps[key]?.items ?? []).map((item) => ({ ...item, id: `${key}-${item.id}` }))),
     ],
     nextTension,
     darknessRolls: rolls.flatMap(({ darkness }) => darkness === null ? [] : [darkness]),
-  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorTitle, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, rolls, room, scavenge, scavengeLimit, searchNumbers]);
+    required,
+  }), [activeContainer, activeDoor, contents, darknessRecords, deepStarted, doorKey, doorTitle, doorText, environmentReport, finishedDoors, followUps, hasLoot, lootItem, lootText, lootGear, nextTension, required, rolls, room, scavenge, scavengeLimit, searchNumbers]);
   useEffect(() => { onReport(report); }, [onReport, report]);
 
   const renderTension = (actionId: string, label: string) => {
@@ -306,15 +342,16 @@ export function PlayExplorationActions({ room, actionsRef, initialSides, darknes
       return <p className="play-explore-note">앞선 행동의 ‘짙어지는 어둠’ 결과를 먼저 확인하세요.</p>;
     }
     const completedEarlier = value && index < rolls.length - 1;
+    const tension = <TensionTool initialSides={previous?.result.nextDie ?? initialSides} showDarknessLink={false} value={value?.result ?? null} rollContext={actionId}
+      onResult={(result) => setRolls((current) => [...(index < 0 ? current : current.slice(0, index)), { id: actionId, result, darkness: null }])} />;
     return (
       <section className="play-explore-step" key={actionId} aria-label={label}>
         {completedEarlier
           ? <p className="play-explore-note">D{value.result.sides} 결과 {value.result.value} · 다음 D{value.result.nextDie}{darkness ? ` · ${darkness.ko}` : ''}</p>
           : <>
-            <TensionTool initialSides={previous?.result.nextDie ?? initialSides} showDarknessLink={false} value={value?.result ?? null}
-              onResult={(result) => setRolls((current) => [...(index < 0 ? current : current.slice(0, index)), { id: actionId, result, darkness: null }])} />
+            {actionId === 'deep' ? <PlayDraftScope name="deep-tension">{tension}</PlayDraftScope> : tension}
             {value?.result.darkness && (
-              <PlayDraftScope name={`action-darkness-${actionId}`}>
+              <PlayDraftScope name={darknessScope(actionId)}>
                 <PlayRoll label="행동 후 짙어지는 어둠" table={DARKNESS_TABLE} value={value.darkness}
                   onValue={(roll) => {
                     const followUpId = roll === null ? undefined : crypto.getRandomValues(new Uint32Array(2)).join('-');
@@ -519,10 +556,10 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const [check, setCheck] = usePlayDraftState<{
     skill: string; roll: number; edge: Edge; modifiers?: SkillModifier[]; madness?: number;
   } | null>('scavenge-check', null);
-  const [draftSkill, setSkill] = useState<string | null>(null);
-  const [draftRoll, setRoll] = useState<string | null>(null);
-  const [draftEdge, setEdge] = useState<Edge | null>(null);
-  const [draftModifiers, setModifiers] = useState<SkillModifier[] | null>(null);
+  const [draftSkill, setSkill] = usePlayRollInput('scavenge-skill', null);
+  const [draftRoll, setRoll] = usePlayRollInput('scavenge', null);
+  const [draftEdge, setEdge] = usePlayDraftState<Edge | null>('scavenge-pending-edge', null);
+  const [draftModifiers, setModifiers] = usePlayDraftState<SkillModifier[] | null>('scavenge-pending-modifiers', null);
   const [invalid, setInvalid] = useState(false);
   const [bonus, setBonus] = usePlayDraftState('scavenge-bonus', false);
   const [tableRoll, setTableRoll] = usePlayDraftState<number | null>('scavenge-table', null);
@@ -562,7 +599,7 @@ function Scavenge({ attempt, multiple, encounterFinished, onReport, onCombat }: 
   const used = check !== null;
   const needsEncounter = checkOutcome?.outcome === 'fumble' && !encounterFinished;
   const rollLabel = multiple ? `방 뒤지기 ${attempt}회차` : '방 뒤지기';
-  const diceField = usePlayRollField('scavenge', rollLabel, 'D100', used, true);
+  const diceField = usePlayRollField('scavenge', rollLabel, 'D100', used && !draftRoll, true);
   useEffect(() => { onReport(attempt, { used, needsEncounter, text, item, gear }); }, [attempt, onReport, used, needsEncounter, text, item, gear]);
 
   const resetRewards = () => {
