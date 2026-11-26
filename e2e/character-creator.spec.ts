@@ -14,6 +14,96 @@ async function allot(creator: Locator, skill: string, amount: number) {
 const noOverflow = async (page: Page, width: number) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 
+async function characterWorkspace(page: Page, title = '캐릭터 설정') {
+  const workspace = page.getByRole('main').locator('.play-character-workspace');
+  await expect(workspace.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await expect(page.locator('#play-drawer')).toBeHidden();
+  return workspace;
+}
+
+async function createCampaign(page: Page, name: string) {
+  await page.getByLabel('플레이 캠페인 선택', { exact: true }).click();
+  const campaign = page.getByRole('region', { name: '플레이 캠페인 관리' });
+  await campaign.getByRole('button', { name: '새 캠페인', exact: true }).click();
+  await campaign.getByRole('textbox', { name: '캠페인 이름' }).fill(name);
+  await campaign.getByRole('button', { name: '만들고 열기', exact: true }).click();
+}
+
+test('a newly created campaign opens character setup in the main workspace and accepts an existing sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/play');
+  await createCampaign(page, '새 탐사대');
+
+  const setup = await characterWorkspace(page);
+  await expect(setup.getByRole('button', { name: '새 생존자 만들기', exact: true })).toBeVisible();
+  await expect(setup.getByRole('button', { name: '나중에 설정', exact: true })).toBeVisible();
+  await setup.getByRole('button', { name: '기존 캐릭터 입력', exact: true }).click();
+  await expect(setup.getByRole('heading', { name: '캐릭터 설정', exact: true })).toBeInViewport({ ratio: 1 });
+  await setup.getByRole('textbox', { name: '이름', exact: true }).fill('Erthos');
+  await setup.getByRole('textbox', { name: 'PC 레벨', exact: true }).fill('3');
+  await setup.getByRole('textbox', { name: 'XP', exact: true }).fill('230');
+  await noOverflow(page, 360);
+
+  await page.reload();
+  await characterWorkspace(page);
+  await expect(setup.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('Erthos');
+  await setup.getByRole('button', { name: '탐험 시작', exact: true }).click();
+  await expect(setup).toBeHidden();
+  await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' }))
+    .toHaveAttribute('aria-current', 'step');
+  await page.reload();
+  await expect(setup).toBeHidden();
+  const drawer = await openDrawer(page, '캐릭터');
+  await expect(drawer.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('Erthos');
+  await expect(drawer.getByRole('textbox', { name: 'PC 레벨', exact: true })).toHaveValue('3');
+  await expect(drawer.getByRole('textbox', { name: 'XP', exact: true })).toHaveValue('230');
+});
+
+test('the campaign setup creator saves the new survivor before starting exploration', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/play');
+  await createCampaign(page, '두 번째 탐사대');
+  const setup = await characterWorkspace(page);
+  await setup.getByRole('button', { name: '새 생존자 만들기', exact: true }).click();
+  const creator = setup.locator('.creator');
+  await creator.getByRole('textbox', { name: '이름 (선택)', exact: true }).fill('Runa');
+  await creator.getByRole('button', { name: '완전 자동 생성', exact: true }).click();
+  const apply = creator.getByRole('button', { name: '캐릭터 탭에 채우기', exact: true });
+  await apply.click();
+  await expect(creator.getByText('시작 장비를 장부에 넣었습니다', { exact: false })).toBeVisible();
+  await page.reload();
+  await characterWorkspace(page);
+  await expect(creator.getByRole('heading', { name: 'VII. 정리', exact: true })).toBeVisible();
+  await expect(apply).toBeDisabled();
+  await expect(setup.getByRole('button', { name: '탐험 시작', exact: true })).toBeVisible();
+  await setup.getByRole('button', { name: '탐험 시작', exact: true }).click();
+  await expect(setup).toBeHidden();
+  const drawer = await openDrawer(page, '캐릭터');
+  await expect(drawer.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('Runa');
+  await expect(drawer.getByRole('textbox', { name: 'PC 레벨', exact: true })).toHaveValue('1');
+  await noOverflow(page, 1366);
+});
+
+test('returning from the wide creator preserves the current character and location', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/play');
+  const journal = page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '저널', exact: true });
+  await journal.click();
+  const location = page.getByRole('textbox', { name: '장소 이름 (선택)', exact: true });
+  await location.fill('현재 묘실');
+  const drawer = await openDrawer(page, '캐릭터');
+  const name = drawer.getByRole('textbox', { name: '이름', exact: true });
+  await name.fill('기존 생존자');
+  await drawer.getByRole('button', { name: '새 생존자 만들기', exact: true }).click();
+  const workspace = await characterWorkspace(page, '새 생존자 만들기');
+  await workspace.getByRole('textbox', { name: '이름 (선택)', exact: true }).fill('작성 중');
+  await workspace.getByRole('button', { name: '캐릭터 탭으로', exact: true }).click();
+  await expect(workspace).toBeHidden();
+  await expect(name).toHaveValue('기존 생존자');
+  await expect(journal).toHaveAttribute('aria-current', 'step');
+  await expect(location).toHaveValue('현재 묘실');
+});
+
 test('a survivor built from typed dice and one-tap choices lists every paper value at 360px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto('/atlas/p-new-run?view=list');
@@ -57,6 +147,7 @@ test('a survivor built from typed dice and one-tap choices lists every paper val
   await page.keyboard.press('ArrowRight');
   await expect(browser.getByRole('heading', { level: 3 })).toHaveText('Brawler');
   await browser.getByRole('button', { name: '이 Mastery 선택' }).click();
+  await browser.getByRole('button', { name: /^다음 Mastery/ }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(browser.getByRole('button', { name: '2개를 이미 골랐습니다' })).toBeDisabled();
   await creator.getByRole('button', { name: 'V. Goal ›' }).click();
@@ -92,12 +183,17 @@ test('full auto fills the character tab, the Mastery tree and the gear ledger, a
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/play');
   const drawer = await openDrawer(page, '캐릭터');
+  const compactWidth = (await drawer.boundingBox())!.width;
   await drawer.getByRole('button', { name: '새 생존자 만들기' }).click();
-  await drawer.getByRole('button', { name: '완전 자동 생성' }).click();
-  await expect(drawer.getByRole('heading', { name: 'VII. 정리' })).toBeVisible();
-  await drawer.getByRole('button', { name: '캐릭터 탭에 채우기' }).click();
-  await expect(drawer.getByText('시작 장비를 장부에 넣었습니다', { exact: false })).toBeVisible();
-  await drawer.getByRole('button', { name: '캐릭터 탭 보기' }).click();
+  const setup = await characterWorkspace(page, '새 생존자 만들기');
+  const creator = setup.locator('.creator');
+  expect((await creator.boundingBox())!.width).toBeGreaterThan(compactWidth);
+  await creator.getByRole('button', { name: '완전 자동 생성' }).click();
+  await expect(creator.getByRole('heading', { name: 'VII. 정리' })).toBeVisible();
+  await creator.getByRole('button', { name: '캐릭터 탭에 채우기' }).click();
+  await expect(creator.getByText('시작 장비를 장부에 넣었습니다', { exact: false })).toBeVisible();
+  await creator.getByRole('button', { name: '캐릭터 탭 보기' }).click();
+  await expect(setup).toBeHidden();
 
   await expect(drawer.getByRole('textbox', { name: 'PC 레벨' })).toHaveValue('1');
   await expect(drawer.getByRole('textbox', { name: 'XP', exact: true })).toHaveValue('0');

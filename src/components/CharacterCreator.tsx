@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { entryById } from '../content';
 import { masteryCatalog } from '../content/entries/masteries';
 import {
@@ -33,9 +33,10 @@ const perkOf = (reward: string) => /^(.+) Perk$/.exec(reward)?.[1];
  * Builds a level 1 survivor step by step (pp.16–21, 64, 67). Every die can be typed from the table or rolled here,
  * one step can be rolled at once, or "완전 자동" fills whatever is still empty; every result stays editable.
  */
-export function CharacterCreator({ onApplyGear, onDone }: {
+export function CharacterCreator({ onApplyGear, onDone, doneLabel = '캐릭터 탭 보기' }: {
   onApplyGear?: (lines: GearLine[]) => Promise<boolean>;
   onDone?: () => void;
+  doneLabel?: string;
 }) {
   const [draft, setDraft] = usePlayDraftState<CreationDraft>('creation', EMPTY_CREATION);
   const [step, setStep] = usePlayDraftState<CreationStep>('creation-step', 'attributes');
@@ -44,8 +45,11 @@ export function CharacterCreator({ onApplyGear, onDone }: {
   const [weaponSkill, setWeaponSkill] = useState('');
   const [cleared, setCleared] = useState<CreationDraft | null>(null);
   const [withGear, setWithGear] = useState(true);
-  const [applied, setApplied] = useState<{ character: PlayCharacter; presets: Record<string, number>; gear: boolean } | null>(null);
+  const [applied, setApplied] = usePlayDraftState<{ character: PlayCharacter; presets: Record<string, number> } | null>('creation-applied', null);
+  const [savingGear, setSavingGear] = useState(false);
+  const [gearSaved, setGearSaved] = useState(false);
   const [message, setMessage] = useState('');
+  const stepTitle = useRef<HTMLHeadingElement>(null);
   const commit = usePlayRoll();
   const pc = usePlayCharacter();
   const status = stepStatus(draft);
@@ -54,7 +58,7 @@ export function CharacterCreator({ onApplyGear, onDone }: {
   const patch = (next: Partial<CreationDraft>) => change((previous) => ({ ...previous, ...next }));
   const go = (id: CreationStep) => {
     setStep(id);
-    requestAnimationFrame(() => document.getElementById('creator-step-title')?.focus({ preventScroll: false }));
+    requestAnimationFrame(() => stepTitle.current?.focus());
   };
   const auto = () => {
     const next = autoCreate(draft);
@@ -281,19 +285,23 @@ export function CharacterCreator({ onApplyGear, onDone }: {
 
   const lines = creationLines(draft);
   const missing = CREATION_STEPS.filter(({ id }) => id !== 'summary' && !status[id]);
-  const record = () => {
-    if (!pc || !status.summary) return;
+  const record = async () => {
+    if (!pc || !status.summary || applied || savingGear) return;
     const { character, skills: values } = creationRecord(draft);
     const previous = { character: pc.character, presets: pc.presets };
     const items = withGear ? startingGear(draft) : [];
-    commit(() => pc.replace(character, values));
-    setApplied({ ...previous, gear: false });
-    if (items.length && onApplyGear) {
-      void onApplyGear(items).then((saved) => {
-        setApplied((current) => current && { ...current, gear: saved });
-        setMessage(saved ? '' : '장비 장부에 넣지 못했습니다. 장비 탭에서 직접 추가하세요.');
-      });
-    }
+    commit(() => {
+      pc.replace(character, values);
+      setApplied(previous);
+    });
+    setGearSaved(false);
+    setMessage('');
+    if (!items.length || !onApplyGear) return;
+    setSavingGear(true);
+    const saved = await onApplyGear(items).catch(() => false);
+    setGearSaved(saved);
+    setMessage(saved ? '' : '장비 장부에 넣지 못했습니다. 장비 탭에서 직접 추가하세요.');
+    setSavingGear(false);
   };
   const summary = (
     <>
@@ -310,19 +318,21 @@ export function CharacterCreator({ onApplyGear, onDone }: {
             .then(() => setMessage('종이에 옮길 값을 복사했습니다.'), () => setMessage('복사하지 못했습니다. 화면의 값을 직접 옮기세요.'));
         }}>값 복사</button>
         {pc && <>
-          {draft.start === 'gear' && onApplyGear && <label className="creator-check"><input type="checkbox" checked={withGear}
+          {draft.start === 'gear' && onApplyGear && <label className="creator-check"><input type="checkbox" checked={withGear} disabled={!!applied}
             onChange={(event) => setWithGear(event.target.checked)} />시작 장비도 장비 장부에 넣기</label>}
-          <button type="button" className="btn primary" disabled={!status.summary} onClick={record}>캐릭터 탭에 채우기</button>
+          <button type="button" className="btn primary" disabled={!status.summary || !!applied} onClick={record}>캐릭터 탭에 채우기</button>
         </>}
       </div>
       {pc && !applied && (pc.character.level !== undefined || pc.character.masteries?.length) && status.summary &&
         <p className="creator-note">지금 캐릭터 탭의 기록(레벨 {pc.character.level ?? '?'})을 새 생존자로 바꿉니다. 바꾼 뒤 바로 되돌릴 수 있습니다.</p>}
-      {applied && pc && <p className="creator-done" role="status">캐릭터 탭에 채웠습니다{applied.gear ? ' · 시작 장비를 장부에 넣었습니다' : ''}.
-        {' '}<button type="button" className="linkbtn" onClick={() => {
+      {applied && pc && <div className="creator-step-actions">
+        <p className="creator-done" role="status">캐릭터 탭에 채웠습니다{savingGear ? ' · 시작 장비 저장 중' : gearSaved ? ' · 시작 장비를 장부에 넣었습니다' : ''}.</p>
+        <button type="button" className="linkbtn" disabled={savingGear} onClick={() => {
           commit(() => pc.restore(applied.character, applied.presets));
           setApplied(null);
         }}>캐릭터 기록 되돌리기</button>
-        {onDone && <> · <button type="button" className="linkbtn" onClick={onDone}>캐릭터 탭 보기</button></>}</p>}
+        {onDone && <button type="button" className="btn ghost" disabled={savingGear} onClick={onDone}>{doneLabel}</button>}
+      </div>}
       {!pc && <p className="creator-note">플레이 화면의 <Link to="/play">캐릭터 탭</Link>에서 만들면 판정 칸·Mastery 테크트리·장비 장부에 바로 채워집니다.</p>}
       {message && <p className="creator-note" role="status">{message}</p>}
     </>
@@ -334,8 +344,8 @@ export function CharacterCreator({ onApplyGear, onDone }: {
     <section className="creator" aria-label="새 생존자 만들기">
       <div className="creator-head">
         <div className="creator-step-actions">
-          <button type="button" className="btn primary" onClick={auto} title="비어 있는 칸만 채웁니다">완전 자동 생성</button>
-          <button type="button" className="btn ghost" disabled={draft === EMPTY_CREATION} onClick={() => {
+          <button type="button" className="btn primary" disabled={!!applied} onClick={auto} title="비어 있는 칸만 채웁니다">완전 자동 생성</button>
+          <button type="button" className="btn ghost" disabled={draft === EMPTY_CREATION || savingGear} onClick={() => {
             setCleared(draft);
             setDraft(EMPTY_CREATION);
             setMasteryRoll(null);
@@ -350,17 +360,17 @@ export function CharacterCreator({ onApplyGear, onDone }: {
       </div>
       <ol className="creator-steps" aria-label="생성 단계">
         {CREATION_STEPS.map(({ id, numeral, label }) => (
-          <li key={id}><button type="button" aria-current={id === step ? 'step' : undefined} data-done={status[id] || undefined} onClick={() => go(id)}>
+          <li key={id}><button type="button" aria-current={id === step ? 'step' : undefined} data-done={status[id] || undefined} disabled={!!applied && id !== step} onClick={() => go(id)}>
             <span className="creator-step-num" aria-hidden="true">{numeral}</span>{label}{status[id] && <span className="sr-only"> 완료</span>}
           </button></li>
         ))}
       </ol>
       <div className="creator-pane">
-        <h3 id="creator-step-title" tabIndex={-1}>{current.numeral}. {current.label}</h3>
+        <h3 ref={stepTitle} tabIndex={-1}>{current.numeral}. {current.label}</h3>
         {panes[step]}
       </div>
       <div className="creator-nav">
-        {index > 0 && <button type="button" className="btn ghost" onClick={() => go(CREATION_STEPS[index - 1].id)}>
+        {index > 0 && <button type="button" className="btn ghost" disabled={!!applied} onClick={() => go(CREATION_STEPS[index - 1].id)}>
           ‹ {CREATION_STEPS[index - 1].numeral}. {CREATION_STEPS[index - 1].label}</button>}
         {index < CREATION_STEPS.length - 1 && <button type="button" className={status[step] ? 'btn primary' : 'btn ghost'}
           onClick={() => go(CREATION_STEPS[index + 1].id)}>{CREATION_STEPS[index + 1].numeral}. {CREATION_STEPS[index + 1].label} ›</button>}

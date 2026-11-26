@@ -1,17 +1,17 @@
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
-  activateCampaign, campaignHref, CAMPAIGN_NAME_MAX, DEFAULT_PLAY_CAMPAIGN, PlayCampaignContext, PLAY_CAMPAIGN_PARAM,
+  activateCampaign, campaignHref, CAMPAIGN_NAME_MAX, DEFAULT_PLAY_CAMPAIGN, finishCampaignCharacterSetup, PlayCampaignContext, PLAY_CAMPAIGN_PARAM,
   readTabCampaign, recoverLegacyPlayTab, saveCampaignName, usePlayCampaigns,
 } from '../../lib/play-campaigns';
 import { navigate, useLocation } from '../../lib/router';
 import { PlayPopover } from './PlayPanels';
 import '../../styles/play-campaign.css';
 
-const CampaignSelector = createContext<ReactNode>(null);
+const CampaignDesk = createContext({ selector: null as ReactNode, needsCharacterSetup: false, finishCharacterSetup: () => {} });
 
 /** The play desk shows the campaign picker inside its own header. */
-export function useCampaignSelector() {
-  return useContext(CampaignSelector);
+export function useCampaignDesk() {
+  return useContext(CampaignDesk);
 }
 
 export function CampaignPlay({ children }: { children: ReactNode }) {
@@ -43,9 +43,9 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
     setTemporary(activateCampaign(active.id));
   }, [active.id]);
 
-  const open = (id: string) => {
+  const open = (id: string, fromNewCampaign = false) => {
     setPickerOpen(false);
-    navigate(campaignHref(id, search));
+    navigate(campaignHref(id, fromNewCampaign ? undefined : search));
   };
   const edit = (mode: 'new' | 'rename') => {
     setError('');
@@ -77,7 +77,7 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
             setTemporary(result.temporary);
             setEditing(null);
             setError('');
-            if (editing === 'new') open(result.id);
+            if (editing === 'new') open(result.id, true);
           }}>
             <label htmlFor={inputId} className="field"><span>캠페인 이름</span>
               <input id={inputId} value={name} ref={input} maxLength={CAMPAIGN_NAME_MAX} required autoComplete="off"
@@ -99,9 +99,10 @@ export function CampaignPlay({ children }: { children: ReactNode }) {
         요청한 캠페인이 이 브라우저에 없어 {active.name} 캠페인을 열었습니다.
       </p>}
       {temporary && <p className="campaign-storage-status" role="status">브라우저에 캠페인 목록을 저장할 수 없어 이 탭에서 보관 중입니다.</p>}
-      <CampaignSelector.Provider value={selector}>
+      <CampaignDesk.Provider value={{ selector, needsCharacterSetup: active.needsCharacterSetup === true,
+        finishCharacterSetup: () => setTemporary(finishCampaignCharacterSetup(active.id)) }}>
         <PlayCampaignContext.Provider key={active.id} value={active.id}>{children}</PlayCampaignContext.Provider>
-      </CampaignSelector.Provider>
+      </CampaignDesk.Provider>
     </>
   );
 }

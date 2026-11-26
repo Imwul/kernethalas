@@ -34,6 +34,7 @@ test('legacy room and gear stay in their own live campaign while a new tab resum
   await picker(page).getByRole('button', { name: '만들고 열기', exact: true }).click();
   await expect(page).toHaveURL(/\/play\?campaign=[0-9a-f-]+$/);
   const expedition = page.url();
+  await page.getByRole('button', { name: '나중에 설정', exact: true }).click();
   await expect(stage(page, '탐험')).toHaveAttribute('aria-current', 'step');
   await openDrawer(page, '장비');
   await expect(gear(page)).not.toContainText('Ration');

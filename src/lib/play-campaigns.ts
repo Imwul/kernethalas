@@ -15,6 +15,7 @@ export interface PlayCampaign {
   id: string;
   name: string;
   playedAt: number;
+  needsCharacterSetup?: true;
 }
 
 interface Registry {
@@ -54,7 +55,8 @@ function readRegistry(): Registry {
       if (!item || !validId(item.id) || seen.has(item.id) || typeof item.name !== 'string'
         || !item.name.trim() || item.name.length > CAMPAIGN_NAME_MAX || !Number.isFinite(item.playedAt)) return [];
       seen.add(item.id);
-      return [{ id: item.id, name: item.name, playedAt: item.playedAt }];
+      return [{ id: item.id, name: item.name, playedAt: item.playedAt,
+        ...(item.needsCharacterSetup === true ? { needsCharacterSetup: true as const } : {}) }];
     });
     if (!seen.has(DEFAULT_PLAY_CAMPAIGN)) campaigns.unshift(BASE.campaigns[0]);
     return { campaigns, last: campaigns.some(({ id }) => id === value?.last) ? value!.last! : null };
@@ -123,9 +125,17 @@ export function saveCampaignName(raw: string, id?: string): { error: string } | 
     }
     return { ...current, campaigns: id
       ? current.campaigns.map((campaign) => campaign.id === chosen ? { ...campaign, name } : campaign)
-      : [...current.campaigns, { id: chosen, name, playedAt: 0 }] };
+      : [...current.campaigns, { id: chosen, name, playedAt: 0, needsCharacterSetup: true }] };
   });
   return duplicate ? { error: '같은 이름의 캠페인이 있습니다.' } : { id: chosen, temporary: inMemory };
+}
+
+export function finishCampaignCharacterSetup(id: string) {
+  return updateRegistry((current) => ({ ...current, campaigns: current.campaigns.map((campaign) => {
+    if (campaign.id !== id || !campaign.needsCharacterSetup) return campaign;
+    const { needsCharacterSetup: _, ...ready } = campaign;
+    return ready;
+  }) }));
 }
 
 function roomSlots(raw: string | null) {

@@ -3,9 +3,12 @@ import { tableById } from '../content';
 import { creatureById, type CreatureRecord } from '../content/entries/creatures';
 import { CopyButton, XRef } from '../components/bits';
 import { PlayAdvancement } from '../components/play/PlayAdvancement';
-import { PlayCharacter } from '../components/play/PlayCharacter';
+import {
+  CHARACTER_SECTION_EVENT, LEVEL_UP_EVENT, USE_ABILITY_EVENT, PlayCharacter, PlayCharacterWorkspace,
+  type CharacterSection, type CharacterWorkspaceView,
+} from '../components/play/PlayCharacter';
 import { PlayCheckpoints } from '../components/play/PlayCheckpoints';
-import { useCampaignSelector } from '../components/play/PlayCampaign';
+import { useCampaignDesk } from '../components/play/PlayCampaign';
 import { DrawerTabLabel, PLAY_DRAWER_EVENT, PLAY_DRAWER_ID, PlayDrawer, type DrawerTab } from '../components/play/PlayDrawer';
 import { PlayPopover } from '../components/play/PlayPanels';
 import { PlayCombat, type EncounterSeed } from '../components/play/PlayCombat';
@@ -50,7 +53,6 @@ import { CHARACTER_LOG_SLOT } from '../components/play/PlayExhaustion';
 import { ExhaustionHealNote } from '../components/play/ExhaustionHealNote';
 import { LINGERING_ENTRY_SLOT, LingeringEntryAlert } from '../components/play/PlayLingering';
 import { StatusIcon, type StatusKind } from '../components/StatusIcon';
-import { CHARACTER_SECTION_EVENT, LEVEL_UP_EVENT, USE_ABILITY_EVENT, type CharacterSection } from '../components/play/PlayCharacter';
 import { navigate, useLocation } from '../lib/router';
 import { SKILL_GROWTH_SLOT, usePendingSkillGrowth, useSkillCriticalHistory } from '../lib/skill-growth';
 import '../styles/play.css';
@@ -198,7 +200,9 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [customSets, setCustomSets] = useState(() => readEncounterLibrary(campaignId));
   const [drawer, setDrawer] = useState<DrawerId | null>(() => hasRestoreUndo() ? 'save' : null);
   const [needsBackup, setNeedsBackup] = useState(false);
-  const campaignSelector = useCampaignSelector();
+  const { selector: campaignSelector, needsCharacterSetup, finishCharacterSetup } = useCampaignDesk();
+  const [characterView, setCharacterView] = usePlayDraftState<CharacterWorkspaceView | null>('characterWorkspace', null);
+  const showCharacterWorkspace = needsCharacterSetup || characterView !== null;
   const desk = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLDivElement>(null);
   const wrapUp = useRef<WrapUpHandle>(null);
@@ -287,6 +291,21 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const openCharacterSection = (section: CharacterSection) => {
     openDrawer('character');
     requestAnimationFrame(() => document.dispatchEvent(new CustomEvent(CHARACTER_SECTION_EVENT, { detail: section })));
+  };
+  const openCharacterCreator = () => {
+    setDrawer(null);
+    setCharacterView('create');
+  };
+  const finishCharacterWorkspace = () => {
+    setCharacterView(null);
+    if (needsCharacterSetup) {
+      finishCharacterSetup();
+      focusStage(active);
+    } else openCharacterSection('sheet');
+  };
+  const backFromCharacterWorkspace = () => {
+    setCharacterView(null);
+    if (!needsCharacterSetup) openDrawer('character');
   };
   const goToLevelUp = () => {
     closeOverlayDrawer();
@@ -611,7 +630,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const activeOngoing = ongoing.conditions.length + ongoing.abilities.length;
   const characterLevel = (draft.slots[PLAY_CHARACTER_SLOT] as PlayCharacterRecord | undefined)?.level;
   const drawerTabs: DrawerTab<DrawerId>[] = [
-    { id: 'character', label: '캐릭터', title: '캐릭터 기본값', badge: characterLevel ? `Lv${characterLevel}` : undefined, content: <PlayCharacter onApplyGear={applyStartingGear} /> },
+    { id: 'character', label: '캐릭터', title: '캐릭터 기본값', badge: characterLevel ? `Lv${characterLevel}` : undefined,
+      content: characterView !== 'sheet' && <PlayCharacter onCreate={openCharacterCreator} /> },
     { id: 'history', label: '이력', title: '굴림 이력', badge: draft.history.length || undefined,
       content: <PlayRollHistory key={revision} paperCommitted={paperCommitted} onCorrection={goToRecordedField} /> },
     { id: 'gear', label: '장비', title: '장비 장부', badge: gear.ledger.items.length || undefined,
@@ -642,6 +662,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   return (
     <CharacterRoomContext.Provider value={progress}>
     <div className="play-desk" ref={desk} data-physical-first={physicalFirst || undefined} data-drawer={drawer ?? undefined}
+      data-character-workspace={showCharacterWorkspace || undefined}
       onKeyDownCapture={advanceDiceFocus}>
       <header className="play-header">
         <h1>플레이 모드</h1>
@@ -658,10 +679,12 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                 onClick={toggleKeepAwake}>화면 켜 두기</button>}
             </div>
           </PlayPopover>
-          <button className="btn ghost play-reset-toggle" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
-            onClick={() => setConfirmReset((open) => !open)}>이번 장소 지우기</button>
+          {!showCharacterWorkspace && <button className="btn ghost play-reset-toggle" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
+            onClick={() => setConfirmReset((open) => !open)}>이번 장소 지우기</button>}
         </div>
       </header>
+      {showCharacterWorkspace && <PlayCharacterWorkspace onboarding={needsCharacterSetup} view={characterView}
+        onView={setCharacterView} onBack={backFromCharacterWorkspace} onFinish={finishCharacterWorkspace} onApplyGear={applyStartingGear} />}
       {confirmReset && (
         <div className="play-reset" id="play-reset" role="group" aria-label="새 장소 확인">
           <p>이번 장소의 입력과 굴림 결과를 저널에 남기지 않고 지웁니다. 기록을 남기고 넘어가려면 저널의 다음 장소를 누르세요.</p>

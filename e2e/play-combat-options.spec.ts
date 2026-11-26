@@ -143,6 +143,7 @@ test('a creature reference opened during play returns to the same named campaign
   await page.getByRole('button', { name: '만들고 열기', exact: true }).click();
   await expect(page).toHaveURL(/campaign=/);
   const campaign = new URL(page.url()).searchParams.get('campaign');
+  await page.getByRole('button', { name: '나중에 설정', exact: true }).click();
 
   await page.getByRole('button', { name: '검색', exact: true }).click();
   const search = page.getByRole('dialog', { name: '규칙 검색' });

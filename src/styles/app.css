@@ -2433,6 +2433,10 @@ details.fold[open] > summary::before {
   display: grid;
   gap: var(--s5);
 }
+.bench > .page-head > .page-title {
+  font-family: var(--f-ko);
+  font-weight: 700;
+}
 .bench-tabs {
   display: flex;
   gap: 0;

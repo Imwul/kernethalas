@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { masteryCatalog } from '../../content/entries/masteries';
 import { goalByName, type GearLine } from '../../lib/character-creation';
 import { COUNTED_GOALS } from '../../lib/character-progress';
@@ -60,33 +60,72 @@ const readScore = (raw: string, digits = 3) => {
 };
 
 /** The paper sheet's survivor, typed once (or made with the creator) and reused by every check in play mode. */
-export function PlayCharacter({ onApplyGear }: { onApplyGear?: (lines: GearLine[]) => Promise<boolean> }) {
-  return <PlayDraftScope root name="character"><CharacterSheet onApplyGear={onApplyGear} /></PlayDraftScope>;
+export function PlayCharacter({ onCreate }: { onCreate?: () => void }) {
+  return <PlayDraftScope root name="character"><CharacterSheet onCreate={onCreate} /></PlayDraftScope>;
 }
 
-function CharacterSheet({ onApplyGear }: { onApplyGear?: (lines: GearLine[]) => Promise<boolean> }) {
+export type CharacterWorkspaceView = 'create' | 'sheet';
+
+export function PlayCharacterWorkspace({ onboarding, view, onView, onBack, onFinish, onApplyGear }: {
+  onboarding: boolean;
+  view: CharacterWorkspaceView | null;
+  onView: (view: CharacterWorkspaceView) => void;
+  onBack: () => void;
+  onFinish: () => void;
+  onApplyGear: (lines: GearLine[]) => Promise<boolean>;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    const frame = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(frame);
+  }, [view]);
+  return (
+    <section className="play-character-workspace" aria-labelledby="play-character-workspace-title">
+      <header className="play-character-workspace-head">
+        <h2 id="play-character-workspace-title" ref={heading} tabIndex={-1}>
+          {onboarding ? '캐릭터 설정' : '새 생존자 만들기'}
+        </h2>
+        {view && <button type="button" className="btn ghost" onClick={onBack}>
+          {onboarding ? '설정으로 돌아가기' : '캐릭터 탭으로'}
+        </button>}
+      </header>
+      {view === 'create' ? <PlayDraftScope root name="character">
+        <CharacterCreator onApplyGear={onApplyGear} onDone={onFinish} doneLabel={onboarding ? '탐험 시작' : undefined} />
+      </PlayDraftScope> : view === 'sheet' ? <>
+        <PlayCharacter />
+        <div className="play-character-workspace-actions"><button type="button" className="btn primary" onClick={onFinish}>탐험 시작</button></div>
+      </> : <>
+        <div className="play-character-setup-choices">
+          <button type="button" aria-labelledby="play-setup-create" aria-describedby="play-setup-create-detail" onClick={() => onView('create')}>
+            <strong id="play-setup-create">새 생존자 만들기</strong>
+            <span id="play-setup-create-detail">주사위를 굴리고 기술, Mastery, 시작 장비를 고릅니다.</span>
+          </button>
+          <button type="button" aria-labelledby="play-setup-sheet" aria-describedby="play-setup-sheet-detail" onClick={() => onView('sheet')}>
+            <strong id="play-setup-sheet">기존 캐릭터 입력</strong>
+            <span id="play-setup-sheet-detail">종이 시트에서 이름, 레벨, 기술과 Mastery를 옮깁니다.</span>
+          </button>
+        </div>
+        <div className="play-character-workspace-actions"><button type="button" className="btn ghost" onClick={onFinish}>나중에 설정</button></div>
+      </>}
+    </section>
+  );
+}
+
+function CharacterSheet({ onCreate }: { onCreate?: () => void }) {
   const pc = usePlayCharacter();
-  const [creating, setCreating] = usePlayDraftState('creating', false);
   const [section, setSection] = usePlayDraftState<CharacterSection>('section', 'sheet');
   useEffect(() => {
     const open = (event: Event) => {
       const next = (event as CustomEvent<CharacterSection>).detail;
-      if (next === 'sheet' || next === 'state' || next === 'mastery' || next === 'goals') { setCreating(false); setSection(next); }
+      if (next === 'sheet' || next === 'state' || next === 'mastery' || next === 'goals') setSection(next);
     };
     document.addEventListener(CHARACTER_SECTION_EVENT, open);
     return () => document.removeEventListener(CHARACTER_SECTION_EVENT, open);
-  }, [setCreating, setSection]);
+  }, [setSection]);
   const [typed, setTyped] = useState<Record<string, string>>({});
   if (!pc) return null;
   const { character, room } = pc;
-  if (creating) {
-    return (
-      <section className="play-character" aria-label="새 생존자 만들기">
-        <button type="button" className="linkbtn play-character-back" onClick={() => setCreating(false)}>‹ 캐릭터 탭으로</button>
-        <CharacterCreator onApplyGear={onApplyGear} onDone={() => setCreating(false)} />
-      </section>
-    );
-  }
   const text = (key: string, saved: string) => typed[key] ?? saved;
   const type = (key: string, value: string, save: (score: number | undefined) => void, digits = 3) => {
     setTyped((previous) => ({ ...previous, [key]: value }));
@@ -112,9 +151,9 @@ function CharacterSheet({ onApplyGear }: { onApplyGear?: (lines: GearLine[]) => 
     <section className="play-character" aria-label="캐릭터 기본값">
       <CharacterTabs section={section} onSection={setSection} />
       <div className="play-character-section" hidden={section !== 'sheet'} role="group" aria-label="기본·Skill">
-        <div className="play-character-top">
-          <button type="button" className={empty ? 'btn primary' : 'btn ghost'} onClick={() => setCreating(true)}>새 생존자 만들기</button>
-        </div>
+        {onCreate && <div className="play-character-top">
+          <button type="button" className={empty ? 'btn primary' : 'btn ghost'} onClick={onCreate}>새 생존자 만들기</button>
+        </div>}
         <div className="play-character-head">
           <label className="field play-character-name"><span>이름</span>
             <input value={character.name ?? ''} maxLength={40} autoComplete="off" placeholder="선택"
@@ -131,7 +170,7 @@ function CharacterSheet({ onApplyGear }: { onApplyGear?: (lines: GearLine[]) => 
               onChange={(event) => type('xp', event.target.value, (score) => pc.update({ xp: score === undefined ? undefined : score - room.xp }), 7)} />
           </label>
         </div>
-        <XpProgress />
+        <XpProgress canLevelUp={!!onCreate} />
         <ChoiceChips label="공격 무기" value={character.weapon as (typeof CHARACTER_WEAPONS)[number] | undefined} options={CHARACTER_WEAPONS}
           short={SHORT} onChange={(weapon) => pc.update({ weapon })} />
         <ChoiceChips label="방어 기술" value={character.defense as (typeof CHARACTER_DEFENSES)[number] | undefined} options={CHARACTER_DEFENSES}
@@ -142,14 +181,14 @@ function CharacterSheet({ onApplyGear }: { onApplyGear?: (lines: GearLine[]) => 
             {skills.map(skillField)}
           </fieldset>
         ))}
-        <Graveyard />
+        {onCreate && <Graveyard />}
       </div>
       <div className="play-character-section" hidden={section !== 'state'} role="group" aria-label="상태">
-        <DeathCheck onCreate={() => setCreating(true)} />
+        {onCreate && <DeathCheck onCreate={onCreate} />}
         <PlayExhaustion />
         <PlaySanity onDeath={() => setSection('state')} />
       </div>
-      <div className="play-character-section" hidden={section !== 'mastery'}><MasteryTrees /></div>
+      <div className="play-character-section" hidden={section !== 'mastery'}><MasteryTrees canUseAbility={!!onCreate} /></div>
       <div className="play-character-section" hidden={section !== 'goals'}><PersonalGoals /><Perks /></div>
     </section>
   );
@@ -182,7 +221,7 @@ function CharacterTabs({ section, onSection }: { section: CharacterSection; onSe
   );
 }
 
-function XpProgress() {
+function XpProgress({ canLevelUp }: { canLevelUp: boolean }) {
   const pc = usePlayCharacter();
   if (!pc) return null;
   const { room } = pc;
@@ -198,7 +237,7 @@ function XpProgress() {
         {xp !== undefined ? <>XP <b>{xp.toLocaleString('ko-KR')}</b> / {XP_TO_LEVEL.toLocaleString('ko-KR')}
           {ready ? ' · 레벨업 가능' : ` · 레벨업까지 ${(XP_TO_LEVEL - xp).toLocaleString('ko-KR')}`}</>
           : 'XP를 적으면 이번 장소 기록과 합산합니다.'}
-        {ready && <> <button type="button" className="btn primary" onClick={() => document.dispatchEvent(new Event(LEVEL_UP_EVENT))}>레벨업 기록하기</button></>}
+        {ready && canLevelUp && <> <button type="button" className="btn primary" onClick={() => document.dispatchEvent(new Event(LEVEL_UP_EVENT))}>레벨업 기록하기</button></>}
         {room.xpItems.length > 0 && <span className="play-character-xp-room"> 이번 장소 {room.xp >= 0 ? '+' : '−'}{Math.abs(room.xp).toLocaleString('ko-KR')} 포함 ({room.xpItems.join(', ')})</span>}
       </p>
     </div>
@@ -207,7 +246,7 @@ function XpProgress() {
 
 type Column = { key: string; label: string; entry: CharacterMastery; amulet: boolean };
 
-function MasteryTrees() {
+function MasteryTrees({ canUseAbility }: { canUseAbility: boolean }) {
   const pc = usePlayCharacter();
   const [selected, setSelected] = useState<{ key: string; node: number | 'feature' } | null>(null);
   const [adding, setAdding] = useState<'base' | 'amulet' | null>(null);
@@ -281,7 +320,7 @@ function MasteryTrees() {
               ? <button type="button" className="btn ghost" onClick={() => setTier(active, (selected.node as number) - 1)}>
                 Tier {tierNumeral(selected.node)}부터 배우지 않음으로</button>
               : <span className="play-character-note">Tier I은 이 Mastery를 고를 때 열립니다.</span>}
-          {selected.node !== 'feature' && selected.node <= active.entry.tier && <button type="button" className="btn ghost" onClick={() =>
+          {canUseAbility && selected.node !== 'feature' && selected.node <= active.entry.tier && <button type="button" className="btn ghost" onClick={() =>
             document.dispatchEvent(new CustomEvent(USE_ABILITY_EVENT, { detail: {
               masteryId: activeInfo.id, tier: active.entry.tier, abilityId: `${activeInfo.id}:${selected.node}` } }))}>전투에서 쓰기</button>}
           <span className="play-character-node-more">
