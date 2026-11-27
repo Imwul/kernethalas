@@ -101,6 +101,10 @@ const ATTACK_OVERRIDES: Record<string, Record<number, CreatureAttackDamage[]>> =
   ] },
   // Shrieking Assault ends with a free melee attack on one creature the shriek affected.
   'cr-bladewings': { 5: [attack('D6', 'Slashing', '비명 뒤 자유 행동 근접 공격')] },
+  // Savage Pounce: a target knocked Prone takes a follow-up bite as a Free Action.
+  'cr-razorjaw': { 5: [attack('D4', 'Piercing', 'Prone이 된 대상에게 자유 행동 물기')] },
+  // Doppelganger Surge: each illusory double makes one Physical attack on its own turn.
+  'cr-veilshifter': { 4: [attack('2D4', 'Psychic', '분신마다 자기 턴에 Physical 공격 1회')] },
 };
 
 const DAMAGE_PHRASE = new RegExp(`(\\d*D\\d+(?:[+-]\\d+)?|\\d+) (${DAMAGE_TYPES.join('|')}) 피해`);

@@ -221,7 +221,8 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
           {selectedAction && (
             <PlayDraftScope name={actionScope} key={actionScope}>
               {allowApplyingConditions && selectedActionText && <ApplyConditions text={selectedActionText} />}
-              {selectedAction.tag !== 'Physical' && <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} summons={summons} />}
+              {selectedAction.tag !== 'Physical' && <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} summons={summons}
+                damageBonuses={adjustment.damageBonuses} />}
             </PlayDraftScope>
           )}
           {selectedAction && selectedAction.tag !== 'Physical' && attackBlock}

@@ -124,3 +124,32 @@ test('in play, the enemy turn starts from its action roll and the attack is reco
   await damage.getByRole('button', { name: '피해 기록', exact: true }).click();
   await expect(damage).toContainText('저널 · Fangvine → PC · 가슴 · 피해 4 Piercing · Toughness −2 · Health −2');
 });
+
+test('a Magical bolt reads as a Spellward check and rolls its Level Adaptation dice after a failure', async ({ page }) => {
+  await page.goto('/ref/cr-vaelorian-magus');
+  const card = page.getByRole('region', { name: '전투 카드' });
+  await card.getByLabel('PC 레벨').fill('7');
+  await enterRoll(card, '1');
+  await expect(card.getByRole('status').first()).toContainText('대상이 Spellward에 실패하면 D6 Necrotic 피해를 받는다');
+  await expect(card.getByRole('status').first()).not.toContainText('명중');
+  await expect(card.getByRole('button', { name: '적 공격 판정' })).toHaveCount(0);
+  const followUp = card.locator('.creature-action-resolution');
+  await expect(followUp).toContainText('피해에 레벨 적응 +D6 포함');
+  const check = followUp.getByRole('group', { name: 'Spellward 판정', exact: true });
+  await check.getByLabel('Spellward 수치', { exact: true }).fill('40');
+  const roll = check.getByLabel('직접 굴린 D100', { exact: true });
+  await roll.fill('83');
+  await roll.press('Enter');
+  const damage = followUp.getByRole('group', { name: 'Necrotic 피해 D6+D6', exact: true });
+  await damage.getByLabel('직접 굴린 값').fill('2 5');
+  await damage.getByRole('button', { name: '확인', exact: true }).click();
+  await expect(damage.getByRole('status')).toContainText('Necrotic 피해 5');
+});
+
+test('Razorjaw follows a Prone pounce with its bite attack', async ({ page }) => {
+  await page.goto('/ref/cr-razorjaw');
+  const card = page.getByRole('region', { name: '전투 카드' });
+  await enterRoll(card, '5');
+  await card.getByRole('button', { name: '적 공격 판정' }).click();
+  await expect(card.getByLabel('이번 적 공격')).toContainText('Savage Pounce · D4 Piercing');
+});

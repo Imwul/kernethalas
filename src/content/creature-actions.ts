@@ -24,7 +24,7 @@ export const creatureActionKo: Record<string, string[]> = {
     '대상 하나에게 근접 공격을 해 명중하면 D8 Slashing 피해를 준다. 명중한 대상은 Endurance를 판정해 실패하면 1라운드 동안 Paralyzed 상태가 된다.',
   ],
   'cr-astral-beast': [
-    '천상의 기운을 쏘아 명중하면 D6 Arcane 피해를 준다.',
+    '천상의 기운을 대상 하나에게 쏜다. 대상이 Spellward에 실패하면 D6 Arcane 피해를 받는다.',
     '다음 자기 턴이 시작될 때까지 모든 피해에 Resistant가 된다.',
     '주변의 모든 생물이 Spellward를 판정한다. 실패하면 D8 Arcane 피해를, 성공하면 그 절반을 받는다.',
   ],
@@ -45,7 +45,7 @@ export const creatureActionKo: Record<string, string[]> = {
   ],
   'cr-bone-golem': [
     '거대한 팔로 대상 하나를 내리쳐 명중하면 D6 Bludgeoning 피해를 준다. 대상은 Athletics를 판정해 실패하면 Prone 상태가 된다.',
-    '뼈 손으로 대상 하나의 생명력을 빨아들인다. 명중하면 D6 Necrotic 피해를 주고, 준 피해의 절반만큼 Health를 회복한다.',
+    '뼈 손으로 대상 하나의 생명력을 빨아들인다. 대상이 Spellward에 실패하면 D6 Necrotic 피해를 받고, 이 생물은 준 피해의 절반만큼 Health를 회복한다.',
     '대상 하나에게 근접 공격을 해 명중하면 D6 Slashing 피해를 준다. Armor가 있는 부위에 명중했다면 즉시 그 Armor의 Integrity 판정을 한다.',
   ],
   'cr-bone-spiders': [
@@ -64,7 +64,7 @@ export const creatureActionKo: Record<string, string[]> = {
     '몸이 터지며 유독 가스와 사령 에너지를 내뿜는다. 방 안의 모든 생물이 Endurance를 판정해 실패하면 D8 Necrotic 피해를, 성공하면 그 절반을 받는다. 이 개미는 이 행동 뒤에 죽는다.',
   ],
   'cr-death-sage': [
-    '사령 화살을 쏘아 명중하면 D6 Necrotic 피해를 준다. 대상은 Endurance도 판정해 실패하면 휴식을 마칠 때까지 최대 Toughness가 1 줄어든다.',
+    '대상 하나에게 사령 화살을 쏜다. 대상이 Spellward에 실패하면 D6 Necrotic 피해를 받고, Endurance도 판정해 실패하면 휴식을 마칠 때까지 최대 Toughness가 1 줄어든다.',
     '대상 하나에게 저주를 건다. 대상은 Endurance를 판정해 실패하면 D4 라운드 동안 모든 무기 Skill과 Dodge 판정에 Disadvantage를 받는다.',
     '대상 하나의 생명력을 빨아들인다. 대상은 Endurance를 판정해 실패하면 D6 Necrotic 피해를 받고, 이 생물은 준 피해의 절반만큼 Health를 회복한다.',
   ],
@@ -85,7 +85,7 @@ export const creatureActionKo: Record<string, string[]> = {
   ],
   'cr-flayed-knight': [
     '유령 칼날로 대상 하나에게 근접 공격을 해 명중하면 D4 Slashing 피해를 준다. 이 피해는 Armor를 모두 무시한다.',
-    '유령 손으로 대상 하나의 생명력을 빨아들인다. 명중하면 D6 Necrotic 피해를 주고, 준 피해의 절반만큼 Health를 회복한다.',
+    '유령 손으로 대상 하나의 생명력을 빨아들인다. 대상이 Spellward에 실패하면 D6 Necrotic 피해를 받고, 이 생물은 준 피해의 절반만큼 Health를 회복한다.',
     '칼날을 넓게 휘둘러 닿는 거리의 대상 둘에게 각각 근접 공격을 하며, 명중한 대상마다 D6 Slashing 피해를 준다. 둘 중 하나라도 명중해 대상의 Toughness를 0으로 만들면, 준 피해의 절반만큼 Health를 회복한다.',
   ],
   'cr-flesh-eater': [
@@ -130,7 +130,7 @@ export const creatureActionKo: Record<string, string[]> = {
   ],
   'cr-netherfiend': [
     '흑요석 발톱으로 대상 하나에게 근접 공격을 해 명중하면 D6 Slashing 피해를 준다. 대상은 Spellward도 판정해 실패하면 D4 라운드 동안 Infernal Mark가 새겨진다. 이 표식이 있는 대상에게 이 생물의 공격은 1 Fire 피해를 더 준다. 이 행동이 다시 나오면 지속 시간이 누적된다.',
-    '기이한 불꽃을 쏘아 명중하면 D4 Fire 피해를 준다. 대상은 Endurance도 판정해 실패하면 Burning 상태가 된다.',
+    '대상 하나에게 기이한 불꽃을 쏜다. 대상이 Spellward에 실패하면 D4 Fire 피해를 받고, Endurance도 판정해 실패하면 Burning 상태가 된다.',
     '타락한 마법 촉수로 대상 하나를 감는다. 대상은 Athletics를 판정해 실패하면 Restrained 상태가 된다.',
   ],
   'cr-plaguebringer': [
@@ -139,7 +139,7 @@ export const creatureActionKo: Record<string, string[]> = {
     '병든 물질을 토해 대상 하나에게 2 Necrotic 피해를 준다. 이 피해는 Toughness를 건너뛰고 Health를 직접 깎는다.',
   ],
   'cr-pyreborn': [
-    '불꽃 촉수를 뻗어 명중하면 D6 Fire 피해를 준다. 대상은 Dodge도 판정해 실패하면 Burning 상태가 된다.',
+    '대상 하나에게 불꽃 촉수를 뻗는다. 대상이 Spellward에 실패하면 D6 Fire 피해를 받고, Dodge도 판정해 실패하면 Burning 상태가 된다.',
     '강한 불꽃을 터뜨린다. 모든 생물이 Dodge를 판정해 실패하면 2 Fire 피해를 받고 Burning 상태가 된다.',
     '불의 폭풍을 부른다. 범위 안의 모든 생물이 Dodge를 판정해 실패하면 D4 Fire 피해를 받고 Burning 상태가 된다.',
   ],
@@ -190,12 +190,12 @@ export const creatureActionKo: Record<string, string[]> = {
     '그림자와 하나가 된다. 다음 자기 턴이 시작될 때까지 이 생물을 노리는 공격은 Disadvantage를 받는다.',
   ],
   'cr-unfettered-familiar': [
-    '남은 비전 기운을 모아 쏘아 명중하면 D6 Arcane 피해를 준다.',
+    '남은 비전 기운을 모아 대상 하나에게 쏜다. 대상이 Spellward에 실패하면 D6 Arcane 피해를 받는다.',
     '대상 하나를 건드린다. 대상은 Endurance를 판정해 실패하면 1 Arcane 피해를 받고 1라운드 동안 Blinded 상태가 된다.',
     '다음에 공격받을 때 반응(Reaction)으로 역류를 일으킬 수 있다. 공격한 생물은 Resolve를 판정해 실패하면 D6 Arcane 피해를 받고, 다음에 쓰는 Magical 능력이 50% 확률로 실패한다.',
   ],
   'cr-vaelorian-magus': [
-    '사령 화살을 던져 명중하면 D6 Necrotic 피해를 준다.',
+    '대상 하나에게 사령 화살을 던진다. 대상이 Spellward에 실패하면 D6 Necrotic 피해를 받는다.',
     '섬뜩한 유령을 불러낸다. 모든 캐릭터가 Resolve를 판정해 실패하면 Frightened (20) 상태가 된다.',
     '대상 하나를 저주로 약하게 만든다. 대상은 다음 공격 굴림이나 Skill 판정에 Disadvantage를 받는다.',
   ],
@@ -205,7 +205,7 @@ export const creatureActionKo: Record<string, string[]> = {
     '대상 하나에게 돌진해 명중하면 D6 Bludgeoning 피해를 준다. 대상은 Athletics도 판정해 실패하면 Prone 상태가 된다.',
   ],
   'cr-voidweaver': [
-    '어두운 광선을 쏘아 명중하면 D4+1 Arcane 피해를 준다.',
+    '대상 하나에게 어두운 광선을 쏜다. 대상이 Spellward에 실패하면 D4+1 Arcane 피해를 받는다.',
     '현실을 비틀어 왜곡 영역을 만든다. 2라운드 동안 방 안의 생물은 무기 Skill과 Dodge 판정에 Disadvantage를 받는다. 이 행동이 다시 나오면 지속 시간이 처음부터 다시 시작된다.',
     '공허의 힘을 터뜨린다. 방 안의 모든 생물이 D6 Arcane 피해를 받고, Athletics를 판정해 실패하면 Prone 상태가 된다.',
   ],
@@ -245,7 +245,7 @@ export const creatureActionKo: Record<string, string[]> = {
     '원뿔 모양으로 얼어붙은 바람을 내뿜어 모든 캐릭터에게 2D6 Cold 피해를 준다.',
     '얼어붙은 팔다리로 대상 하나를 쳐 D6+2 Bludgeoning 피해를 준다.',
     '땅속으로 사라졌다가 거칠게 솟아오른다. 모든 생물이 Acrobatics를 판정해 실패하면 2D6 Bludgeoning 피해를 받고 Prone 상태가 된다.',
-    '얼음 우박을 만들어 최대 대상 셋에게 던진다. 맞은 대상은 2D6 Cold 피해를 받고, Athletics를 판정해 실패하면 Prone 상태가 된다.',
+    '얼음 우박을 만들어 최대 대상 셋에게 던진다. Spellward에 실패한 대상은 2D6 Cold 피해를 받고, Athletics를 판정해 실패하면 Prone 상태가 된다.',
     '일직선으로 돌진한다. 모든 생물이 Dodge를 판정해 실패하면 2D6 Bludgeoning 피해를 받고 Prone 상태가 된다.',
     '냉기 오라를 펼친다. 다음 2라운드 동안 오라 안의 적은 자기 턴이 시작될 때마다 1 Cold 피해를 받는다.',
   ],
@@ -293,7 +293,7 @@ export const creatureActionKo: Record<string, string[]> = {
   'cr-venomcloud-siren': [
     '독가스 구름을 내뿜는다. 방 안의 모든 생물이 Endurance를 판정해 실패하면 2D6 Poison 피해를 받는다.',
     '뱀 같은 몸으로 대상 하나를 쳐 D6 Piercing 피해를 준다. 대상은 Endurance를 판정해 실패하면 Poisoned (1) 상태가 된다.',
-    '독 투사체를 최대 대상 셋에게 쏜다. 맞은 대상은 각각 2D6 Poison 피해를 받는다.',
+    '독 투사체를 최대 대상 셋에게 쏜다. Spellward에 실패한 대상은 각각 2D6 Poison 피해를 받는다.',
     '땅에서 가시 덩굴이 솟는다. 범위 안의 생물은 Athletics를 판정해 실패하면 Restrained 상태가 된다.',
     '섬뜩한 노래를 부른다. 방 안의 모든 생물이 Resolve를 판정해 실패하면 Frightened (20) 상태가 된다.',
     '독 마법으로 자신을 강화한다. 다음에 성공한 공격이 2D6 Poison 피해를 더 준다.',

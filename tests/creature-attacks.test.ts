@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { creatureById, creatures } from '../src/content/entries/creatures';
+import { creatureActionKo } from '../src/content/creature-actions';
 import {
   creatureAttackDamage, creatureAttackPool, creaturePenetration, formatAttackDamage, poolDieCount,
 } from '../src/lib/creature-combat';
+import { withDamageBonuses } from '../src/lib/damage-pool';
 
 const action = (id: string, min: number) => {
   const creature = creatureById.get(id)!;
@@ -32,6 +34,8 @@ describe('creature attacks from the action table', () => {
     expect(creatureAttackDamage(...action('cr-cavebound-leech', 5)).map(({ dice, type }) => `${dice} ${type}`))
       .toEqual(['2D8 Acid', 'D6 Piercing']);
     expect(creatureAttackDamage(...action('cr-bladewings', 5))).toMatchObject([{ dice: 'D6', type: 'Slashing' }]);
+    expect(creatureAttackDamage(...action('cr-razorjaw', 5))).toMatchObject([{ dice: 'D4', type: 'Piercing' }]);
+    expect(creatureAttackDamage(...action('cr-veilshifter', 4))).toMatchObject([{ dice: '2D4', type: 'Psychic' }]);
   });
 
   it('adds Level Adaptation dice to the pool and fixed bonuses to the chosen die', () => {
@@ -47,5 +51,23 @@ describe('creature attacks from the action table', () => {
   it('reads Penetrating from the traits', () => {
     expect(creatures.some((creature) => creaturePenetration(creature) === 1)).toBe(true);
     expect(creaturePenetration(creatureById.get('cr-abyssal-vexator')!)).toBe(0);
+  });
+});
+
+describe('Level Adaptation on action damage', () => {
+  it('adds dice to the pool and fixed bonuses to the die that counts', () => {
+    expect(withDamageBonuses([['Necrotic', 'D6']], ['+D6'])).toEqual({ damage: [['Necrotic', 'D6'], ['Necrotic', 'D6']], applied: ['+D6'] });
+    expect(withDamageBonuses([['Arcane', 'D4+1']], ['+2']).damage).toEqual([['Arcane', 'D4+3']]);
+    expect(withDamageBonuses([['Fire', '2D6']], ['+D6+2']).damage).toEqual([['Fire', '2D6'], ['Fire', 'D6+2']]);
+    expect(withDamageBonuses([['Necrotic', 2]], ['+1']).damage).toEqual([['Necrotic', 3]]);
+    expect(withDamageBonuses([], ['+D6'])).toEqual({ damage: [], applied: [] });
+  });
+});
+
+describe('Magical action wording', () => {
+  it('never describes a Magical action as landing on a hit, since the target resists it with a check', () => {
+    const misleading = creatures.flatMap((creature) => creature.actions.flatMap((entry, index) =>
+      entry.tag === 'Magical' && /명중|맞은 대상/.test(creatureActionKo[creature.id]?.[index] ?? '') ? [`${creature.id} ${entry.name}`] : []));
+    expect(misleading).toEqual([]);
   });
 });

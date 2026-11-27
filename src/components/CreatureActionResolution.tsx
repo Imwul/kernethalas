@@ -3,7 +3,7 @@ import type { ActionDamage, CreatureActionRule } from '../content/creature-actio
 import type { CreatureAction } from '../content/entries/creatures';
 import { pooledDie, type RollResult } from '../lib/dice';
 import type { DamageType } from '../lib/damage';
-import { splitActionDamage, type ActionDamagePool } from '../lib/damage-pool';
+import { splitActionDamage, withDamageBonuses, type ActionDamagePool } from '../lib/damage-pool';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import { CreatureAreaTargets, type CreatureAreaRole, type SharedActionDamage } from './CreatureAreaTargets';
 import { CreatureSummonRoll, type CombatSummonControls } from './CreatureSummonRoll';
@@ -12,10 +12,12 @@ import { PhysicalDiceRoll } from './PhysicalDiceRoll';
 import { PhysicalSkillRoll, skillCheckSucceeded } from './PhysicalSkillRoll';
 import { XRef } from './bits';
 
-export function CreatureActionResolution({ action, rule, summons }: {
+export function CreatureActionResolution({ action, rule, summons, damageBonuses = [] }: {
   action: CreatureAction;
   rule: CreatureActionRule;
   summons?: CombatSummonControls;
+  /** Level Adaptation damage bonuses that apply at the current level, e.g. ['+D6']. */
+  damageBonuses?: readonly string[];
 }) {
   const [element, setElement] = usePlayDraftState<RollResult | undefined>('element', undefined);
   const revision = usePlayDraftState('resistance-run', 0);
@@ -23,7 +25,7 @@ export function CreatureActionResolution({ action, rule, summons }: {
   const clear = useClearPlayDraftScope();
   const alternate = action.tag === 'Magical' && !!rule.resistance && !['Spellward', 'Magic Resistance'].includes(rule.resistance);
   const elementType = !element ? undefined : element.total <= 2 ? 'Fire' : element.total <= 4 ? 'Lightning' : 'Force';
-  const damage: readonly ActionDamage[] = elementType ? [[elementType, 'D6']] : rule.damage ?? [];
+  const { damage, applied } = withDamageBonuses(elementType ? [[elementType, 'D6']] : rule.damage ?? [], damageBonuses);
   const renderTarget = (name?: string, shared?: SharedActionDamage, role?: CreatureAreaRole) => (
     <ActionTargetResolution rule={rule} damage={damage} target={name} shared={shared} role={role} summons={summons}
       elementRevision={rule.elemental ? revision : undefined} />
@@ -50,6 +52,7 @@ export function CreatureActionResolution({ action, rule, summons }: {
             revision[1]((number) => number + 1);
             setElement(value);
           }} />}
+        {applied.length > 0 && <p className="damage-note">피해에 레벨 적응 {applied.join(' ')} 포함 · 피해 풀에서 가장 높은 눈</p>}
         {alternate && <p className="damage-note">행동이 지정한 판정입니다. 일반 <XRef id="magical-attacks">Spellward 규칙</XRef>과 이 판정의 관계는 룰북에서 불명확합니다.</p>}
         {!rule.elemental && rule.targetScope && (rule.resistance || rule.after)
           ? <CreatureAreaTargets damage={damage} renderTarget={renderTarget} />
