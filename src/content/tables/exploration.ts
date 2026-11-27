@@ -1,5 +1,4 @@
 import type { OracleTable, TableRow } from '../schema';
-import { CREATURE_NAME_KO } from '../creature-names';
 import { core, req, opt, cond, ed } from '../helpers';
 import { corridorDescriptionCues, roomDescriptionCues } from './place-description-cues';
 
@@ -34,7 +33,7 @@ const CREATURES_B = ['Living Moss', 'Necropede', 'Netherfiend', 'Plaguebringer',
 export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const crRow = (name: string, i: number) => {
   const id = `cr-${slug(name)}`;
-  return r(i + 1, i + 1, CREATURE_NAME_KO[id] ?? name, name, { next: [n(id)] });
+  return r(i + 1, i + 1, name, name, { next: [n(id)] });
 };
 
 const OVERSEERS = ['Carnage Devourer', 'Dreadlord', 'Glacial Burrower', 'Gorehoof', 'Infernal Archon', 'Infernal Tormentor', 'Pyroclasmic Possessor', 'Veilshifter', 'Venomcloud Siren', 'Zephyrous Shadow'];
@@ -64,16 +63,16 @@ export const explorationTables: OracleTable[] = [
     usage: '새 도메인 시작 시 1회(또는 Growing Darkness 81–100). 도메인의 모든 생물에 적용, Overseer 자신은 제외. Overseer를 처치하면 사라짐.',
     mode: 'summary',
     rows: [
-      r(1, 1, 'Critical Strike 면역.', 'Tough'),
-      r(2, 2, '레벨 5마다 Health +D6.', 'Vital'),
-      r(3, 3, '피해 +1.', 'Frenzied'),
-      r(4, 4, '전투 기술(Combat Skill) +10.', 'Skilled'),
-      r(5, 5, '마법 저항(Magic Resistance) +10.', 'Magebane'),
-      r(6, 6, '피해 유형 표(룰북 225쪽)로 정한 유형 하나에 Resistant.', 'Resistant', { next: [n('t-damage-type')] }),
-      r(7, 7, '한 번에 5 이상 피해를 입히면 대상은 Resolve 실패 시 Sanity 1 손실.', 'Corrupting'),
-      r(8, 8, '죽을 때 Arcane 1 피해.', 'Unstable'),
-      r(9, 9, '정신(Mind) +20.', 'Alert'),
-      r(10, 10, 'Penetrating (1) 특성 획득(같은 특성과 중첩).', 'Piercing', { next: [n('creature-traits')] }),
+      r(1, 1, '이 도메인의 적은 Critical Strike에 면역이다.', 'Tough'),
+      r(2, 2, '이 도메인의 적은 레벨 5마다 Health에 D6을 더한다. 레벨 10이면 2D6, 레벨 15면 3D6이다.', 'Vital'),
+      r(3, 3, '이 도메인의 적이 주는 피해가 1 늘어난다.', 'Frenzied'),
+      r(4, 4, '이 도메인의 적은 Combat Skill이 10 높다.', 'Skilled'),
+      r(5, 5, '이 도메인의 적은 Magic Resistance가 10 높다.', 'Magebane'),
+      r(6, 6, '이 도메인의 적은 피해 유형 하나에 Resistant다. 어떤 유형인지는 피해 유형 표(룰북 225쪽)를 굴려 정한다.', 'Resistant', { next: [n('t-damage-type')] }),
+      r(7, 7, '이 도메인의 적이 한 번의 공격으로 피해를 5 이상 주면, 맞은 대상은 Resolve 판정을 하고 실패하면 Sanity를 1 잃는다.', 'Corrupting'),
+      r(8, 8, '이 도메인의 적은 처치될 때 Arcane 피해 1을 일으킨다. 누가 받는지는 원문에 적혀 있지 않다.', 'Unstable'),
+      r(9, 9, '이 도메인의 적은 Mind가 20 높다.', 'Alert'),
+      r(10, 10, '이 도메인의 적은 Penetrating (1) 특성을 얻는다. 이미 Penetrating이 있으면 수치를 더한다.', 'Piercing', { next: [n('creature-traits')] }),
     ],
     notes: [
       { type: 'clarification', text: '9번 “Alert”는 Mind +20 효과이며, 기습 불가 특성인 생물 특성 Alert와 이름만 같다.' },

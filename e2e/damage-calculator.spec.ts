@@ -4,8 +4,8 @@ import { chosen } from './helpers/choice';
 test('a mobile monster hit carries the critical, weak spot, armor and damage reactions into the breakdown', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/bestiary?q=necro');
-  await page.getByRole('link', { name: '시체지네', exact: true }).click();
-  const card = page.getByRole('dialog', { name: '시체지네' }).getByRole('region', { name: '전투 카드' });
+  await page.getByRole('link', { name: 'Necropede', exact: true }).click();
+  const card = page.getByRole('dialog', { name: 'Necropede' }).getByRole('region', { name: '전투 카드' });
   await card.getByRole('button', { name: '피해 계산', exact: true }).click();
   const damage = card.getByRole('region', { name: '피해 계산기' });
   await damage.getByRole('textbox', { name: '선택 주사위' }).fill('4');
@@ -55,8 +55,8 @@ test('physical resistance rounds up and can be adjusted for a magical attack', a
 test('an enemy critical carries the PC hit into Toughness and Health without spending either', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/bestiary?q=necro');
-  await page.getByRole('link', { name: '시체지네', exact: true }).click();
-  const card = page.getByRole('dialog', { name: '시체지네' }).getByRole('region', { name: '전투 카드' });
+  await page.getByRole('link', { name: 'Necropede', exact: true }).click();
+  const card = page.getByRole('dialog', { name: 'Necropede' }).getByRole('region', { name: '전투 카드' });
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
   await attack.getByRole('button', { name: '적이 공격' }).click();

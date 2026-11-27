@@ -125,9 +125,9 @@ test('the introductory paper map uses its own encounter lookup and a marked exit
   await enter(explore(page).getByRole('region', { name: '조우 판정', exact: true }), '직접 굴린 값', '10');
   const intro = explore(page).getByRole('region', { name: '도입 도메인 조우' });
   await enter(intro, '직접 굴린 값', '15');
-  await expect(intro.getByRole('status')).toContainText('살점 포식자');
+  await expect(intro.getByRole('status')).toContainText('Flesh Eater');
   await intro.getByRole('button', { name: '도입 도메인 조우로' }).click();
-  await expect(page.getByRole('heading', { name: '살점 포식자', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Flesh Eater', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '탐험', exact: true }).click();
   await explore(page).getByRole('checkbox', { name: '지도에 표시된 출구 위치' }).check();

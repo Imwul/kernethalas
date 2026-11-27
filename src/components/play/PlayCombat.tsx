@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { entryById, tableById } from '../../content';
-import { creatureById, creatureName, type CreatureRecord } from '../../content/entries/creatures';
+import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
 import type { EncounterSet } from '../../lib/custom-encounters';
 import { rollDie, tableSides } from '../../lib/dice';
@@ -212,7 +212,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
   const targets = useMemo(() => lineup.targets.flatMap((target) => {
     const creature = creatureById.get(target.creatureId);
     if (!creature) return [];
-    const label = target.ordinal ? `${creatureName(creature)} ${target.ordinal}` : creatureName(creature);
+    const label = target.ordinal ? `${creature.name} ${target.ordinal}` : creature.name;
     return [{ ...target, creature, label }];
   }), [lineup.targets]);
   const primary = targets[0]?.creature ?? null;
@@ -419,7 +419,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
               {tableId === 't-overseer' && domainOverseer && (
                 <div className="play-combat-domain-overseer">
                   <button type="button" className="btn primary" onClick={() => selectCreature(domainOverseer, '이 도메인의 Overseer')}>이 도메인의 Overseer 선택</button>
-                  {(!discovery || domainOverseerKnown) && <strong>{creatureName(domainOverseer)}</strong>}
+                  {(!discovery || domainOverseerKnown) && <strong lang="en">{domainOverseer.name}</strong>}
                 </div>
               )}
               <EncounterRoll table={table} submitLabel="생물 선택" onResult={(roll) => {

@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import { creatureById, creatureName } from '../../content/entries/creatures';
+import { creatureById } from '../../content/entries/creatures';
 import { exportEncounterLibrary, intersects, MAX_SET_NAME, parseEncounterExport, type EncounterSet, type PlayCustomEncounterRow } from '../../lib/custom-encounters';
 import { readOracleValue } from '../../lib/oracle';
 import { PlayCreatureSearch } from './PlayCreatureSearch';
@@ -145,7 +145,7 @@ export function PlayCustomEncounterEditor({ rows, onChange }: {
             const range = rangeText(row);
             return <li key={row.min}>
               <span className="play-custom-range">{range}</span>
-              <strong>{creatureName(creatureById.get(row.creatureId) ?? { id: row.creatureId, name: row.creatureId })}</strong>
+              <strong lang="en">{creatureById.get(row.creatureId)?.name}</strong>
               <div className="play-custom-row-actions">
                 <button type="button" className="btn ghost" aria-label={`${range} 범위 수정`} onClick={() => {
                   setEditing(row.min);
@@ -184,7 +184,7 @@ export function PlayCustomEncounterEditor({ rows, onChange }: {
             setCreatureId(candidate.id);
             setError('');
           }} />
-          {creature && <p className="play-combat-note" role="status">선택한 생물 <strong>{creatureName(creature)}</strong></p>}
+          {creature && <p className="play-combat-note" role="status">선택한 생물 <strong lang="en">{creature.name}</strong></p>}
           <div className="play-custom-row-actions">
             <button type="submit" className="btn primary" aria-describedby={error ? `${id}-error` : undefined}>
               {editing === null ? '범위 추가' : '수정 저장'}

@@ -1,5 +1,5 @@
 import type { CreatureSummon } from '../content/creature-action-rules';
-import { creatureById, creatureName } from '../content/entries/creatures';
+import { creatureById } from '../content/entries/creatures';
 import type { RollResult } from '../lib/dice';
 import { usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { PhysicalDiceRoll } from './PhysicalDiceRoll';
@@ -20,8 +20,7 @@ export function CreatureSummonRoll({ summon, encounter }: { summon: CreatureSumm
   const total = roll?.expr === summon.die ? roll.total : 0;
   const count = Number.isInteger(total) && total >= 1 && total <= 4 ? total : 0;
   const roster = summon.kind === 'roster' ? summon : undefined;
-  const summoned = roster && creatureById.get(roster.creatureId);
-  const name = summoned && creatureName(summoned);
+  const name = roster && creatureById.get(roster.creatureId)?.name;
   const activeCount = roster ? encounter?.activeCount(roster.creatureId) ?? 0 : 0;
   const available = roster ? Math.max(0, roster.limit - activeCount) : 0;
   const countToAdd = Math.min(count, available);

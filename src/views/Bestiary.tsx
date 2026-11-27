@@ -1,6 +1,6 @@
 import { useContext, useId, useMemo, useRef, useState } from 'react';
 import { entryById, hrefOf, tableById } from '../content';
-import { armorKo, creatureName, creatures, PART_KO, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
+import { armorKo, creatures, PART_KO, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
 import { bestiaryEncounterHref } from '../lib/bestiary-encounter';
 import { tableSides } from '../lib/dice';
 import { readOracleValue } from '../lib/oracle';
@@ -38,7 +38,7 @@ const rollHint = (tableId: LookupId) => {
 };
 
 const SORTS = {
-  name: { ko: '이름', key: (c: CreatureRecord) => creatureName(c) },
+  name: { ko: '이름', key: (c: CreatureRecord) => c.name },
   health: { ko: 'Health', key: (c: CreatureRecord) => -num(c.health) },
   cs: { ko: 'Combat Skill', key: (c: CreatureRecord) => -num(c.combatSkill) },
   mr: { ko: 'Magic Resistance', key: (c: CreatureRecord) => -num(c.magicResistance) },
@@ -264,7 +264,7 @@ export function Bestiary() {
               return (
                 <tr key={c.id}>
                   <th scope="row" className="name">
-                    <ContextLink id={c.id}>{creatureName(c)}</ContextLink>
+                    <ContextLink id={c.id}>{c.name}</ContextLink>
                   </th>
                   <td data-label="유형">{c.types.map((x) => TYPE_KO[x] ?? x).join(' · ')}</td>
                   <td data-label="수" className="n">
@@ -297,7 +297,7 @@ export function Bestiary() {
                         {!rolls.length && !via.length && '—'}
                       </span>
                       <Link className="bestiary-encounter-link" to={bestiaryEncounterHref(c.id)}
-                        aria-label={`${creatureName(c)} 조우에 추가`}>조우에 추가</Link>
+                        aria-label={`${c.name} 조우에 추가`}>조우에 추가</Link>
                     </div>
                   </td>
                 </tr>

@@ -110,7 +110,7 @@ test('a full workbench leaves existing panes in place from reference and search'
   await page.getByRole('button', { name: '검색', exact: true }).click();
   const search = page.getByRole('dialog', { name: '규칙 검색' });
   const query = search.getByRole('searchbox');
-  await query.fill('지옥 집정관');
+  await query.fill('Infernal Archon');
   await query.press('Shift+Enter');
   await expect(search.getByRole('alert')).toContainText('작업대가 8칸 찼습니다.');
   await query.press('Escape');

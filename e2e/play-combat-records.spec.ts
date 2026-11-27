@@ -18,8 +18,8 @@ async function necropede(page: Page) {
   await stage(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('시체지네');
-  await button(combat, '시체지네').click();
+  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Necropede');
+  await button(combat, 'Necropede').click();
   return combat;
 }
 
@@ -45,7 +45,7 @@ test('manual damage keeps its target and location through another attack and let
   const journal = page.getByRole('region', { name: '이번 장소 기록' });
   await stage(page, '저널');
   const paper = journal.getByRole('group', { name: '종이 시트에 반영' });
-  const first = paper.getByRole('checkbox', { name: /^시체지네 · .+ · 피해 6 Piercing$/ });
+  const first = paper.getByRole('checkbox', { name: /^Necropede · .+ · 피해 6 Piercing$/ });
   await expect(first).toBeVisible();
   await first.check();
 
@@ -76,7 +76,7 @@ test('manual damage keeps its target and location through another attack and let
   await button(incoming, '피해 기록').click();
   await stage(page, '저널');
   await expect(first).toBeChecked();
-  await expect(paper.getByRole('checkbox', { name: '시체지네 → PC · 피해 5 Poison · Toughness −3 · Health −2' })).toBeVisible();
+  await expect(paper.getByRole('checkbox', { name: 'Necropede → PC · 피해 5 Poison · Toughness −3 · Health −2' })).toBeVisible();
   await page.reload();
   await expect(journal).toContainText('Toughness −3 · Health −2');
   await expect(first).toBeChecked();
@@ -114,7 +114,7 @@ test('a completed fight shows exactly which rewards change before saving the cor
   await edit.click();
   await button(preview, '결과 수정 확정').click();
   await stage(page, '저널');
-  await expect(journal).toContainText('시체지네 · 전투 종료');
+  await expect(journal).toContainText('Necropede · 전투 종료');
   await expect(journal).not.toContainText('Crafting Supplies 1');
   await expect(journal.getByRole('region', { name: '종이 시트 정정표' })).toContainText('XP +50 (승리)');
   await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);

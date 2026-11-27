@@ -41,8 +41,8 @@ test('failed surprise leads to Initiative with Perception −20 and the Quick mo
 test('monster card imports Mind and Alert plus the greatest fear loss of the encounter', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/bestiary?q=dwerax');
-  await page.getByRole('link', { name: '드웨랙스', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '드웨랙스' });
+  await page.getByRole('link', { name: 'Dwerax', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Dwerax' });
   await dialog.getByText('조우 시작', { exact: true }).click();
   const start = dialog.getByRole('region', { name: '조우 시작 계산기' });
   await expect(start.getByRole('textbox', { name: '적 최고 Mind' })).toHaveValue('60');

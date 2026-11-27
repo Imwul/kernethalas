@@ -14,8 +14,8 @@ test('a physical Magic Resistance failure opens the damage roll and confirmed Ma
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('송곳니 덩굴');
-  await combat.getByRole('button', { name: '송곳니 덩굴', exact: true }).click();
+  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Fangvine');
+  await combat.getByRole('button', { name: 'Fangvine', exact: true }).click();
   await openPane(combat, 'Mastery·마법');
 
   const mastery = combat.getByRole('region', { name: 'PC Mastery 능력' });
@@ -24,7 +24,7 @@ test('a physical Magic Resistance failure opens the damage roll and confirmed Ma
   const abilities = mastery.getByRole('combobox', { name: '사용할 능력' });
   await expect(abilities.getByRole('option', { name: 'Fireball' })).toHaveCount(0);
   await abilities.selectOption({ label: 'Fire Bolt' });
-  const target = mastery.getByRole('region', { name: '송곳니 덩굴', exact: true });
+  const target = mastery.getByRole('region', { name: 'Fangvine', exact: true });
   await expect(target.getByRole('textbox', { name: 'Magic Resistance 수치' })).toHaveValue('30');
   const resistance = target.getByRole('textbox', { name: '직접 굴린 D100' });
   await resistance.fill('17');
@@ -46,7 +46,7 @@ test('a physical Magic Resistance failure opens the damage roll and confirmed Ma
   await page.getByRole('button', { name: '저널', exact: true }).click();
   const journal = page.getByRole('region', { name: '이번 장소 기록' });
   await expect(journal).toContainText('Fire Bolt');
-  await expect(journal).toContainText('송곳니 덩굴 · 저항 실패 · Fire 피해 10');
+  await expect(journal).toContainText('Fangvine · 저항 실패 · Fire 피해 10');
 });
 
 test('XP threshold, sequential unlock and one physical advancement die publish a reload-safe record at 3440px', async ({ page }) => {

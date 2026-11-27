@@ -27,7 +27,7 @@ test('a PC base attack gets one +10 and a pre-update manually adjusted score sta
   await button(sheet.getByRole('group', { name: '공격 무기' }), 'Bladed').click();
   await textbox(sheet, 'Bladed Weapons 수치').fill('55');
   await closeDrawer(page);
-  const { card } = await selectCreature(page, '별계 야수');
+  const { card } = await selectCreature(page, 'Astral Beast');
   await button(card, '공격 판정').click();
   const check = card.getByRole('region', { name: '공격 판정 해석기' });
   const skill = textbox(check, '공격자 수치');
@@ -63,7 +63,7 @@ test('a PC base attack gets one +10 and a pre-update manually adjusted score sta
 test('a confirmed defense and fumble each get one D10, and a PC bonus carries to another target', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
-  const { combat, card } = await selectCreature(page, '시체지네');
+  const { combat, card } = await selectCreature(page, 'Necropede');
   await button(card, '공격 판정').click();
   const check = card.getByRole('region', { name: '공격 판정 해석기' });
   await button(check, '적이 공격').click();
@@ -110,7 +110,7 @@ test('area checks use the player sheet only for the designated PC and keep each 
   await textbox(drawer, '현재 Exhaustion').fill('17');
   await closeDrawer(page);
 
-  const { card } = await selectCreature(page, '별계 야수');
+  const { card } = await selectCreature(page, 'Astral Beast');
   await physical(card.getByRole('region', { name: '표 굴리기', exact: true }), '5');
   await button(card, '여러 대상 판정').click();
   await textbox(card, '대상 이름 (한 줄에 하나씩)').fill('PC\nMinion');

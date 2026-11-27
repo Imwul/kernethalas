@@ -29,7 +29,7 @@ test('an attack exchange records the pair once and keeps skills for the next att
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, '시체지네');
+  await selectCreature(combat, 'Necropede');
   await combat.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = combat.getByRole('region', { name: '공격 판정 해석기' });
   const input = (name: string) => attack.getByRole('textbox', { name, exact: true });
@@ -45,11 +45,11 @@ test('an attack exchange records the pair once and keeps skills for the next att
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  const record = history.getByRole('button', { name: /공격 교환 · PC → 시체지네(?: 1)? D100 × 2 공격 00 \/ 방어 31.*수정 미리보기$/ });
+  const record = history.getByRole('button', { name: /공격 교환 · PC → Necropede(?: 1)? D100 × 2 공격 00 \/ 방어 31.*수정 미리보기$/ });
   await expect(record).toHaveCount(1);
   await record.click();
   await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
-  await expect(combat.getByRole('heading', { name: '시체지네 1', exact: true })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: 'Necropede 1', exact: true })).toBeVisible();
   await expect(attack.getByRole('button', { name: 'PC가 공격', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(input('공격자 D100')).toBeFocused();
   await expect(input('공격자 D100')).toBeEditable();
@@ -69,7 +69,7 @@ test('correcting a confirmed pair also rewinds its dependent hit-location roll',
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, '시체지네');
+  await selectCreature(combat, 'Necropede');
   const card = combat.getByRole('region', { name: '전투 카드' });
   await card.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
@@ -81,7 +81,7 @@ test('correcting a confirmed pair also rewinds its dependent hit-location roll',
 
   await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  await history.getByRole('button', { name: /공격 교환 · PC → 시체지네 D100 × 2 공격 12 \/ 방어 90.*수정 미리보기$/ }).click();
+  await history.getByRole('button', { name: /공격 교환 · PC → Necropede D100 × 2 공격 12 \/ 방어 90.*수정 미리보기$/ }).click();
   await expect(history.getByRole('group', { name: '굴림 수정 미리보기' })).toContainText('D20 1 다시 확인');
   await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
   await expect(attack.getByRole('textbox', { name: '공격자 D100', exact: true })).toBeFocused();
@@ -94,10 +94,10 @@ test('marked defeats drive creature spoils and unmarked targets can still be fou
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, '시체지네');
+  await selectCreature(combat, 'Necropede');
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
-  const first = combat.getByRole('combobox', { name: '시체지네 1 상태', exact: true });
-  const second = combat.getByRole('combobox', { name: '시체지네 2 상태', exact: true });
+  const first = combat.getByRole('combobox', { name: 'Necropede 1 상태', exact: true });
+  const second = combat.getByRole('combobox', { name: 'Necropede 2 상태', exact: true });
   const victory = combat.getByRole('button', { name: '승리 후 전투 마치기' });
   await first.selectOption('defeated');
   await expect(victory).toBeDisabled();
@@ -109,8 +109,8 @@ test('marked defeats drive creature spoils and unmarked targets can still be fou
   // A finished fight opens on its after-fight steps; loot is the next tab.
   await page.getByRole('region', { name: '휴식과 전리품 정리' }).getByRole('button', { name: '전리품', exact: true }).click();
   const loot = page.getByRole('region', { name: '전리품 굴림', exact: true });
-  await expect(loot.getByRole('region', { name: '시체지네 1 처치 보상' })).toBeVisible();
-  await expect(loot.getByRole('region', { name: '시체지네 2 처치 보상' })).toHaveCount(0);
+  await expect(loot.getByRole('region', { name: 'Necropede 1 처치 보상' })).toBeVisible();
+  await expect(loot.getByRole('region', { name: 'Necropede 2 처치 보상' })).toHaveCount(0);
   await go(page, '조우·전투');
   await expect(second).toBeDisabled();
   await expect(victory).toHaveCount(0);
@@ -133,9 +133,9 @@ test('only targets still in combat return after retreat', async ({ page }) => {
   await roll(explore, '긴장 주사위 굴린 값', '3');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, '시체지네');
-  await addCreature(combat, '지옥 집정관');
-  await combat.getByRole('combobox', { name: '시체지네 상태', exact: true }).selectOption('defeated');
+  await selectCreature(combat, 'Necropede');
+  await addCreature(combat, 'Infernal Archon');
+  await combat.getByRole('combobox', { name: 'Necropede 상태', exact: true }).selectOption('defeated');
   await openPane(combat, '도주');
   const flee = combat.getByRole('region', { name: '전투 도주' });
   await flee.getByRole('textbox', { name: 'Dodge 수치' }).fill('50');
@@ -161,8 +161,8 @@ test('only targets still in combat return after retreat', async ({ page }) => {
   await expect(light).toContainText('현재 광원 6');
   await expect(explore.getByRole('region', { name: '조우 판정', exact: true })).toHaveCount(0);
   await returning.click();
-  await expect(combat.getByRole('heading', { name: '지옥 집정관', exact: true })).toBeVisible();
-  await expect(combat.getByRole('combobox', { name: '시체지네 상태' })).toHaveCount(0);
+  await expect(combat.getByRole('heading', { name: 'Infernal Archon', exact: true })).toBeVisible();
+  await expect(combat.getByRole('combobox', { name: 'Necropede 상태' })).toHaveCount(0);
   await go(page, '저널');
   await expect(name).toHaveValue('A-12');
   await go(page, '조우·전투');
@@ -195,13 +195,13 @@ test('a legacy retreat waits for a separate Darkness ambush and keeps both encou
   await roll(explore.getByRole('region', { name: '짙어지는 어둠', exact: true }), '직접 굴린 값', '37');
   await expect(returning).toHaveCount(0);
   await ambush.click();
-  await selectCreature(combat, '시체지네');
+  await selectCreature(combat, 'Necropede');
   const victory = combat.getByRole('button', { name: '승리 후 전투 마치기', exact: true });
   await victory.click();
   await go(page, '탐험');
   await expect(ambush).toHaveCount(0);
   await returning.click();
-  await expect(combat.getByRole('heading', { name: '지옥 집정관', exact: true })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: 'Infernal Archon', exact: true })).toBeVisible();
   await victory.click();
   await go(page, '탐험');
   await expect(ambush).toHaveCount(0);
@@ -215,7 +215,7 @@ test('Overseer summons respect the active limit and Shadow Reapers have a separa
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, '지옥 집정관');
+  await selectCreature(combat, 'Infernal Archon');
   const card = combat.getByRole('region', { name: '전투 카드' });
   const summon = card.getByRole('region', { name: '소환 처리' });
   const chooseAction = async (value: string) => {
@@ -228,11 +228,11 @@ test('Overseer summons respect the active limit and Shadow Reapers have a separa
   await chooseAction('3');
   await roll(summon, '직접 굴린 값', '4');
   await summon.getByRole('button', { name: '전투에 1체 추가' }).click();
-  await expect(combat.getByRole('group', { name: '전투 대상', exact: true }).getByRole('button', { name: /^하급 악마/ })).toHaveCount(4);
+  await expect(combat.getByRole('group', { name: '전투 대상', exact: true }).getByRole('button', { name: /^Lesser Demon/ })).toHaveCount(4);
   await expect(summon).toContainText('교전 중 4체 · 추가 가능 0체');
   await expect(summon.getByRole('button', { name: /추가$/ })).toHaveCount(0);
 
-  await addCreature(combat, '공포 군주');
+  await addCreature(combat, 'Dreadlord');
   await chooseAction('1');
   await roll(summon, '직접 굴린 값', '2');
   const reaper = summon.getByRole('group', { name: 'Shadow Reaper 공격 처리' });

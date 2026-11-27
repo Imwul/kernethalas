@@ -33,7 +33,7 @@ test('notes follow a reference into play, stay attached to the correct entry, an
   await page.getByRole('link', { name: '플레이 모드', exact: true }).click();
   await page.getByRole('button', { name: '검색', exact: true }).click();
   const search = page.getByRole('dialog', { name: '규칙 검색' });
-  await search.getByRole('searchbox', { name: '검색어' }).fill('시체지네');
+  await search.getByRole('searchbox', { name: '검색어' }).fill('Necropede');
   await search.getByRole('searchbox', { name: '검색어' }).press('Enter');
   const preview = page.locator('.reference-panel');
   await expect(preview).toBeVisible();

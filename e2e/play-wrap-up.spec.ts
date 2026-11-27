@@ -45,7 +45,7 @@ async function enterNecropede(combat: Locator) {
   await combat.getByRole('button', { name: '확인', exact: true }).click();
   await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
   await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
-  await expect(combat.getByRole('heading', { name: '시체지네', exact: true })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: 'Necropede', exact: true })).toBeVisible();
 }
 
 test('a failed physical camp check resumes its saved plan after the encounter', async ({ page }) => {
@@ -67,7 +67,7 @@ test('a failed physical camp check resumes its saved plan after the encounter', 
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await enterNecropede(combat);
   await page.reload();
-  await expect(combat.getByRole('heading', { name: '시체지네' })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: 'Necropede' })).toBeVisible();
   await combat.getByRole('button', { name: '전투만 마치기', exact: true }).click();
 
   await expect(campDie).toHaveValue('2');
@@ -105,16 +105,16 @@ test('each defeated creature has an independent loot roll and paper change', asy
   // A finished fight opens on its after-fight steps; loot is the next tab.
   await page.getByRole('region', { name: '휴식과 전리품 정리' }).getByRole('button', { name: '전리품', exact: true }).click();
   const loot = page.getByRole('region', { name: '전리품 굴림' });
-  await enterRoll(loot.getByRole('region', { name: '시체지네 1 처치 보상' }), '자원 D10', '7');
-  await enterRoll(loot.getByRole('region', { name: '시체지네 2 처치 보상' }), '자원 D10', '3');
+  await enterRoll(loot.getByRole('region', { name: 'Necropede 1 처치 보상' }), '자원 D10', '7');
+  await enterRoll(loot.getByRole('region', { name: 'Necropede 2 처치 보상' }), '자원 D10', '3');
   await page.reload();
-  await expect(loot.getByRole('region', { name: '시체지네 1 처치 보상' })).toContainText('Crafting Supplies 1');
-  await expect(loot.getByRole('region', { name: '시체지네 2 처치 보상' })).toContainText('Cooking Ingredients 1');
+  await expect(loot.getByRole('region', { name: 'Necropede 1 처치 보상' })).toContainText('Crafting Supplies 1');
+  await expect(loot.getByRole('region', { name: 'Necropede 2 처치 보상' })).toContainText('Cooking Ingredients 1');
   await page.getByRole('button', { name: '저널 기록 보기' }).click();
   const journal = page.getByRole('region', { name: '이번 장소 기록' });
   const sheet = journal.getByRole('group', { name: '종이 시트에 반영' });
-  await expect(sheet.getByText('Crafting Supplies +1 · 시체지네 1 처치 보상', { exact: true })).toBeVisible();
-  await expect(sheet.getByText('Cooking Ingredients +1 · 시체지네 2 처치 보상', { exact: true })).toBeVisible();
+  await expect(sheet.getByText('Crafting Supplies +1 · Necropede 1 처치 보상', { exact: true })).toBeVisible();
+  await expect(sheet.getByText('Cooking Ingredients +1 · Necropede 2 처치 보상', { exact: true })).toBeVisible();
 });
 
 test('domain darkness triggers a short rest check and its result can clear that effect', async ({ page }) => {

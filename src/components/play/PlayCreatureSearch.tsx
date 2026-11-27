@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { creatureById, creatureName, type CreatureRecord } from '../../content/entries/creatures';
+import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
 import { findCreatureNames } from '../../lib/search';
 
 export function PlayCreatureSearch({ label = '생물 이름', onSelect }: {
@@ -26,7 +26,7 @@ export function PlayCreatureSearch({ label = '생물 이름', onSelect }: {
               <li key={id}><button type="button" className="btn ghost" onClick={() => {
                 setQuery('');
                 onSelect(creature);
-              }}>{creatureName(creature)}</button></li>
+              }}>{creature.name}</button></li>
             );
           })}
         </ul>

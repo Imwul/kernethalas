@@ -105,9 +105,9 @@ test('victory records the XP bonus for a creature strengthened by Growing Darkne
   await explore.getByRole('button', { name: '조우 표로' }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('거대 거미');
-  await combat.getByRole('button', { name: '거대 거미', exact: true }).click();
-  await combat.getByRole('combobox', { name: '거대 거미 상태' }).selectOption('defeated');
+  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Giant Spider');
+  await combat.getByRole('button', { name: 'Giant Spider', exact: true }).click();
+  await combat.getByRole('combobox', { name: 'Giant Spider 상태' }).selectOption('defeated');
   await combat.getByRole('button', { name: '승리 후 전투 마치기' }).click();
   await page.getByRole('button', { name: '저널', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'XP +60 (승리)' })).toBeVisible();

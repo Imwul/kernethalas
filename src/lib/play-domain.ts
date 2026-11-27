@@ -49,17 +49,11 @@ export function domainOverseer(roll: number | null) {
   return id ? creatureById.get(id) : undefined;
 }
 
-/** Korean names for the Overseer Influence results (the book's names stay in the table's label). */
-export const INFLUENCE_NAME_KO: Record<string, string> = {
-  Tough: '강인함', Vital: '생명력', Frenzied: '광란', Skilled: '숙련', Magebane: '마법 내성',
-  Resistant: '저항', Corrupting: '타락', Unstable: '불안정', Alert: '기민함', Piercing: '관통',
-};
-
 export function influenceText({ roll, damageRoll }: InfluenceRoll) {
   const row = playTableRow(INFLUENCE_TABLE, roll);
   const type = playTableRow(DAMAGE_TYPE_TABLE, damageRoll)?.ko;
-  if (roll === 6 && type) return `저항 · ${type} 피해에 저항한다.`;
-  return row ? `${INFLUENCE_NAME_KO[row.label ?? ''] ?? row.label} · ${row.ko}` : '';
+  if (roll === 6 && type) return `Resistant · 이 도메인의 적은 ${type} 피해에 Resistant다.`;
+  return row ? `${row.label} · ${row.ko}` : '';
 }
 
 // Table ranges which apply again later, or impose a modifier that can be lifted.

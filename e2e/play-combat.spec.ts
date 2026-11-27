@@ -23,7 +23,7 @@ test('play combat accepts a physical Overseer roll and supports Korean creature 
   await expect(overseer).toHaveValue('5');
   await expect(combat.getByRole('region', { name: '전투 카드' })).toHaveCount(0);
   await overseer.press('Enter');
-  const heading = combat.getByRole('heading', { name: '지옥 집정관' });
+  const heading = combat.getByRole('heading', { name: 'Infernal Archon' });
   await expect(heading).toBeFocused();
   await expect(combat.getByText('Overseer D10 5')).toBeVisible();
   await expect(combat.getByRole('region', { name: '전투 카드' })).toBeVisible();
@@ -35,8 +35,8 @@ test('play combat accepts a physical Overseer roll and supports Korean creature 
   await expect(overseer).toHaveValue('');
   await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('네크로피드');
-  await combat.getByRole('button', { name: '시체지네', exact: true }).click();
-  await expect(combat.getByRole('heading', { name: '시체지네' })).toBeVisible();
+  await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
+  await expect(combat.getByRole('heading', { name: 'Necropede' })).toBeVisible();
   await expect(page).toHaveURL(/\/play$/);
 });
 
@@ -47,7 +47,7 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름' }).fill('네크로피드');
-  await combat.getByRole('button', { name: '시체지네', exact: true }).click();
+  await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
 
   const card = combat.getByRole('region', { name: '전투 카드' });
   await card.getByRole('textbox', { name: '직접 굴린 값' }).fill('1');
@@ -62,8 +62,8 @@ test('duplicate combat targets keep separate action and damage rolls through swi
 
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   const lineup = combat.getByRole('group', { name: '전투 대상', exact: true });
-  const first = lineup.getByRole('button', { name: '시체지네 1', exact: true });
-  const second = lineup.getByRole('button', { name: '시체지네 2', exact: true });
+  const first = lineup.getByRole('button', { name: 'Necropede 1', exact: true });
+  const second = lineup.getByRole('button', { name: 'Necropede 2', exact: true });
   await expect(second).toHaveAttribute('aria-pressed', 'true');
   await expect(card.getByRole('status')).not.toContainText('Bone Slam');
   await card.getByRole('textbox', { name: '직접 굴린 값' }).fill('3');
@@ -80,8 +80,8 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   await expect(card.getByRole('status')).toContainText('Soul Drain');
 
   await combat.getByRole('button', { name: '다른 생물 추가' }).click();
-  await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('지옥 집정관');
-  await combat.getByRole('button', { name: '지옥 집정관', exact: true }).last().click();
+  await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('Infernal Archon');
+  await combat.getByRole('button', { name: 'Infernal Archon', exact: true }).last().click();
   await expect(combat.getByRole('textbox', { name: '적 최고 Mind' })).toHaveValue('50');
   await openPane(combat, '라운드');
   await expect(page.getByRole('link', { name: '지속 피해와 상태', exact: true })).toBeVisible();
@@ -113,15 +113,15 @@ test('the custom D20 table validates overlaps, allows gaps, and restores saved r
   await rangeStart.fill('2');
   await rangeEnd.fill('5');
   await creatureSearch.fill('네크로피드');
-  await combat.getByRole('button', { name: '시체지네', exact: true }).click();
+  await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
   await combat.getByRole('button', { name: '범위 추가', exact: true }).click();
   await expect(rows).toContainText('2–5');
-  await expect(rows).toContainText('시체지네');
+  await expect(rows).toContainText('Necropede');
 
   await rangeStart.fill('5');
   await rangeEnd.fill('7');
-  await creatureSearch.fill('지옥 집정관');
-  await combat.getByRole('button', { name: '지옥 집정관', exact: true }).click();
+  await creatureSearch.fill('Infernal Archon');
+  await combat.getByRole('button', { name: 'Infernal Archon', exact: true }).click();
   await combat.getByRole('button', { name: '범위 추가', exact: true }).click();
   await expect(combat.getByRole('alert')).toHaveText('이미 저장한 주사위 범위와 겹칩니다.');
   await expect(rows.getByRole('listitem')).toHaveCount(1);
@@ -134,10 +134,10 @@ test('the custom D20 table validates overlaps, allows gaps, and restores saved r
   await roll.fill('9');
   await roll.press('Enter');
   await expect(combat.getByRole('status')).toContainText('이 범위에 지정한 생물이 없습니다.');
-  await expect(combat.getByRole('heading', { name: '시체지네', exact: true })).toHaveCount(0);
+  await expect(combat.getByRole('heading', { name: 'Necropede', exact: true })).toHaveCount(0);
   await roll.fill('3');
   await roll.press('Enter');
-  await expect(combat.getByRole('heading', { name: '시체지네', exact: true })).toBeFocused();
+  await expect(combat.getByRole('heading', { name: 'Necropede', exact: true })).toBeFocused();
   await expect(combat.getByText('사용자 지정 조우표 D20 3')).toBeVisible();
   await combat.getByRole('button', { name: '조우 다시 선택' }).click();
   await combat.getByRole('button', { name: 'D20 굴리기' }).click();
