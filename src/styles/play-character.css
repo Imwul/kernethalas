@@ -35,7 +35,7 @@
 /* Character setup uses the play desk's main column and keeps the current place mounted beneath it. */
 html:has(.play-desk[data-character-workspace]) { overflow-anchor: none; }
 .play-desk[data-character-workspace] > :is(.play-bar, .play-layout, .play-reset) { display: none; }
-.play-character-workspace {
+:is(.play-character-workspace, .play-domain-setup) {
   display: grid;
   gap: var(--s3);
   min-width: 0;
@@ -57,7 +57,7 @@ html:has(.play-desk[data-character-workspace]) { overflow-anchor: none; }
   font: 400 clamp(23px, 3vw, 32px)/1.25 var(--f-ko-display);
 }
 .play-character-workspace-head h2:focus { outline: none; }
-.play-character-workspace :is(.play-character-workspace-head, .play-character-workspace-actions) .btn { min-height: 44px; }
+:is(.play-character-workspace, .play-domain-setup) :is(.play-character-workspace-head, .play-character-workspace-actions) .btn { min-height: 44px; }
 .play-character-workspace .play-character-tabs { inset-block-start: var(--play-sticky-top, 0px); }
 .play-character-setup-choices {
   display: grid;

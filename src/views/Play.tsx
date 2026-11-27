@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { tableById } from '../content';
 import { creatureById, type CreatureRecord } from '../content/entries/creatures';
 import { CopyButton, XRef } from '../components/bits';
@@ -101,6 +101,25 @@ const ENCOUNTER_LABELS = { encounter: '전투', overseer: 'Overseer 은신처', 
 const COMBAT_EFFECTS = new Set([1, 13, 23, 29, 35, 51, 55, 59, 61, 65, 77]);
 const REST_EFFECTS = new Set([15, 17, 19, 61]);
 const EXPLORE_EFFECTS = new Set([61, 69, 73]);
+
+/** The first domain's setup (Overseer, Influence, intro or standard) in the main column, ended by one button into exploration. */
+function PlayDomainSetup({ children, onStart }: { children: ReactNode; onStart: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    const frame = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return (
+    <section className="play-domain-setup" aria-labelledby="play-domain-setup-title">
+      <header className="play-character-workspace-head">
+        <h2 id="play-domain-setup-title" ref={heading} tabIndex={-1}>첫 도메인 설정</h2>
+      </header>
+      {children}
+      <div className="play-character-workspace-actions"><button type="button" className="btn primary" onClick={onStart}>이 도메인으로 탐험 시작</button></div>
+    </section>
+  );
+}
 
 function encounterFromEvent(source: string): EncounterSeed | undefined {
   const intro = /^intro-encounter-(\d+)(?::[\w:-]+)?$/.exec(source);
@@ -235,7 +254,10 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [needsBackup, setNeedsBackup] = useState(false);
   const { selector: campaignSelector, needsCharacterSetup, finishCharacterSetup } = useCampaignDesk();
   const [characterView, setCharacterView] = usePlayDraftState<CharacterWorkspaceView | null>('characterWorkspace', null);
+  // After character setup the first domain is set up in the main column too, before exploration opens.
+  const [domainSetup, setDomainSetup] = usePlayDraftState('domainSetup', false);
   const showCharacterWorkspace = needsCharacterSetup || characterView !== null;
+  const showWorkspace = showCharacterWorkspace || domainSetup;
   const desk = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLDivElement>(null);
   const wrapUp = useRef<WrapUpHandle>(null);
@@ -355,7 +377,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       const progress = domain.progress ?? newDomainProgress();
       const untouched = domains.length === 1 && domain.overseerRoll === null && !progress.lair && !progress.exit && !progress.lastCheck;
       if (created && untouched && progress.mode !== 'intro') updateDomain({ progress: { ...progress, mode: 'intro' } });
-      openDrawer('domain');
+      setDrawer(null);
+      setDomainSetup(true);
     } else openCharacterSection('sheet');
   };
   const backFromCharacterWorkspace = () => {
@@ -745,7 +768,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const appliedKeys = applied.map(paperReceiptKey);
   const unapplied = sheet.filter(({ id, text }) => !appliedKeys.includes(`${id}:${text}`)).length;
   const pause = session.pause?.roomId === roomLedgerId ? session.pause : null;
-  const sessionVisible = !showCharacterWorkspace && (sessionEditing || !!pause || !!session.nextIntent);
+  const sessionVisible = !showWorkspace && (sessionEditing || !!pause || !!session.nextIntent);
   const sessionPlace = [domain.name.trim() || `도메인 ${domain.id}`, placeName.trim() || (!paperId ? `장소 ${roomNumber}` : ''),
     paperId && `지도 ${paperId}`].filter(Boolean).join(' · ');
   const lastRoll = draft.history.filter((entry) => !entry.action).at(-1);
@@ -809,6 +832,10 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
 
   const activeOngoing = ongoing.conditions.length + ongoing.abilities.length;
   const characterLevel = (draft.slots[PLAY_CHARACTER_SLOT] as PlayCharacterRecord | undefined)?.level;
+  const domainPanel = (setup = false) => <PlayDomain key={domain.id} setup={setup} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
+    overseerKnown={overseerKnown} onRevealOverseer={revealOverseer}
+    onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
+    timeline={timeline} onTimelineChange={setTimeline} />;
   const drawerTabs: DrawerTab<DrawerId>[] = [
     { id: 'character', label: '캐릭터', title: '캐릭터 기본값', badge: characterLevel ? `Lv${characterLevel}` : undefined,
       content: characterView !== 'sheet' && <PlayCharacter onCreate={openCharacterCreator} /> },
@@ -829,10 +856,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           goToRecordedField(roll, after);
         }} /> },
     { id: 'domain', label: '도메인', title: domain.name.trim() || `도메인 ${domain.id}`, badge: effects.length || undefined,
-      content: <PlayDomain key={domain.id} domain={domain} domains={domains} activeEffects={effects} defeated={defeated} domainPlaceId={String(roomNumber)}
-        overseerKnown={overseerKnown} onRevealOverseer={revealOverseer}
-        onUpdate={updateDomain} onSwitch={switchDomain} onDismiss={(id) => setDismissed((old) => [...old, id])}
-        timeline={timeline} onTimelineChange={setTimeline} /> },
+      content: domainPanel() },
     { id: 'save', label: '저장', title: '플레이 저장·이어하기', flag: needsBackup ? '백업 필요' : undefined,
       content: <PlayCheckpoints data={{ slots: draft.slots, gear: gear.ledger, encounters: customSets, history: draft.history }}
         place={placeName.trim() || paperId || `장소 ${roomNumber}`} stage={stage.label} onRestore={restoreCheckpoint}
@@ -845,7 +869,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     <CharacterRoomContext.Provider value={progress}>
     <PlayDiscoveryMode.Provider value={discovery}>
     <div className="play-desk" ref={desk} data-physical-first={physicalFirst || undefined} data-drawer={drawer ?? undefined}
-      data-character-workspace={showCharacterWorkspace || undefined}
+      data-character-workspace={showWorkspace || undefined}
       onKeyDownCapture={advanceDiceFocus} onFocusCapture={({ target }) => {
         if (target instanceof HTMLInputElement && target.dataset.playRollField && target.closest('.play-stage')) {
           lastRollField.current[active] = target.dataset.playRollField;
@@ -867,10 +891,10 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                 onClick={toggleKeepAwake}>화면 켜 두기</button>}
             </div>
           </PlayPopover>
-          {!showCharacterWorkspace && <button className="btn ghost" type="button" ref={sessionButton} aria-expanded={sessionEditing || !!pause}
+          {!showWorkspace && <button className="btn ghost" type="button" ref={sessionButton} aria-expanded={sessionEditing || !!pause}
             aria-controls={sessionVisible ? sessionId : undefined} onClick={() => setSessionEditing(true)}>오늘 여기까지</button>}
           {/* Discarding the place is rare and destructive, so it sits behind the "⋯" menu instead of beside the session button. */}
-          {!showCharacterWorkspace && <PlayPopover className="play-more-menu" label="그 밖의 동작" align="end" open={moreOpen} onOpenChange={setMoreOpen}
+          {!showWorkspace && <PlayPopover className="play-more-menu" label="그 밖의 동작" align="end" open={moreOpen} onOpenChange={setMoreOpen}
             trigger={<span aria-hidden="true">⋯</span>}>
             <button className="play-menu-item" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
               onClick={() => { setMoreOpen(false); setConfirmReset(true); }}>이번 장소 지우기…</button>
@@ -883,6 +907,11 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
         onClose={() => { setSessionEditing(false); sessionButton.current?.focus({ preventScroll: true }); }} />}
       {showCharacterWorkspace && <PlayCharacterWorkspace onboarding={needsCharacterSetup} view={characterView}
         onView={setCharacterView} onBack={backFromCharacterWorkspace} onFinish={finishCharacterWorkspace} onApplyGear={applyStartingGear} onUndoGear={undoGearGrant} />}
+      {!showCharacterWorkspace && domainSetup && <PlayDomainSetup onStart={() => {
+        setDomainSetup(false);
+        selectStage('explore');
+        focusStage('explore');
+      }}>{domainPanel(true)}</PlayDomainSetup>}
       {confirmReset && (
         <div className="play-reset" id="play-reset" role="group" aria-label="새 장소 확인">
           <p>이번 장소의 입력과 굴림 결과를 저널에 남기지 않고 지웁니다. 기록을 남기고 넘어가려면 저널의 다음 장소를 누르세요.</p>
@@ -1089,7 +1118,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
         </div>
         <aside className="play-context" aria-label="플레이 중 참고">
           <PlayActionBar stage={active} onHistory={goToRollHistory} />
-          <PlayDrawer tabs={drawerTabs} active={showCharacterWorkspace ? null : drawer} modal={drawerModal} onSelect={(id) => openDrawer(id)} onClose={() => {
+          <PlayDrawer tabs={drawerTabs} active={showWorkspace ? null : drawer} modal={drawerModal} onSelect={(id) => openDrawer(id)} onClose={() => {
             const opener = drawer && document.querySelector<HTMLElement>(`.play-tray-item[aria-expanded="true"]`);
             setDrawer(null);
             requestAnimationFrame(() => (opener?.getClientRects().length ? opener : document.querySelector<HTMLElement>('.play-tray-all'))?.focus({ preventScroll: true }));

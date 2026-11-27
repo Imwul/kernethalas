@@ -50,6 +50,10 @@ test('a newly created campaign opens character setup in the main workspace and a
   await expect(setup.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('Erthos');
   await setup.getByRole('button', { name: '이 캐릭터로 탐험 시작', exact: true }).click();
   await expect(setup).toBeHidden();
+  // an entered sheet also sets up the first domain, without presetting the introductory domain
+  const domainSetup = page.getByRole('region', { name: '첫 도메인 설정', exact: true });
+  await expect(chosen(domainSetup, '도메인 방식')).toHaveAttribute('data-value', 'standard');
+  await domainSetup.getByRole('button', { name: '이 도메인으로 탐험 시작', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' }))
     .toHaveAttribute('aria-current', 'step');
   await page.reload();
@@ -72,11 +76,14 @@ test('the campaign setup creator saves the new survivor before starting explorat
   // one button records the survivor, grants the starting gear and opens exploration
   await creator.getByRole('button', { name: '이 생존자로 탐험 시작', exact: true }).click();
   await expect(setup).toBeHidden();
-  // the new survivor goes straight on to the first domain, set up as the introductory domain
-  const domain = page.locator('#play-drawer').getByRole('region', { name: '도메인 효과', exact: true });
-  await expect(domain).toBeVisible();
-  await expect(chosen(domain, '도메인 방식')).toHaveAttribute('data-value', 'intro');
-  await expect(domain.getByRole('group', { name: 'Overseer D10', exact: true })).toBeVisible();
+  // the new survivor goes straight on to the first domain in the main column, set up as the introductory domain
+  const domainSetup = page.getByRole('region', { name: '첫 도메인 설정', exact: true });
+  await expect(domainSetup.getByRole('heading', { name: '첫 도메인 설정' })).toBeFocused();
+  await expect(chosen(domainSetup, '도메인 방식')).toHaveAttribute('data-value', 'intro');
+  await expect(domainSetup.getByRole('group', { name: 'Overseer D10', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '플레이 단계' })).toBeHidden();
+  await domainSetup.getByRole('button', { name: '이 도메인으로 탐험 시작', exact: true }).click();
+  await expect(domainSetup).toBeHidden();
   await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' }))
     .toHaveAttribute('aria-current', 'step');
   await page.reload();

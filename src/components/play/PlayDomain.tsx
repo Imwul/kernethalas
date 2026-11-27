@@ -13,6 +13,8 @@ import { PlayTimeline } from './PlayTimeline';
 import { ChoiceButtons } from '../ChoiceButtons';
 
 interface Props {
+  /** First-domain setup: hides switching to another domain and the chronicle. */
+  setup?: boolean;
   domain: PlayDomainRecord;
   domains: PlayDomainRecord[];
   activeEffects: DarknessEvent[];
@@ -45,7 +47,7 @@ function InfluenceInputs({ label, value, onChange, context }: { label: string; v
 }
 
 export function PlayDomain({ domain, domains, activeEffects, defeated, overseerKnown, onRevealOverseer, onUpdate, onSwitch, onDismiss, domainPlaceId,
-  timeline, onTimelineChange }: Props) {
+  timeline, onTimelineChange, setup = false }: Props) {
   const [destination, setDestination] = useState<number | 'new' | null>(null);
   const summary = useRef<HTMLParagraphElement>(null);
   const discovery = useContext(PlayDiscoveryMode);
@@ -67,7 +69,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, overseerK
           <label className="field"><span>도메인 이름</span>
             <input value={domain.name} onChange={(event) => onUpdate({ name: event.target.value })} />
           </label>
-          {otherDomains.length > 1 && (
+          {!setup && otherDomains.length > 1 && (
             <label className="field"><span>도메인 전환</span>
               <select value={destination === 'new' ? domain.id : destination ?? domain.id} onChange={(event) => {
                 const next = Number(event.target.value);
@@ -75,7 +77,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, overseerK
               }}>{otherDomains.map((option) => <option key={option.id} value={option.id}>{domainName(option)}</option>)}</select>
             </label>
           )}
-          <button className="btn ghost" type="button" onClick={() => setDestination('new')}>새 도메인</button>
+          {!setup && <button className="btn ghost" type="button" onClick={() => setDestination('new')}>새 도메인</button>}
         </div>
         {destination !== null && (
           <div className="play-reset" role="group" aria-label="도메인 전환 확인">
@@ -87,7 +89,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, overseerK
             <button className="btn ghost" type="button" onClick={() => setDestination(null)}>취소</button>
           </div>
         )}
-        {timeline && onTimelineChange && <PlayTimeline domainId={domain.id} domainName={domainName(domain)} timeline={timeline} onChange={onTimelineChange} />}
+        {!setup && timeline && onTimelineChange && <PlayTimeline domainId={domain.id} domainName={domainName(domain)} timeline={timeline} onChange={onTimelineChange} />}
         <section className="play-domain-options" aria-label="도메인 진행 설정">
           <h3>탐험 진행</h3>
           <div className="play-domain-fields">
