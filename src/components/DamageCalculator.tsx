@@ -1,6 +1,11 @@
 import type { creatureDefenses } from '../content/creature-defenses';
 import { formatCombatDamage, isCombatDamageRecord, type CombatDamageRecord } from '../lib/combat-damage-records';
-import { calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, listedDamageReactions, splitPcDamage, type DamageReactions, type DamageType } from '../lib/damage';
+import {
+  calculateDirectDamage, DAMAGE_TYPES, ignoresArmor, isPhysicalDamage, listedDamageReactions, splitPcDamage, UNTYPED_DAMAGE,
+  type DamageChoice, type DamageReactions, type DamageType,
+} from '../lib/damage';
+import { formatAttackDamage, poolDieCount, type CreatureAttackPool } from '../lib/creature-combat';
+import { pooledDie, type RollResult } from '../lib/dice';
 import { usePlayDraft, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
 import { playAction } from '../lib/play-roll-history';
 import { XRef } from './bits';
@@ -9,6 +14,7 @@ import { TogglePanel } from './TogglePanel';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import '../styles/damage-calculator.css';
 import { ChoiceButtons } from './ChoiceButtons';
+import { PhysicalDiceRoll } from './PhysicalDiceRoll';
 
 interface Impact {
   location: string;
@@ -17,6 +23,8 @@ interface Impact {
 }
 
 type PaperTarget = { slot: string; target: string; source?: string; editable: boolean };
+/** The creature action that hit the PC: its Damage Pool, type and Armor it ignores (Penetrating). */
+export type IncomingAttack = CreatureAttackPool & { name: string; when?: string; armorIgnore: number };
 type DamageCandidate = Omit<CombatDamageRecord, 'id' | 'target' | 'source'>;
 
 const REACTION_LABELS = [
@@ -28,7 +36,7 @@ function readInteger(text: string, min: number): number | null {
   return /^[+-]?\d+$/.test(text.trim()) && Number.isSafeInteger(value) && value >= min ? value : null;
 }
 
-export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCritical, pc = false, confirmedFirst = false, paper }: {
+export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCritical, pc = false, confirmedFirst = false, paper, attack, fixed }: {
   impact?: Impact;
   unlocatedArmor: number | null;
   defenses?: ReturnType<typeof creatureDefenses>;
@@ -36,34 +44,41 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
   pc?: boolean;
   confirmedFirst?: boolean;
   paper?: PaperTarget;
+  attack?: IncomingAttack;
+  /** Damage the exchange already set (both sides failed: 1), entered as confirmed damage that Armor does not reduce. */
+  fixed?: number;
 }) {
-  const [rollText, setRollText] = usePlayDraftState('damage-roll', '');
-  const [type, setType] = usePlayDraftState<DamageType | ''>('damage-type', '');
-  const [modifierText, setModifierText] = usePlayDraftState('damage-modifier', '');
+  const [rollText, setRollText] = usePlayDraftState('damage-roll', attack && !attack.dice ? String(attack.mod) : '');
+  const [type, setType] = usePlayDraftState<DamageChoice | ''>('damage-type', attack?.type ?? '');
+  const [modifierText, setModifierText] = usePlayDraftState('damage-modifier', attack?.dice && attack.mod ? String(attack.mod) : '');
+  const [poolRoll, setPoolRoll] = usePlayDraftState<RollResult | undefined>('damage-pool-roll', undefined);
   const [critical, setCritical] = usePlayDraftState<1 | 2 | 3>('damage-critical', initialCritical ? 2 : 1);
   const [useImpact, setUseImpact] = usePlayDraftState('damage-use-impact', true);
   const [armorOverride, setArmorOverride] = usePlayDraftState<string | null>('damage-armor', null);
-  const [ignoreText, setIgnoreText] = usePlayDraftState('damage-ignore', '');
+  const [ignoreText, setIgnoreText] = usePlayDraftState('damage-ignore', attack?.armorIgnore ? String(attack.armorIgnore) : '');
   const [reductionText, setReductionText] = usePlayDraftState('damage-reduction', '');
   const [magical, setMagical] = usePlayDraftState('damage-magical', false);
   const [reactionOverrides, setReactionOverrides] = usePlayDraftState<Partial<DamageReactions>>('damage-reactions', {});
-  const [confirmed, setConfirmed] = usePlayDraftState('damage-confirmed', confirmedFirst);
-  const [confirmedText, setConfirmedText] = usePlayDraftState('damage-confirmed-amount', '');
+  const [confirmed, setConfirmed] = usePlayDraftState('damage-confirmed', confirmedFirst || fixed !== undefined);
+  const [confirmedText, setConfirmedText] = usePlayDraftState('damage-confirmed-amount', fixed === undefined ? '' : String(fixed));
   const [manualWeak, setManualWeak] = usePlayDraftState('damage-weak-spot', false);
 
   const activeImpact = useImpact ? impact : undefined;
   const currentArmor = activeImpact ? activeImpact.armor : unlocatedArmor;
   const armorText = armorOverride ?? (currentArmor === null ? '' : String(currentArmor));
-  const bypass = type !== '' && ignoresArmor(type);
+  // '' is still unpicked. Untyped damage counts: Armor applies and no type rule changes it.
+  const damageType = type === '' || type === UNTYPED_DAMAGE ? null : type;
+  const typed = type !== '';
+  const bypass = damageType !== null && ignoresArmor(damageType);
   const roll = readInteger(rollText, 1);
   const modifier = readInteger(modifierText || '0', -Infinity);
   const armor = readInteger(armorText, 0);
   const extraArmorIgnore = readInteger(ignoreText || '0', 0);
   const reduction = readInteger(reductionText || '0', 0);
-  const reactions = { ...listedDamageReactions(type, magical, defenses), ...reactionOverrides };
+  const reactions = { ...listedDamageReactions(damageType ?? '', magical, defenses), ...reactionOverrides };
   const weak = activeImpact?.weak ?? (pc && !impact && manualWeak);
-  const result = type && roll !== null && modifier !== null && (armor !== null || bypass) && extraArmorIgnore !== null && reduction !== null
-    ? calculateDirectDamage({ roll, modifier, armor: armor ?? 0, extraArmorIgnore, reduction, critical, weak, reactions, type })
+  const result = typed && roll !== null && modifier !== null && (armor !== null || bypass) && extraArmorIgnore !== null && reduction !== null
+    ? calculateDirectDamage({ roll, modifier, armor: armor ?? 0, extraArmorIgnore, reduction, critical, weak, reactions, type: damageType })
     : null;
   const overflow = !!result && (!Number.isSafeInteger(result.beforeArmor) || !Number.isSafeInteger(result.reacted));
   const invalid = (rollText !== '' && roll === null) || modifier === null || (!bypass && armorText !== '' && armor === null)
@@ -71,18 +86,26 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
   const fixedAmount = readInteger(confirmedText, 0);
   const incomingAmount = confirmed ? fixedAmount : !invalid && result && !result.restored ? result.amount : null;
   const damage: DamageCandidate | null = confirmed
-    ? fixedAmount === null ? null : { amount: fixedAmount, type: type || undefined, location: activeImpact?.location }
-    : !invalid && result && type ? {
-      amount: result.amount, type, location: activeImpact?.location, ...(result.restored && { restored: true }),
+    ? fixedAmount === null ? null : { amount: fixedAmount, type: damageType ?? undefined, location: activeImpact?.location }
+    : !invalid && result ? {
+      amount: result.amount, type: damageType ?? undefined, location: activeImpact?.location, ...(result.restored && { restored: true }),
     } : null;
+  const changeType = (next: DamageChoice | '') => {
+    setType(next);
+    setReactionOverrides({});
+  };
+  const extraCount = [extraArmorIgnore, reduction].filter((value) => (value ?? 0) > 0).length + Object.keys(reactionOverrides).length;
 
   return (
     <section className="damage-calc" aria-label={pc ? 'PC 받는 피해 계산기' : '피해 계산기'}>
-      {pc && (
-        <div className="seg damage-entry-mode" role="group" aria-label="받는 피해 입력 방식">
+      {(pc || paper || confirmed) && (
+        <div className="seg damage-entry-mode" role="group" aria-label={pc ? '받는 피해 입력 방식' : '피해 입력 방식'}>
           <button type="button" aria-pressed={!confirmed} onClick={() => setConfirmed(false)}>공격 피해</button>
           <button type="button" aria-pressed={confirmed} onClick={() => setConfirmed(true)}>확정 피해</button>
         </div>
+      )}
+      {confirmed && fixed !== undefined && (
+        <p className="damage-note">양쪽 실패 · 방어자가 받는 {fixed} 피해는 Armor·저항으로 줄지 않습니다. <XRef id="q-both-fail">판정 규칙</XRef></p>
       )}
       {confirmed ? (
         <div className="damage-fields">
@@ -92,7 +115,7 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
             {confirmedText !== '' && fixedAmount === null && <span className="field-err">0 이상의 정수를 입력하세요.</span>}
           </label>
           {paper && <label className="field"><span>피해 유형 (선택)</span>
-            <select value={type} onChange={(event) => { setType(event.target.value as DamageType | ''); setReactionOverrides({}); }}>
+            <select value={damageType ?? ''} onChange={(event) => changeType(event.target.value as DamageType | '')}>
               <option value="">유형 미지정</option>
               {DAMAGE_TYPES.map((item) => <option key={item}>{item}</option>)}
             </select>
@@ -109,17 +132,24 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
               {impact.location} 명중 적용{impact.weak && ' · 약점'}
             </label>
           ) : <p className="damage-note">명중 부위 표에서 결과를 고르거나 Armor를 직접 입력하세요.</p>}
+          {attack && <div className="damage-attack-source">
+            <p><span>공격</span> <b lang="en">{attack.name}</b>{attack.when && ` · ${attack.when}`} · {formatAttackDamage(attack, attack.armorIgnore)}</p>
+            {attack.dice && <PhysicalDiceRoll label={`${attack.name} 피해`} dice={attack.dice} value={poolRoll}
+              resultText={() => poolDieCount(attack.dice) > 1 ? `${attack.type} · 가장 높은 눈` : attack.type}
+              pool={{ choose: false }} onValue={(value) => {
+                setPoolRoll(value);
+                setRollText(String(pooledDie(value).face));
+              }} />}
+          </div>}
           <div className="damage-fields">
             <label className="field"><span>선택 주사위</span>
               <input inputMode="numeric" value={rollText} onChange={(event) => setRollText(event.target.value)}
                 aria-invalid={rollText !== '' && roll === null || undefined} placeholder="예: 4" />
             </label>
             <label className="field"><span>피해 유형</span>
-              <select value={type} onChange={(event) => {
-                setType(event.target.value as DamageType | '');
-                setReactionOverrides({});
-              }}>
+              <select value={type} onChange={(event) => changeType(event.target.value as DamageChoice | '')}>
                 <option value="">유형 선택</option>
+                <option value={UNTYPED_DAMAGE}>유형 없음</option>
                 {DAMAGE_TYPES.map((item) => <option key={item}>{item}</option>)}
               </select>
             </label>
@@ -139,16 +169,17 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
               <label className="damage-check"><input type="checkbox" checked={manualWeak}
                 onChange={(event) => setManualWeak(event.target.checked)} />약점 명중</label>
             )}
-            {defenses?.resistsNonMagicalPhysical && type && isPhysicalDamage(type) && (
+            {defenses?.resistsNonMagicalPhysical && damageType && isPhysicalDamage(damageType) && (
               <label className="damage-check"><input type="checkbox" checked={magical} onChange={(event) => {
                 setMagical(event.target.checked);
                 setReactionOverrides({});
               }} />마법 피해</label>
             )}
           </div>
-          {type && <DamageTypeGuide type={type} reactions={defenses || Object.keys(reactionOverrides).length ? reactions : undefined}
+          {damageType && <DamageTypeGuide type={damageType} reactions={defenses || Object.keys(reactionOverrides).length ? reactions : undefined}
             immuneConditions={defenses?.immuneConditions} />}
-          <TogglePanel className="damage-extra" label="추가 피해 보정">
+          {type === UNTYPED_DAMAGE && <p className="damage-note">유형 없는 피해 · Armor를 그대로 빼고 유형 규칙은 적용하지 않습니다.</p>}
+          <TogglePanel className="damage-extra" label="추가 피해 보정" badge={extraCount || undefined}>
             <div className="damage-fields">
               <label className="field"><span>추가로 무시할 Armor</span>
                 <input inputMode="numeric" value={ignoreText} onChange={(event) => setIgnoreText(event.target.value)}
@@ -158,9 +189,9 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
                 <input inputMode="numeric" value={reductionText} onChange={(event) => setReductionText(event.target.value)}
                   aria-invalid={reduction === null || undefined} placeholder="0" />
               </label>
-              {type && (
+              {typed && (
                 <fieldset className="damage-reactions">
-                  <legend>{type} 피해 반응</legend>
+                  <legend>{damageType ?? '유형 없는'} 피해 반응</legend>
                   {REACTION_LABELS.map(([key, label]) => (
                     <label className="damage-check" key={key}><input type="checkbox" checked={reactions[key]}
                       onChange={(event) => setReactionOverrides({ ...reactionOverrides, [key]: event.target.checked })} />{label}</label>
@@ -170,11 +201,11 @@ export function DamageCalculator({ impact, unlocatedArmor, defenses, initialCrit
             </div>
           </TogglePanel>
           {invalid ? <p className="field-err" role="alert">주사위 값은 양의 정수로 입력하세요. Armor·무시·감소에는 0 이상의 정수를 사용하세요.</p>
-            : result && type && (
+            : result && (
               <DamageBreakdown result={result} armor={armor ?? 0} critical={critical} weak={weak}
-                type={type} reactions={reactions} reduction={reduction ?? 0} pc={pc} />
+                type={damageType} reactions={reactions} reduction={reduction ?? 0} pc={pc} />
             )}
-          {type && roll !== null && armorText === '' && !bypass && (
+          {typed && roll !== null && armorText === '' && !bypass && (
             <p className="damage-note">Armor를 입력하면 피해를 계산합니다.</p>
           )}
         </>
@@ -262,13 +293,14 @@ function DamageBreakdown({ result, armor, critical, weak, type, reactions, reduc
   armor: number;
   critical: number;
   weak: boolean;
-  type: DamageType;
+  type: DamageType | null;
   reactions: DamageReactions;
   reduction: number;
   pc: boolean;
 }) {
   const { base, multiplier, piercing, beforeArmor, armorIgnore, absorbed, afterArmor, slashing, reacted, reduced, amount, restored } = result;
   const modifierLabel = critical > 1 && weak ? '치명타·약점' : weak ? '약점' : '치명타';
+  const bypass = type !== null && ignoresArmor(type);
   const reactionLabel = reactions.immune ? '면역' : reactions.vulnerable && reactions.resistant ? '취약·저항 상쇄'
     : reactions.vulnerable ? '취약 ×2' : reactions.resistant ? '저항 ½ · 올림' : '';
   return (
@@ -277,14 +309,14 @@ function DamageBreakdown({ result, armor, critical, weak, type, reactions, reduc
         <div><dt>주사위 + 고정 보정</dt><dd>{base}</dd></div>
         {multiplier > 1 && <div><dt>{modifierLabel} ×{multiplier}</dt><dd>{base * multiplier}</dd></div>}
         {piercing > 0 && <div><dt>Piercing 치명타 +{piercing}</dt><dd>{beforeArmor}</dd></div>}
-        {(armor > 0 || ignoresArmor(type)) && (
-          <div><dt>{ignoresArmor(type) ? 'Armor 무시' : `Armor −${absorbed}`}{!ignoresArmor(type) && armorIgnore > 0 && ` (${armorIgnore} 무시)`}</dt><dd>{afterArmor}</dd></div>
+        {(armor > 0 || bypass) && (
+          <div><dt>{bypass ? 'Armor 무시' : `Armor −${absorbed}`}{!bypass && armorIgnore > 0 && ` (${armorIgnore} 무시)`}</dt><dd>{afterArmor}</dd></div>
         )}
         {reactionLabel && <div><dt>{reactionLabel}</dt><dd>{reacted}</dd></div>}
         {reduction > 0 && <div><dt>유형별 피해 감소 −{reduction}</dt><dd>{reduced}</dd></div>}
         {slashing > 0 && <div><dt>Slashing 3 이하 +{slashing}</dt><dd>{amount}</dd></div>}
       </dl>
-      <p role="status">{restored ? (pc ? 'Wounds 회복' : 'Health 회복') : '최종 피해'} <strong>{amount}</strong> <span>{type}</span></p>
+      <p role="status">{restored ? (pc ? 'Wounds 회복' : 'Health 회복') : '최종 피해'} <strong>{amount}</strong> <span>{type ?? '유형 없음'}</span></p>
       {type === 'Acid' && amount > 0 && !restored && (
         <p className="damage-note">Acid 피해를 입은 부위는 캠프 수리 전까지 Armor −1.</p>
       )}

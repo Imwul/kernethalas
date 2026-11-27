@@ -462,7 +462,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
       )}
       {fighting && <PlayDraftScope key={roundScope} name={roundScope}>
         <PlayTurnSummary targets={activeTargets} selected={selected?.status ? undefined : selected} belt={belt} initiative={order}
-          onAttack={() => selectedCard.current?.openPcAttack()} onBelt={onOpenBelt}
+          onAttack={() => selectedCard.current?.openPcAttack()} onEnemyAction={() => selectedCard.current?.openEnemyAction()} onBelt={onOpenBelt}
           onMastery={() => openTool('mastery')} onRound={() => openTool('round')} onFlee={() => openTool('flee')} />
         <CombatLingeringAlert onOpenRound={() => setTool('round')} />
       </PlayDraftScope>}

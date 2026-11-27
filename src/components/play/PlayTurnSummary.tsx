@@ -70,12 +70,13 @@ function EncounterOptions({ target, enemyTurn, actions, onMastery }: {
   </div>;
 }
 
-export function PlayTurnSummary({ targets, selected, belt, initiative, onAttack, onBelt, onMastery, onRound, onFlee }: {
+export function PlayTurnSummary({ targets, selected, belt, initiative, onAttack, onEnemyAction, onBelt, onMastery, onRound, onFlee }: {
   targets: readonly Target[];
   selected?: Target;
   belt: readonly GearItem[];
   initiative?: string;
   onAttack: () => void;
+  onEnemyAction?: () => void;
   onBelt?: () => void;
   onMastery: () => void;
   onRound: () => void;
@@ -119,6 +120,8 @@ export function PlayTurnSummary({ targets, selected, belt, initiative, onAttack,
     </div>
     <div className="play-turn-shortcuts" role="group" aria-label="전투 바로가기">
       {selected && <button className="btn ghost" type="button" onClick={onAttack}>PC 공격 입력</button>}
+      {selected && onEnemyAction && <button className="btn ghost" type="button" onClick={onEnemyAction}>
+        적 행동 {selected.creature.actionDice ?? 'D6'}</button>}
       <button className="btn ghost" type="button" onClick={onMastery}>Mastery 열기</button>
       {onBelt && <button className="btn ghost" type="button" onClick={onBelt}>벨트 확인{belt.length > 0 && ` (${belt.length})`}</button>}
       <button className="btn ghost" type="button" onClick={onFlee}>전투 도주 열기</button>

@@ -34,6 +34,8 @@ interface CreatureAttack {
   attacking: boolean;
   onChangeAttacker: (attacking: boolean) => void;
   onHitLocation: (critical: boolean, pc: boolean, exchangeId?: string) => void;
+  /** Both sides failed: the defender takes 1 damage that nothing reduces. `pc` is true when the PC defends. */
+  onBothFailed?: (pc: boolean, exchangeId?: string) => void;
   onNextAttack: (enemyAttacks: boolean) => void;
 }
 
@@ -364,8 +366,15 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
           </button>
         </div>
       )}
-      {result && (result.outcome === 'hit' || result.outcome === 'critical-hit' || result.outcome === 'defended' || result.attackerFumble) && (
+      {result && (result.outcome === 'hit' || result.outcome === 'critical-hit' || result.outcome === 'defended' || result.attackerFumble
+        || (result.outcome === 'both-failed' && creature?.onBothFailed)) && (
         <div className="checkcalc-follow-ups">
+          {result.outcome === 'both-failed' && creature?.onBothFailed && (
+            <button type="button" className="btn primary" data-checkcalc-forward=""
+              onClick={() => confirm((exchangeId) => creature.onBothFailed?.(enemyAttacks, exchangeId))}>
+              {enemyAttacks ? 'PC' : '적'} 1 피해 적용
+            </button>
+          )}
           {(result.outcome === 'hit' || result.outcome === 'critical-hit') && (
             <HitLocation enemyAttacks={enemyAttacks}
               onHitLocation={creature && (() => confirm((exchangeId) => creature.onHitLocation(result.outcome === 'critical-hit', enemyAttacks, exchangeId)))} />

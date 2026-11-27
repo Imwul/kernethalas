@@ -41,6 +41,14 @@ describe('direct damage', () => {
   });
 });
 
+describe('untyped damage', () => {
+  it('takes Armor in full and applies no type rule', () => {
+    expect(calculateDirectDamage({ ...hit, type: null })).toMatchObject({ armorIgnore: 0, absorbed: 2, slashing: 0, amount: 3 });
+    expect(calculateDirectDamage({ ...hit, type: null, critical: 2 })).toMatchObject({ piercing: 0, beforeArmor: 10, amount: 8 });
+    expect(calculateDirectDamage({ ...hit, type: null, extraArmorIgnore: 1 })).toMatchObject({ armorIgnore: 1, amount: 4 });
+  });
+});
+
 describe('PC damage allocation', () => {
   it('deducts Toughness first and sends only the remainder to Health', () => {
     expect(splitPcDamage(8, 3, false)).toEqual({ toughnessLoss: 3, healthLoss: 5 });

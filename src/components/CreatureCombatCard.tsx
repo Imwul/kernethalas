@@ -7,7 +7,10 @@ import type { Entry } from '../content/schema';
 import { isCombatDamageRecord } from '../lib/combat-damage-records';
 import { calculateCreatureAdaptation, readCreatureLevel } from '../lib/creature-adaptation';
 import { DAMAGE_TYPES, isPhysicalDamage, listedDamageReactions, type DamageType } from '../lib/damage';
-import { creatureActionTable, creatureHitImpact, creatureHitTable, creatureSpoilsTables } from '../lib/creature-combat';
+import {
+  creatureActionTable, creatureAttackDamage, creatureAttackPool, creatureHitImpact, creatureHitTable, creaturePenetration,
+  creatureSpoilsTables, formatAttackDamage,
+} from '../lib/creature-combat';
 import { creatureActionSource } from '../lib/overlay';
 import { usePlayCharacter } from '../lib/play-character';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraft, usePlayDraftScope, usePlayDraftState, usePlayRoll } from '../lib/play-draft';
@@ -16,11 +19,12 @@ import { OracleBody } from '../views/Oracle';
 import { TogglePanel } from './TogglePanel';
 import { XRef } from './bits';
 import { CheckCalculator } from './CheckCalculator';
+import { ChoiceButtons } from './ChoiceButtons';
 import { CreatureAdaptation } from './CreatureAdaptation';
 import { CreatureActionResolution } from './CreatureActionResolution';
 import { CreatureTraitSummary } from './CreatureTraitSummary';
 import type { CombatSummonControls } from './CreatureSummonRoll';
-import { DamageCalculator } from './DamageCalculator';
+import { DamageCalculator, type IncomingAttack } from './DamageCalculator';
 import { DamageTypeGuide } from './DamageTypeGuide';
 import { EncounterStart } from './EncounterStart';
 import { ApplyConditions } from './play/PlayLingering';
@@ -28,9 +32,11 @@ import { PlayDiscoveryMode } from './play/PlayDiscovery';
 import '../styles/creature-combat.css';
 
 const PC_HIT_TABLE = tableById.get('t-hit-humanoid')!;
-type DamageSeed = { attempt: number; critical: boolean; exchangeId?: string };
+/** `fixed`: damage set by the exchange itself, such as the defender's 1 damage when both sides fail. */
+type DamageSeed = { attempt: number; critical: boolean; exchangeId?: string; fixed?: number };
+const BOTH_FAILED_DAMAGE = 1;
 
-export type CreatureCombatHandle = { openPcAttack: () => void };
+export type CreatureCombatHandle = { openPcAttack: () => void; openEnemyAction: () => void };
 
 export function CreatureCombatCard({ creature, entry, targetName, summons, showEncounterStart = true, showAftermath = true, allowApplyingConditions = true, ref }: {
   creature: CreatureRecord;
@@ -55,6 +61,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const [enemyAttacking, setEnemyAttacking] = usePlayDraftState('creature-attacking', false);
   const [actionValue, setActionValue] = usePlayDraftState<number | null>('creature-action', null);
   const [actionRevision, setActionRevision] = usePlayDraftState('creature-action-revision', 0);
+  const [attackChoice, setAttackChoice] = usePlayDraftState('creature-attack-choice', 0);
   const clearScope = useClearPlayDraftScope();
   const [hitValue, setHitValue] = usePlayDraftState<number | null>('creature-hit', null);
   const [pcTarget, setPcTarget] = usePlayDraftState('creature-is-pc-target', false);
@@ -69,8 +76,17 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const focusHitInput = useRef(false);
   const checkTab = useRef<HTMLButtonElement>(null);
   const checkPanel = useRef<HTMLDivElement>(null);
+  const actionPanel = useRef<HTMLDivElement>(null);
   const damageTab = useRef<HTMLButtonElement>(null);
-  useImperativeHandle(ref, () => ({ openPcAttack() {
+  useImperativeHandle(ref, () => ({ openEnemyAction() {
+    // An enemy turn starts with its action roll: the result decides whether and how it attacks.
+    setMode('action');
+    requestAnimationFrame(() => {
+      const input = actionPanel.current?.querySelector<HTMLInputElement>('input:enabled');
+      input?.focus({ preventScroll: true });
+      (input ?? actionPanel.current)?.scrollIntoView({ block: 'center' });
+    });
+  }, openPcAttack() {
     setEnemyAttacking(false);
     setMode('check');
     requestAnimationFrame(() => {
@@ -86,6 +102,14 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const selectedAction = actionValue === null ? undefined : creature.actions.find(({ min, max }) => min <= actionValue && actionValue <= max);
   const selectedActionText = actionValue === null ? undefined : action.rows.find(({ min, max }) => min <= actionValue && actionValue <= max)?.ko;
   const actionScope = `action-follow-up-${actionRevision}`;
+  // The rolled action decides how the creature attacks: its damage dice and type carry into the PC's damage.
+  const attackOptions = selectedAction ? creatureAttackDamage(creature, selectedAction) : [];
+  const chosenAttack = attackOptions[Math.min(attackChoice, attackOptions.length - 1)];
+  const penetration = creaturePenetration(creature);
+  const incoming: IncomingAttack | undefined = selectedAction && chosenAttack && {
+    name: selectedAction.name, when: chosenAttack.when, armorIgnore: penetration,
+    ...creatureAttackPool(chosenAttack, adjustment.damageBonuses),
+  };
   const hit = creatureHitTable(creature, entry, adjustment.armorBonuses);
   const hitDie = (pcTarget ? PC_HIT_TABLE : hit)?.dice;
   const hitRow = hitValue === null ? undefined : hit?.rows.find(({ min, max }) => min <= hitValue && hitValue <= max);
@@ -95,7 +119,8 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const pcHit = pcHitValue === null ? undefined : PC_HIT_TABLE.rows.find(({ min, max }) => min <= pcHitValue && pcHitValue <= max);
   const pcImpact = pcHit ? { location: pcHit.ko, armor: null, weak: pcHit.label === 'Head' } : undefined;
   const damageKey = `outgoing-${damageSeed.attempt}-${impact?.location ?? ''}`;
-  const pcDamageKey = `incoming-${pcDamageSeed.attempt}-${pcImpact?.location ?? ''}`;
+  const pcDamageKey = `incoming-${pcDamageSeed.attempt}-${pcImpact?.location ?? ''}${incoming
+    ? `-${actionRevision}-${attackChoice}-${incoming.dice ?? incoming.mod}` : ''}`;
   const damageSlot = `${scope}damage-record:enemy:${damageSeed.exchangeId ?? damageSeed.attempt}`;
   const pcDamageSlot = `${scope}damage-record:pc:${pcDamageSeed.exchangeId ?? pcDamageSeed.attempt}`;
   const combatName = targetName ?? creature.name;
@@ -125,6 +150,20 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
     });
     return () => cancelAnimationFrame(frame);
   }, [mode, pcTarget]);
+
+  const attackBlock = attackOptions.length > 0 && (
+    <div className="creature-attack-pick">
+      {attackOptions.length > 1 && <ChoiceButtons label="공격 방식" value={Math.min(attackChoice, attackOptions.length - 1)}
+        onChange={setAttackChoice} options={attackOptions.map((option, index) => ({
+          value: index, label: `${option.when} · ${formatAttackDamage(creatureAttackPool(option, adjustment.damageBonuses))}`,
+        }))} />}
+      <button type="button" className="btn ghost creature-action-check" onClick={() => {
+        setEnemyAttacking(true);
+        setMode('check');
+        checkTab.current?.focus();
+      }}>적 공격 판정</button>
+    </div>
+  );
 
   return (
     <section className="creature-combat" aria-label="전투 카드">
@@ -162,7 +201,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
             </div>
           </div>
         )}
-        <div id={actionPane} hidden={mode !== 'action'}>
+        <div id={actionPane} ref={actionPanel} hidden={mode !== 'action'}>
           {discovery && <div className="creature-action-discovery">
             {!actionsRevealed && <p>주사위를 굴리면 해당 행동과 필요한 판정이 열립니다.</p>}
             <button className="btn ghost" type="button" aria-expanded={actionsRevealed}
@@ -173,23 +212,19 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
           <OracleBody t={action} value={actionValue} onValue={(value) => {
             clearScope(actionScope);
             setActionRevision((revision) => revision + 1);
+            setAttackChoice(0);
             setActionValue(value);
           }} compact collapseTableBeforeRoll
             tableDisclosure={discovery ? actionsRevealed ? 'revealed' : 'hidden' : undefined}
             rollLabel={`${action.dice} 굴리기`} sourceForRow={(row) => row.label ? creatureActionSource(creature.id, row.label) : undefined} />
-          {selectedAction?.tag === 'Physical' && (
-            <button type="button" className="btn ghost creature-action-check" onClick={() => {
-              setEnemyAttacking(true);
-              setMode('check');
-              checkTab.current?.focus();
-            }}>적 공격 판정</button>
-          )}
+          {selectedAction?.tag === 'Physical' && attackBlock}
           {selectedAction && (
             <PlayDraftScope name={actionScope} key={actionScope}>
               {allowApplyingConditions && selectedActionText && <ApplyConditions text={selectedActionText} />}
               {selectedAction.tag !== 'Physical' && <CreatureActionResolution action={selectedAction} rule={creatureActionRule(creature, selectedAction)} summons={summons} />}
             </PlayDraftScope>
           )}
+          {selectedAction && selectedAction.tag !== 'Physical' && attackBlock}
         </div>
         <div ref={hitPanel} hidden={mode !== 'hit'}>
           <div hidden={pcTarget}>
@@ -207,6 +242,13 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
           )}
         </div>
         <div id={checkPane} ref={checkPanel} hidden={mode !== 'check'}>
+          {enemyAttacking && <div className="creature-attack-context" aria-label="이번 적 공격">
+            {incoming ? <p><span>이번 공격</span> <b lang="en">{incoming.name}</b> · {formatAttackDamage(incoming, penetration)}</p>
+              : <>
+                <p><span>이번 공격</span> 행동 {action.dice}에서 공격 행동이 나오면 피해 주사위와 유형이 이어집니다.</p>
+                <button type="button" className="btn ghost" onClick={() => setMode('action')}>행동 {action.dice} 보기</button>
+              </>}
+          </div>}
           <CheckCalculator attackOnly creature={{
             name: combatName,
             combatSkill: unknownCS ? null : combatSkill,
@@ -220,6 +262,18 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
                 setHitValue(null);
                 setDamageSeed(({ attempt }) => ({ attempt: attempt + 1, critical: false }));
               }
+            },
+            onBothFailed: (pc, exchangeId) => {
+              setPcTarget(pc);
+              const seed = pc ? pcDamageSeed : damageSeed;
+              if (!exchangeId || seed.exchangeId !== exchangeId) {
+                (pc ? setPcDamageSeed : setDamageSeed)(({ attempt }) => ({
+                  attempt: attempt + 1, critical: false, exchangeId, fixed: BOTH_FAILED_DAMAGE,
+                }));
+                (pc ? setPcHitValue : setHitValue)(null);
+              }
+              setMode('damage');
+              requestAnimationFrame(() => damageTab.current?.focus());
             },
             onHitLocation: (critical, pc, exchangeId) => {
               setPcTarget(pc);
@@ -244,13 +298,13 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
         <div hidden={mode !== 'damage' || pcTarget}>
           <PlayDraftScope name={damageKey} key={damageKey}>
             <DamageCalculator impact={impact} unlocatedArmor={unlocatedArmor} defenses={defenses} initialCritical={damageSeed.critical}
-              paper={!showAftermath ? { slot: damageSlot, target: combatName, editable: allowApplyingConditions } : undefined} />
+              fixed={damageSeed.fixed} paper={!showAftermath ? { slot: damageSlot, target: combatName, editable: allowApplyingConditions } : undefined} />
           </PlayDraftScope>
         </div>
         <div hidden={mode !== 'damage' || !pcTarget}>
           <PlayDraftScope name={pcDamageKey} key={pcDamageKey}>
             <DamageCalculator impact={pcImpact} unlocatedArmor={null} initialCritical={pcDamageSeed.critical} pc
-              paper={!showAftermath ? { slot: pcDamageSlot, target: player?.character.name || 'PC', source: combatName, editable: allowApplyingConditions } : undefined} />
+              attack={incoming} fixed={pcDamageSeed.fixed} paper={!showAftermath ? { slot: pcDamageSlot, target: player?.character.name || 'PC', source: combatName, editable: allowApplyingConditions } : undefined} />
           </PlayDraftScope>
         </div>
       </div>

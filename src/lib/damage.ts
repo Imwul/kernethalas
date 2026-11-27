@@ -4,6 +4,9 @@ export const DAMAGE_TYPES = [
 ] as const;
 
 export type DamageType = typeof DAMAGE_TYPES[number];
+/** A damage source that names no type, such as the 1 damage when both sides fail an attack. */
+export const UNTYPED_DAMAGE = 'none';
+export type DamageChoice = DamageType | typeof UNTYPED_DAMAGE;
 
 const PHYSICAL_DAMAGE = new Set<DamageType>(['Bludgeoning', 'Piercing', 'Slashing']);
 
@@ -55,7 +58,8 @@ export function splitPcDamage(amount: number, toughness: number, directHealth: b
 interface DirectDamage {
   roll: number;
   modifier: number;
-  type: DamageType;
+  /** null: untyped damage — Armor applies in full and no type rule adds or ignores anything. */
+  type: DamageType | null;
   critical: 1 | 2 | 3;
   weak: boolean;
   armor: number;
@@ -71,7 +75,7 @@ export function calculateDirectDamage(input: DirectDamage) {
   const multiplier = Math.max(critical, weak ? 2 : 1);
   const piercing = type === 'Piercing' && critical > 1 ? 2 : 0;
   const beforeArmor = base * multiplier + piercing;
-  const armorIgnore = ignoresArmor(type) ? armor : Math.min(armor, extraArmorIgnore + (type === 'Bludgeoning' ? 1 : 0));
+  const armorIgnore = type && ignoresArmor(type) ? armor : Math.min(armor, extraArmorIgnore + (type === 'Bludgeoning' ? 1 : 0));
   const absorbed = Math.min(beforeArmor, armor - armorIgnore);
   const afterArmor = beforeArmor - absorbed;
   const reacted = reactions.immune ? 0

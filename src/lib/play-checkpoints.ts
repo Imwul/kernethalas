@@ -2,7 +2,7 @@ import { creatureById } from '../content/entries/creatures';
 import { isCombatDamageRecord, isCombatDamageSlot } from './combat-damage-records';
 import { isAttackFollowUp } from './attack-follow-ups';
 import { MAX_SET_NAME, PLAY_ENCOUNTER_STORAGE_KEY, readPlayCustomEncounterRows, type EncounterSet } from './custom-encounters';
-import { DAMAGE_TYPES } from './damage';
+import { DAMAGE_TYPES, UNTYPED_DAMAGE } from './damage';
 import { DICE_CHAIN } from './dice';
 import { isPaperMapDoorReport, isPaperMapDoorReports, isPaperMapTile, PAPER_MAP_SLOT, PAPER_MAP_TAGS, paperMapKey } from './paper-map';
 import { isClueRollId, isPaperMapClues, MAP_CLUE_ROLL_SLOTS, type PaperMapClue } from './paper-map-clues';
@@ -80,6 +80,7 @@ const rollResult = shape({ expr: isText, dice: list(isPositive), mod: isFiniteNu
 const summonRoll: Validator = (value) => isRecord(value) && value.expr === 'D4' && value.mod === 0
   && Array.isArray(value.dice) && value.dice.length === 1 && between(1, 4)(value.dice[0]) && value.total === value.dice[0];
 const damageType = oneOf(['', ...DAMAGE_TYPES]);
+const damageChoice = oneOf(['', UNTYPED_DAMAGE, ...DAMAGE_TYPES]);
 const storyEffect: Validator = (value) => isRecord(value) && (
   value.kind === 'count'
     ? isText(value.name) && isFiniteNumber(value.amount) && optional(oneOf(Object.keys(GEAR_WEIGHTS)))(value.weight)
@@ -241,7 +242,9 @@ const SCOPED_FIELDS: Record<string, Validator> = {
   'comparison-magical': isBoolean,
   'comparison-effects': recordOf(list(isText)),
   'damage-roll': isText,
-  'damage-type': damageType,
+  'damage-type': damageChoice,
+  'damage-pool-roll': rollResult,
+  'creature-attack-choice': between(0, 9),
   'damage-modifier': isText,
   'damage-critical': between(1, 3),
   'damage-armor': nullable(isText),

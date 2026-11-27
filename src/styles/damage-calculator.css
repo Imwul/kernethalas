@@ -26,6 +26,9 @@
 .damage-reactions legend { font: 13px var(--f-ui); }
 .damage-reactions .damage-check { margin-inline-end: var(--s2); }
 .damage-note { margin: 0; color: var(--ink-2); font: 14px/1.45 var(--f-ui); }
+.damage-attack-source { display: grid; gap: var(--s2); min-width: 0; }
+.damage-attack-source > p { margin: 0; font: 14px/1.6 var(--f-ui); overflow-wrap: anywhere; }
+.damage-attack-source > p > span { color: var(--ink-2); font-size: 13px; }
 .damage-result { padding: var(--s2) var(--s3); border: 1px solid var(--rule-soft); background: var(--bone); }
 .damage-result dl { margin: 0; }
 .damage-result dl > div { display: flex; justify-content: space-between; gap: var(--s2); padding-block: var(--s1); border-bottom: 1px solid var(--rule-soft); }
