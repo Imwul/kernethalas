@@ -23,6 +23,70 @@ const SKILL_NOTES = outcomeText('skills');
 const RESISTANCE_NOTES = outcomeText('resistances');
 const PERK_NOTES = outcomeText('perks');
 const TRAIT_NOTES = outcomeText('weapon-traits');
+const DAMAGE_NOTES = outcomeText('damage-types');
+const SPEED_NOTE = entryById.get('weapon-speed')?.summary ?? '';
+const DAMAGE_ORDER = ['Slashing', 'Piercing', 'Bludgeoning'];
+/** What each armor piece covers and how its numbers are used (pp.82–83, 85, 210–211), in our own words. */
+const ARMOR_COVERS: Record<string, string> = {
+  Torso: '가슴과 복부를 지킨다', Vambraces: '두 팔을 지킨다', Greaves: '다리와 발을 지킨다', Helmet: '머리를 지킨다', Shield: '손에 들고 Parry에 쓴다',
+};
+type Tag = { tag: string; text: string; on?: boolean };
+
+/** A short glossary of the tags shown on gear cards; rows that apply to the current pick are marked. */
+function TagList({ label, tags }: { label: string; tags: Tag[] }) {
+  return (
+    <div className="creator-tags">
+      <span className="creator-tags-title">{label}</span>
+      <dl aria-label={label}>
+        {tags.map(({ tag, text, on }) => (
+          <div key={tag} className={on ? 'is-on' : undefined}><dt lang="en">{tag}</dt><dd>{text}</dd></div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function weaponTags(list: typeof STARTING_WEAPONS, chosen?: (typeof STARTING_WEAPONS)[number]): Tag[] {
+  const damage = DAMAGE_ORDER.filter((type) => list.some(({ damage: d }) => d === type));
+  const speeds = [...new Set(list.map(({ speed }) => speed))].sort();
+  const traits = [...TRAIT_NOTES.keys()].filter((trait) => list.some(({ traits: t }) => t.includes(trait)));
+  return [
+    ...damage.map((type) => ({ tag: `D6 ${type}`, text: `피해 주사위는 D6. ${DAMAGE_NOTES.get(type) ?? ''}`, on: chosen?.damage === type })),
+    { tag: `Speed ${speeds.join(' / ')}`, text: `${SPEED_NOTE} 0이면 깎지 않는다.`, on: !!chosen },
+    ...traits.map((trait) => ({ tag: trait, text: TRAIT_NOTES.get(trait) ?? '', on: chosen?.traits.includes(trait) })),
+    { tag: '무게', text: '한손 무기는 Normal, Two-Handed 무기는 Heavy로 친다(가방에 넣어 들고 다닐 때만).', on: !!chosen },
+  ];
+}
+
+function armorTags(piece: string | undefined, armor: ReturnType<typeof armorFor>): Tag[] {
+  const has = (...pieces: string[]) => !piece || pieces.includes(piece);
+  const value = (pattern: RegExp) => armor && !armor.magic ? pattern.exec(armor.detail)?.[1] : undefined;
+  const tags: Tag[] = [piece
+    ? { tag: piece, text: `${ARMOR_COVERS[piece]}.${piece === 'Shield' ? '' : ' 명중 부위가 여기일 때만 Armor가 적용된다.'}`, on: true }
+    : { tag: '부위', text: Object.entries(ARMOR_COVERS).map(([name, covers]) => `${name}: ${covers}`).join(' · ') }];
+  if (has('Torso', 'Vambraces', 'Greaves', 'Helmet')) tags.push({
+    tag: `Armor${value(/Armor (\d+)/) ? ` ${value(/Armor (\d+)/)}` : ''}`, on: !!armor,
+    text: '그 부위에 맞은 피해에서 한 번 뺀다. 전투 중 Slashing·Piercing·Bludgeoning 피해에만 통하고 나머지 피해 유형과 함정 피해는 막지 못한다.',
+  });
+  if (has('Shield')) tags.push({
+    tag: `Parry${value(/Parry (\+\d+)/) ? ` ${value(/Parry (\+\d+)/)}` : ''}`, on: !!armor,
+    text: '방패로 Parry할 때 무기 Skill에 더한다. 무기에 Parrying 특성이 없어도 방패로는 Parry할 수 있다.',
+  });
+  tags.push({
+    tag: `Integrity${value(/Integrity (D\d+)/) ? ` ${value(/Integrity (D\d+)/)}` : ''}`, on: !!armor,
+    text: '이 장비를 쓴 전투가 끝나면 굴린다. 1–2면 한 단계 내려가고(D12→D10→D8→D6→D4), D4에서 1–2면 망가진다. 야영의 Repair로 한 단계 올린다.',
+  });
+  if (has('Torso')) tags.push({
+    tag: `기동성${value(/기동성 (\S+)/) ? ` ${value(/기동성 (\S+)/)}` : ''}`, on: !!armor,
+    text: 'Torso를 입고 있는 동안 Acrobatics, Dodge, Stealth 판정에서 뺀다.',
+  });
+  if (has('Helmet')) tags.push({
+    tag: `Perception${value(/Perception (\S+)/) ? ` ${value(/Perception (\S+)/)}` : ''}`, on: !!armor,
+    text: '투구를 쓰고 있는 동안 Perception 판정에서 뺀다.',
+  });
+  tags.push({ tag: '무게', text: '방어구, 투구, 방패는 Normal이고 Wall 방패만 Heavy다.', on: !!armor });
+  return tags;
+}
 const skillNote = (skill: string) => SKILL_NOTES.get(skill)
   ?? (isWeaponSkill(skill) ? SKILL_NOTES.get('Bladed / Bludgeoning / Shafted Weapons') : undefined);
 const SHORT_WEAPON: Record<string, string> = {
@@ -266,15 +330,14 @@ export function CharacterCreator({ onApplyGear, onUndoGear, onDone, doneLabel = 
               </button>
             ))}
           </div>
-          {weapon && <ul className="creator-traits" aria-label={`${weapon.name} 특성`}>
-            {weapon.traits.map((trait) => <li key={trait}><b lang="en">{trait}</b> {TRAIT_NOTES.get(trait)}</li>)}
-            <li><b>무게</b> {weapon.heavy ? '양손 무기라 가방에 넣으면 Heavy' : '한손 무기라 가방에 넣으면 Normal'}</li>
-          </ul>}
+          <TagList label={weapon && weapon.skill === shownSkill ? `${weapon.name} 태그 뜻` : '무기 태그 뜻'}
+            tags={weaponTags(STARTING_WEAPONS.filter(({ skill }) => skill === shownSkill), weapon?.skill === shownSkill ? weapon : undefined)} />
         </fieldset>
         <JournalRoll tableId="t-random-armor" label="무작위 방어구" value={draft.armorPiece}
           onValue={(value) => patch({ armorPiece: value, armorGrade: null })} />
         {piece && <JournalRoll key={piece.piece} tableId={piece.grades} label={`${piece.piece} 등급`} value={draft.armorGrade}
           onValue={(value) => patch({ armorGrade: value })} resultText={armor ? `${armor.name} · ${armor.detail}` : undefined} />}
+        <TagList label={piece ? `${armor && !armor.magic ? armor.name : piece} 태그 뜻` : '방어구 태그 뜻'} tags={armorTags(piece?.piece, armor)} />
         {armor?.magic && <p className="creator-note">마법 흉갑입니다. <XRef id="p-magic-item">마법 아이템 생성</XRef>으로 속성을 정하거나 등급을 다시 굴리세요.</p>}
         <div className="creator-dice">
           {STARTING_SUPPLIES.map(({ id, name, dice }) => (

@@ -158,10 +158,11 @@ test('a survivor built from typed dice and one-tap choices lists every paper val
   await creator.getByRole('button', { name: 'VI. 장비 ›' }).click();
 
   await creator.getByRole('group', { name: 'Bladed 무기' }).getByRole('button', { name: /Longsword/ }).click();
-  await expect(creator.getByRole('list', { name: 'Longsword 특성' })).toContainText('Parrying');
+  await expect(creator.locator('dl[aria-label="Longsword 태그 뜻"] .is-on dt')).toHaveText(['D6 Slashing', 'Speed 0 / 5', 'Parrying', 'Versatile', '무게']);
   await roll(creator, '무작위 방어구 D10', '1');
   await roll(creator, 'Torso 등급 D100', '65');
   await expect(creator.getByRole('group', { name: 'Torso 등급 D100' }).getByRole('status')).toContainText('Mail · Armor 2 · Integrity D8');
+  await expect(creator.locator('dl[aria-label="Mail 태그 뜻"] dt')).toHaveText(['Torso', 'Armor 2', 'Integrity D8', '기동성 −15', '무게']);
   await roll(creator, 'Cooking Ingredients D10', '4');
   await roll(creator, 'Crafting Supplies D10+5', '2');
   await roll(creator, '동전 D20', '11');
