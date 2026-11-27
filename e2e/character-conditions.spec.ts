@@ -21,8 +21,8 @@ test('a creature poison reaches the PC, each round asks for its damage, and Endu
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Giant Spider');
-  await combat.getByRole('button', { name: 'Giant Spider', exact: true }).click();
+  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('거대 거미');
+  await combat.getByRole('button', { name: '거대 거미', exact: true }).click();
 
   const card = combat.getByRole('region', { name: '전투 카드' }).first();
   await card.getByRole('textbox', { name: '직접 굴린 값' }).first().fill('1');
@@ -53,7 +53,7 @@ test('a creature poison reaches the PC, each round asks for its damage, and Endu
   await board.getByRole('button', { name: '턴 시작', exact: true }).click();
   await page.reload();
   await expect(board.getByRole('status')).toContainText('2라운드');
-  await expect(board.getByRole('status')).toContainText('Giant Spider 턴 시작');
+  await expect(board.getByRole('status')).toContainText('거대 거미 턴 시작');
   await expect(lingering).toContainText('2라운드 지속 피해 · 2');
   await expect(card.getByRole('button', { name: '중독 적용함' })).toBeDisabled();
   await expect(resistance).toHaveCount(0);
@@ -164,8 +164,8 @@ test('rewinding a creature action also rewinds its applied condition and round d
   await go(page, '조우·전투');
   const combat = by(page, 'region', '조우와 전투 도구');
   await choose(combat, '조우 방식', 'search');
-  await by(combat, 'searchbox', '생물 이름').fill('Giant Spider');
-  await by(combat, 'button', 'Giant Spider').click();
+  await by(combat, 'searchbox', '생물 이름').fill('거대 거미');
+  await by(combat, 'button', '거대 거미').click();
   const card = by(combat, 'region', '전투 카드');
   const roll = by(card, 'textbox', '직접 굴린 값');
   const apply = by(card, 'button', 'PC에 적용 · 중독 (1)');
@@ -191,8 +191,8 @@ test('the incoming hit handoff focuses its D20 input at 320px', async ({ page })
   await go(page, '조우·전투');
   const combat = by(page, 'region', '조우와 전투 도구');
   await choose(combat, '조우 방식', 'search');
-  await by(combat, 'searchbox', '생물 이름').fill('Giant Spider');
-  await by(combat, 'button', 'Giant Spider').click();
+  await by(combat, 'searchbox', '생물 이름').fill('거대 거미');
+  await by(combat, 'button', '거대 거미').click();
   const card = by(combat, 'region', '전투 카드');
   await by(card, 'button', '공격 판정').click();
   const attack = by(card, 'region', '공격 판정 해석기');

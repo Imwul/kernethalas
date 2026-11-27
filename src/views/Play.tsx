@@ -345,10 +345,17 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
     setCharacterView('create');
   };
   const finishCharacterWorkspace = () => {
+    const created = characterView === 'create';
+    const entered = characterView !== null;
     setCharacterView(null);
     if (needsCharacterSetup) {
       finishCharacterSetup();
-      focusStage(active);
+      if (!entered) { focusStage(active); return; }
+      // A survivor ready for play goes straight on to setting up the first domain; a newly made one starts in the introductory domain.
+      const progress = domain.progress ?? newDomainProgress();
+      const untouched = domains.length === 1 && domain.overseerRoll === null && !progress.lair && !progress.exit && !progress.lastCheck;
+      if (created && untouched && progress.mode !== 'intro') updateDomain({ progress: { ...progress, mode: 'intro' } });
+      openDrawer('domain');
     } else openCharacterSection('sheet');
   };
   const backFromCharacterWorkspace = () => {

@@ -46,7 +46,7 @@ test('records Overseer recovery and applies armor wear to an equipped item only 
   await expect(wrap.getByRole('region', { name: '전투 종료 처리 목록' })).toContainText('Sanity D4 회복');
   await wrap.getByRole('button', { name: '전투 종료', exact: true }).click();
   await enterDie(wrap.getByRole('group', { name: '전투 후 Toughness 회복 D4' }), '2');
-  await enterDie(wrap.getByRole('group', { name: 'Infernal Archon 처치 후 Sanity 회복 D4' }), '3');
+  await enterDie(wrap.getByRole('group', { name: '지옥 집정관 처치 후 Sanity 회복 D4' }), '3');
   const worn = wrap.getByRole('combobox', { name: '이번 전투에 사용한 장부 방어구' });
   await worn.selectOption({ label: 'Leather Armor · D8' });
   const armor = wrap.getByRole('region', { name: '방어구 내구도 굴림' });

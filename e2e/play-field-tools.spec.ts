@@ -33,8 +33,8 @@ test('a physical tie roll assigns the extra opponent, and a Dodge roll records a
   await expect(allocation.getByRole('group', { name: '개별 적 배정' })).toHaveCount(0);
   await tie.press('Enter');
   await expect(allocation.getByRole('definition')).toHaveText(['2마리', '1마리', '2마리']);
-  await allocation.getByRole('combobox', { name: 'Necropede 1 상대' }).selectOption('ally-1');
-  const second = allocation.getByRole('combobox', { name: 'Necropede 2 상대' });
+  await allocation.getByRole('combobox', { name: '시체지네 1 상대' }).selectOption('ally-1');
+  const second = allocation.getByRole('combobox', { name: '시체지네 2 상대' });
   await expect(second.getByRole('option', { name: '동료·Minion 1' })).toBeDisabled();
 
   await openPane(combat, '도주');
@@ -75,7 +75,7 @@ test('custom encounter sets migrate the old table, validate imports and round-tr
   await choose(combat, '조우 방식', 'custom');
   const table = combat.getByRole('combobox', { name: '이 도메인에서 사용할 조우표' });
   await combat.getByText('사용자 지정 조우표 편집', { exact: true }).click();
-  await expect(combat.getByRole('list', { name: '저장한 조우 범위' })).toContainText('Necropede');
+  await expect(combat.getByRole('list', { name: '저장한 조우 범위' })).toContainText('시체지네');
   await combat.getByText('조우표 관리 및 파일 공유', { exact: true }).click();
   await combat.getByRole('button', { name: '새 조우표' }).click();
   await combat.getByRole('textbox', { name: '조우표 이름' }).fill('동쪽 묘실 조우');
@@ -98,6 +98,6 @@ test('custom encounter sets migrate the old table, validate imports and round-tr
   const roll = combat.getByRole('textbox', { name: 'D20 결과' });
   await roll.fill('2');
   await roll.press('Enter');
-  await expect(combat.getByRole('heading', { name: 'Necropede', exact: true })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: '시체지네', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(3440);
 });

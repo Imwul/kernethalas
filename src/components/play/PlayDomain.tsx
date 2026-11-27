@@ -1,4 +1,5 @@
 import { useContext, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { creatureName } from '../../content/entries/creatures';
 import { DICE_CHAIN } from '../../lib/dice';
 import { activeDomainDie, DEFAULT_DOMAIN_PROGRESS, stepDomainDie } from '../../lib/domain-progress';
 import {
@@ -60,7 +61,7 @@ export function PlayDomain({ domain, domains, activeEffects, defeated, overseerK
   return (
     <section className="play-domain play-domain-body" aria-label="도메인 효과">
         {(overseer || activeEffects.length > 0) && <p className="play-domain-summary" tabIndex={-1} ref={summary}>
-          {overseer && (concealOverseer ? <span>Overseer 미공개</span> : <span lang="en">{overseer.name}</span>)}
+          {overseer && (concealOverseer ? <span>Overseer 미공개</span> : <span>{creatureName(overseer)}</span>)}
           {activeEffects.length > 0 && <span>어둠 {activeEffects.length}개</span>}
         </p>}
         <div className="play-domain-fields">

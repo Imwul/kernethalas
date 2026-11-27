@@ -7,8 +7,8 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('Necropede');
-  await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
+  await combat.getByRole('searchbox', { name: '생물 이름' }).fill('시체지네');
+  await combat.getByRole('button', { name: '시체지네', exact: true }).click();
 
   const start = combat.getByRole('region', { name: '조우 시작 계산기' });
   await choose(start, '조우의 공포 특성', '4');

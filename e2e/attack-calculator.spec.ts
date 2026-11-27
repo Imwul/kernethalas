@@ -32,8 +32,8 @@ test('the attack procedure opens the right defense and fumble tables and retains
 test('a mobile creature card carries adjusted CS into an attack and opens its own hit table', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/bestiary?q=necro');
-  await page.getByRole('link', { name: 'Necropede', exact: true }).click();
-  const card = page.getByRole('dialog', { name: 'Necropede' }).getByRole('region', { name: '전투 카드' });
+  await page.getByRole('link', { name: '시체지네', exact: true }).click();
+  const card = page.getByRole('dialog', { name: '시체지네' }).getByRole('region', { name: '전투 카드' });
   const traits = card.getByRole('region', { name: '생물 특성 효과' });
   await expect(traits).toContainText('Endurance');
   await expect(traits).toContainText('Poisoned (1)');

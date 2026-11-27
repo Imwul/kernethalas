@@ -136,8 +136,8 @@ test('the next-action shortcut follows search rewards, resolved encounters and c
   await encounter.click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
-  await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
+  await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('시체지네');
+  await combat.getByRole('button', { name: '시체지네', exact: true }).click();
   await combat.getByRole('button', { name: '전투만 마치기', exact: true }).click();
   await stages.getByRole('button', { name: '탐험', exact: true }).click();
   await expect(encounter).toHaveCount(0);

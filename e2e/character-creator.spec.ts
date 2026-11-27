@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { chosen } from './helpers/choice';
 import { openDrawer } from './helpers/play-desk';
 
 async function roll(scope: Locator, group: string, value: string) {
@@ -71,6 +72,11 @@ test('the campaign setup creator saves the new survivor before starting explorat
   // one button records the survivor, grants the starting gear and opens exploration
   await creator.getByRole('button', { name: '이 생존자로 탐험 시작', exact: true }).click();
   await expect(setup).toBeHidden();
+  // the new survivor goes straight on to the first domain, set up as the introductory domain
+  const domain = page.locator('#play-drawer').getByRole('region', { name: '도메인 효과', exact: true });
+  await expect(domain).toBeVisible();
+  await expect(chosen(domain, '도메인 방식')).toHaveAttribute('data-value', 'intro');
+  await expect(domain.getByRole('group', { name: 'Overseer D10', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '탐험' }))
     .toHaveAttribute('aria-current', 'step');
   await page.reload();

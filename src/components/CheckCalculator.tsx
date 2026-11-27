@@ -3,6 +3,7 @@ import { EdgeToggle } from './EdgeToggle';
 import { AttackFollowUpRoll, AttackPendingEffects, useAttackFollowUps, type PendingAttackEffect } from './AttackFollowUps';
 import { pcCheckModifiers } from '../lib/play-check-modifiers';
 import { procById } from '../content';
+import { creatureName } from '../content/entries/creatures';
 import { d100FromValue, resolveCheck, resolveOpposed, type Edge } from '../lib/dice';
 import { resolvePhysicalAttack, type AttackDefenseMode, type PhysicalAttackResult } from '../lib/attack-defense';
 import { attackFollowUpModifier } from '../lib/attack-follow-ups';
@@ -220,7 +221,7 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     const r = resolveOpposed(ca, cb);
     verdict = { t: r.winner === 'A' ? 'A 승리' : r.winner === 'B' ? 'B 승리' : r.winner === 'reroll' ? '다시 굴림' : '규칙 미정', d: r.reason };
   }
-  const matchup = creature && (enemyAttacks ? `${creature.name} → PC` : `PC → ${creature.name}`);
+  const matchup = creature && (enemyAttacks ? `${creatureName(creature)} → PC` : `PC → ${creatureName(creature)}`);
   const exchangeOutcome = result && `${ATTACK_LABELS[result.outcome]}${result.attackerFumble ? ' · 공격자 펌블' : ''}`;
   const dice = !attackingRolls ? '판정 없음' : defendingRolls ? 'D100 × 2' : 'D100';
   const summarizeRolls = (attacker: string, defender: string) => !attacker ? '자동 명중'
@@ -381,10 +382,10 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
       )}
       {confirmed && creature && result?.outcome === 'defended' &&
         <AttackFollowUpRoll kind={enemyAttacks ? 'pc-defense' : 'enemy-defense'} exchangeId={confirmed.id}
-          side={enemyAttacks ? 'enemy' : 'pc'} targetName={creature.name} />}
+          side={enemyAttacks ? 'enemy' : 'pc'} targetName={creatureName(creature)} />}
       {confirmed && creature && result?.attackerFumble &&
         <AttackFollowUpRoll kind={enemyAttacks ? 'enemy-fumble' : 'pc-fumble'} exchangeId={confirmed.id}
-          side={enemyAttacks ? 'enemy' : 'pc'} targetName={creature.name} />}
+          side={enemyAttacks ? 'enemy' : 'pc'} targetName={creatureName(creature)} />}
       <AttackPendingEffects entries={pending} onToggle={(slot) => setSelectedEffects((previous) =>
         previous.includes(slot) ? previous.filter((id) => id !== slot) : [...previous, slot])} />
     </section>

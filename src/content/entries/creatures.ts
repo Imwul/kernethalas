@@ -2,7 +2,7 @@ import type { Entry } from '../schema';
 import { core, rr, req, cond, opt, ed } from '../helpers';
 import creatureData from '../generated/creatures.json';
 import { creatureActionKo } from '../creature-actions';
-import { CREATURE_NAME_ALIASES } from '../creature-names';
+import { CREATURE_NAME_ALIASES, CREATURE_NAME_KO } from '../creature-names';
 import { CREATURE_TYPE_DEFENSES, describeTypeDefense } from '../creature-defenses';
 import { combatTables } from '../tables/combat';
 
@@ -53,6 +53,10 @@ export interface CreatureRecord {
 
 export const creatures = creatureData as CreatureRecord[];
 export const creatureById = new Map(creatures.map((creature) => [creature.id, creature]));
+/** The Korean name shown for a creature (English stays on its detail page and in search). */
+const idByName = new Map(creatures.map(({ id, name }) => [name, id]));
+export const creatureName = (creature: { id?: string; name: string }) =>
+  CREATURE_NAME_KO[creature.id ?? idByName.get(creature.name) ?? ''] ?? creature.name;
 
 export const TYPE_KO: Record<string, string> = {
   Animal: '동물',
@@ -112,7 +116,7 @@ function creatureEntry(c: CreatureRecord): Entry {
     kind: 'creature',
     category: c.group === 'creature' ? 'creatures' : c.group === 'minion' ? 'character' : 'overseers',
     en: c.name,
-    ko: c.name,
+    ko: creatureName(c),
     aliases: [c.name, ...(CREATURE_NAME_ALIASES[c.id] ?? []), ...c.types, ...c.types.map((t) => TYPE_KO[t] ?? t), group, ...c.traits],
     tags: [group, ...c.types],
     summary: `${c.types.map((t) => TYPE_KO[t] ?? t).join(' · ')} — ${group}. 수치는 레벨 적응 적용 전 기본값.`,

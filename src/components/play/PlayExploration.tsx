@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { tableById } from '../../content';
-import { creatureById } from '../../content/entries/creatures';
+import { creatureById, creatureName } from '../../content/entries/creatures';
 import type { OracleTable } from '../../content/schema';
 import { ENCOUNTER_PLACES, encounterRowsForPlace, roomShapeForRoll, type EncounterPlace } from '../../content/tables/exploration';
 import type { CheckOutcome } from '../../lib/dice';
@@ -491,7 +491,7 @@ export function PlayExploration({ actionsRef, onReport, onCombat, onWrapUp, onJo
           )}
           {showIntroEncounter && <section className="play-explore-step" aria-label="도입 도메인 조우">
             <JournalRoll die="D20" label="도입 도메인 전투 조우" value={introEncounterRoll} onValue={setIntroEncounterRoll}
-              resultText={introCreature?.name} />
+              resultText={introCreature && creatureName(introCreature)} />
             {introCreature && <button className="btn primary play-explore-action-btn" type="button" data-play-next=""
               onClick={() => onCombat('encounter', introBattleId)}>도입 도메인 조우로</button>}
           </section>}

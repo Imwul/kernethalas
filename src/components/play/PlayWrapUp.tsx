@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from 'react';
 import { tableById, titleOf } from '../../content';
-import { creatureById, type CreatureRecord } from '../../content/entries/creatures';
+import { creatureById, creatureName, type CreatureRecord } from '../../content/entries/creatures';
 import { creatureSpoilsTables } from '../../lib/creature-combat';
 import type { RequiredExplorationRoll } from '../../lib/exploration-follow-up';
 import { journalRow } from '../../lib/loot-journal';
@@ -85,7 +85,7 @@ function sourcesForBattle(ids: string, battleId: string, labels: string) {
   const creatureGroups = combatants.map((creature, index) => {
     counts[creature.id] = (counts[creature.id] ?? 0) + 1;
     const duplicate = combatants.some((other, i) => other.id === creature.id && i !== index);
-    const label = targetLabels[index] || (duplicate ? `${creature.name} ${counts[creature.id]}` : creature.name);
+    const label = targetLabels[index] || (duplicate ? `${creatureName(creature)} ${counts[creature.id]}` : creatureName(creature));
     const tables = creatureSpoilsTables(creature).map((tableId) => ({
       tableId, id: `${battleId}:loot:${creature.id}:${index}:${tableId}`, owner: combatants.length > 1 ? label : '',
     }));

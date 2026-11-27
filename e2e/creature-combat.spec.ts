@@ -43,8 +43,8 @@ test('Overseer action opens its summoned creature and preserves the result', asy
   const card = page.getByRole('region', { name: '전투 카드' }).first();
   await expect(card.locator('.creature-combat-meta div').filter({ hasText: '라운드당 턴' }).first()).toContainText('2');
   await enterRoll(card, '3');
-  await card.getByRole('link', { name: 'Lesser Demon', exact: true }).click();
-  const demon = page.getByRole('dialog', { name: 'Lesser Demon' });
+  await card.getByRole('link', { name: '하급 악마', exact: true }).click();
+  const demon = page.getByRole('dialog', { name: '하급 악마' });
   await expect(demon.getByRole('region', { name: '전투 카드' })).toBeVisible();
   await demon.getByRole('button', { name: '참고 패널 닫기' }).click();
   await expect(card.getByRole('status')).toContainText('Demonic Conjuration');
@@ -76,8 +76,8 @@ test('ultrawide keeps the bestiary and workbench in place beside a creature pane
   await page.goto('/bestiary?q=abyssal');
   const list = page.locator('.bestiary-table');
   const before = (await list.boundingBox())!;
-  await list.getByRole('link', { name: 'Abyssal Vexator', exact: true }).click();
-  const panel = page.getByRole('dialog', { name: 'Abyssal Vexator' });
+  await list.getByRole('link', { name: '심연의 훼방꾼', exact: true }).click();
+  const panel = page.getByRole('dialog', { name: '심연의 훼방꾼' });
   await expect(panel).toBeVisible();
   await expect(page.getByRole('navigation', { name: '범주 색인' })).toBeVisible();
   await expect(page.locator('.frame-dock')).toBeVisible();
@@ -99,8 +99,8 @@ test('ultrawide keeps the bestiary and workbench in place beside a creature pane
 test('narrow panel keeps stats visible, separates roll details and restores combat after a defense roll', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto('/bestiary?q=abyssal');
-  await page.getByRole('link', { name: 'Abyssal Vexator', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Abyssal Vexator' });
+  await page.getByRole('link', { name: '심연의 훼방꾼', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '심연의 훼방꾼' });
   const card = dialog.getByRole('region', { name: '전투 카드' });
   const stats = card.locator('.creature-adaptation-stats');
   await expect(stats.locator('strong')).toHaveText(['8 + 4 × 레벨', '40', '80']);
@@ -141,7 +141,7 @@ test('narrow panel keeps stats visible, separates roll details and restores comb
   const defense = page.getByRole('dialog', { name: 'PC 방어 동작' });
   await enterRoll(defense, '7');
   await expect(defense.getByRole('status')).toContainText('다음 공격 Advantage');
-  await defense.getByRole('button', { name: 'Abyssal Vexator' }).click();
+  await defense.getByRole('button', { name: '심연의 훼방꾼' }).click();
   await expect(defenseLink).toBeFocused();
   await expect(card.getByLabel('PC 레벨')).toHaveValue('11');
   await expect(result).toContainText('Abyssal Wither');

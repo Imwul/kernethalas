@@ -1,5 +1,5 @@
 import type { OracleTable, TableRow } from '../schema';
-import { CREATURE_NAME_ALIASES } from '../creature-names';
+import { CREATURE_NAME_KO } from '../creature-names';
 import { core, req, opt, cond, ed } from '../helpers';
 import { corridorDescriptionCues, roomDescriptionCues } from './place-description-cues';
 
@@ -34,7 +34,7 @@ const CREATURES_B = ['Living Moss', 'Necropede', 'Netherfiend', 'Plaguebringer',
 export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const crRow = (name: string, i: number) => {
   const id = `cr-${slug(name)}`;
-  return r(i + 1, i + 1, CREATURE_NAME_ALIASES[id]?.[0] ?? name, name, { next: [n(id)] });
+  return r(i + 1, i + 1, CREATURE_NAME_KO[id] ?? name, name, { next: [n(id)] });
 };
 
 const OVERSEERS = ['Carnage Devourer', 'Dreadlord', 'Glacial Burrower', 'Gorehoof', 'Infernal Archon', 'Infernal Tormentor', 'Pyroclasmic Possessor', 'Veilshifter', 'Venomcloud Siren', 'Zephyrous Shadow'];

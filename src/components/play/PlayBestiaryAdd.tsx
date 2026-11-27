@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { CreatureRecord } from '../../content/entries/creatures';
+import { creatureName, type CreatureRecord } from '../../content/entries/creatures';
 
 export function PlayBestiaryAdd({ creature, finished, onAdd, onCancel }: {
   creature: CreatureRecord;
@@ -17,7 +17,7 @@ export function PlayBestiaryAdd({ creature, finished, onAdd, onCancel }: {
   return (
     <section className="play-bestiary-add" aria-labelledby={title}>
       <h3 id={title}>도감 생물을 조우에 추가</h3>
-      <p><strong lang="en">{creature.name}</strong> · 도감 개체 수 <span>{creature.number}</span></p>
+      <p><strong>{creatureName(creature)}</strong> · 도감 개체 수 <span>{creature.number}</span></p>
       {finished ? <>
         <p>이 조우는 이미 끝났습니다. 추가하려면 먼저 조우를 다시 선택하세요.</p>
         <button className="btn ghost" type="button" onClick={onCancel}>추가 취소</button>

@@ -1,7 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 import type { Entry } from '../content/schema';
 import { CATEGORY_LABEL } from '../content';
-import { creatureById } from '../content/entries/creatures';
+import { creatureById, creatureName } from '../content/entries/creatures';
 import { bestiaryEncounterHref } from '../lib/bestiary-encounter';
 import { entrySource, masterySource } from '../lib/overlay';
 import { isUsageDieRule } from '../lib/usage-die';
@@ -43,7 +43,7 @@ export function EntryBody({ e, compact = false, hideTitle = false, actions }: { 
 
       {creature && <div className="creature-reference-actions">
         <Link className="btn ghost" to={bestiaryEncounterHref(creature.id)}
-          aria-label={`${creature.name} 조우에 추가`}>조우에 추가</Link>
+          aria-label={`${creatureName(creature)} 조우에 추가`}>조우에 추가</Link>
       </div>}
       <RulingNote key={`note:${e.id}`} id={e.id} />
 

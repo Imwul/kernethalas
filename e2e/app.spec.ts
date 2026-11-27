@@ -124,5 +124,5 @@ test('bestiary lists all 59 creatures, each with a way to appear', async ({ page
   await expect(rows).toHaveCount(10);
   await categories.getByRole('button', { name: /^Overseer 소환수/ }).click();
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('Lesser Demon');
+  await expect(rows.first()).toContainText('하급 악마');
 });

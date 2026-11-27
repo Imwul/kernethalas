@@ -20,7 +20,7 @@ async function go(page: Page, name: string) {
   await button(page.getByRole('navigation', { name: '플레이 단계' }), name).click();
 }
 
-async function selectEnemy(page: Page, name = 'Necropede') {
+async function selectEnemy(page: Page, name = '시체지네') {
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');

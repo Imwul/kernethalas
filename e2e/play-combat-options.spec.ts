@@ -24,7 +24,7 @@ async function roll(scope: Locator, label: string, value: string) {
 
 test('only real D100 rolls appear for undefended and automatic physical hits', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
-  const combat = await selectCreature(page, 'Necropede');
+  const combat = await selectCreature(page, '시체지네');
   await combat.getByRole('button', { name: '공격 판정', exact: true }).click();
   const attack = combat.getByRole('region', { name: '공격 판정 해석기' });
   const verdict = attack.getByRole('status', { name: '공격 판정 결과' });
@@ -67,7 +67,7 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
 
 test('area saves stay separate and apply full or rounded half damage to named targets', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
-  const combat = await selectCreature(page, 'Astral Beast');
+  const combat = await selectCreature(page, '별계 야수');
   const card = combat.getByRole('region', { name: '전투 카드' });
   await roll(card.getByRole('region', { name: '표 굴리기', exact: true }), '직접 굴린 값', '5');
   await card.getByRole('button', { name: '여러 대상 판정' }).click();
@@ -107,13 +107,13 @@ test('area saves stay separate and apply full or rounded half damage to named ta
 
 test('a bestiary handoff confirms a count and appends to the original encounter once', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  const combat = await selectCreature(page, 'Necropede');
+  const combat = await selectCreature(page, '시체지네');
   await page.goto('/bestiary?g=overseer&q=Infernal%20Archon');
-  await page.getByRole('link', { name: 'Infernal Archon 조우에 추가', exact: true }).click();
+  await page.getByRole('link', { name: '지옥 집정관 조우에 추가', exact: true }).click();
   const request = combat.getByRole('region', { name: '도감 생물을 조우에 추가' });
   await expect(request).toBeVisible();
-  await expect(request).toContainText('Infernal Archon');
-  await expect(combat.getByRole('heading', { name: 'Necropede', exact: true })).toBeVisible();
+  await expect(request).toContainText('지옥 집정관');
+  await expect(combat.getByRole('heading', { name: '시체지네', exact: true })).toBeVisible();
   const count = request.getByRole('textbox', { name: '추가할 개체 수' });
   const confirm = request.getByRole('button', { name: '조우에 추가 확정' });
   await count.fill('21');
@@ -121,14 +121,14 @@ test('a bestiary handoff confirms a count and appends to the original encounter 
   await count.fill('2');
   await confirm.click();
   const lineup = combat.getByRole('group', { name: '전투 대상', exact: true });
-  await expect(lineup.getByRole('button')).toHaveText(['Necropede', 'Infernal Archon 1', 'Infernal Archon 2']);
+  await expect(lineup.getByRole('button')).toHaveText(['시체지네', '지옥 집정관 1', '지옥 집정관 2']);
   await expect(page).not.toHaveURL(/encounter-creature=/);
   await page.reload();
   await expect(lineup.getByRole('button')).toHaveCount(3);
 
   await page.goto('/ref/cr-dreadlord');
-  await page.getByRole('link', { name: 'Dreadlord 조우에 추가', exact: true }).click();
-  await expect(request).toContainText('Dreadlord');
+  await page.getByRole('link', { name: '공포 군주 조우에 추가', exact: true }).click();
+  await expect(request).toContainText('공포 군주');
   await request.getByRole('button', { name: '추가 취소' }).click();
   await expect(lineup.getByRole('button')).toHaveCount(3);
   await expect(page).not.toHaveURL(/encounter-creature=/);
@@ -147,17 +147,17 @@ test('a creature reference opened during play returns to the same named campaign
 
   await page.getByRole('button', { name: '검색', exact: true }).click();
   const search = page.getByRole('dialog', { name: '규칙 검색' });
-  await search.getByRole('searchbox', { name: '검색어' }).fill('Dreadlord');
+  await search.getByRole('searchbox', { name: '검색어' }).fill('공포 군주');
   await search.getByRole('searchbox', { name: '검색어' }).press('Enter');
-  const detail = page.getByRole('dialog', { name: 'Dreadlord', exact: true });
-  await detail.getByRole('link', { name: 'Dreadlord 조우에 추가', exact: true }).click();
+  const detail = page.getByRole('dialog', { name: '공포 군주', exact: true });
+  await detail.getByRole('link', { name: '공포 군주 조우에 추가', exact: true }).click();
   await expect(detail).toHaveCount(0);
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await expect(choiceGroup(combat, '조우 방식')).toBeVisible();
   expect(new URL(page.url()).searchParams.get('campaign')).toBe(campaign);
   await combat.getByRole('button', { name: '조우에 추가 확정' }).click();
-  await expect(combat.getByRole('heading', { name: 'Dreadlord', exact: true })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: '공포 군주', exact: true })).toBeVisible();
   expect(new URL(page.url()).searchParams.get('campaign')).toBe(campaign);
   await page.reload();
-  await expect(combat.getByRole('heading', { name: 'Dreadlord', exact: true })).toBeVisible();
+  await expect(combat.getByRole('heading', { name: '공포 군주', exact: true })).toBeVisible();
 });

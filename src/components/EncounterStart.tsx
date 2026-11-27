@@ -1,6 +1,6 @@
 import { useEffect, useId } from 'react';
 import { EdgeToggle } from './EdgeToggle';
-import type { CreatureRecord } from '../content/entries/creatures';
+import { creatureName, type CreatureRecord } from '../content/entries/creatures';
 import type { CheckResult, Edge } from '../lib/dice';
 import { encounterCheck, encounterFear, encounterInitiativeModifier, encounterInteger, encounterOpposed } from '../lib/encounter-start';
 import { readOracleValue } from '../lib/oracle';
@@ -154,7 +154,7 @@ export function EncounterStart({ creature, onResolved }: {
             { value: 'ambushed', label: '적에게 기습당함', disabled: livingShadow },
           ]} />
       </div>
-      {creature && <p className="encounter-note">{creature.name} 기본 Mind {creature.mind}. 적이 여럿이면 가장 높은 Mind를 사용하세요.</p>}
+      {creature && <p className="encounter-note">{creatureName(creature)} 기본 Mind {creature.mind}. 적이 여럿이면 가장 높은 Mind를 사용하세요.</p>}
       {livingShadow && <p className="encounter-note encounter-perk">Living Shadow Perk · 기습당하지 않습니다.</p>}
       {initiativeRules.notes.length > 0 && <p className="encounter-note">{initiativeRules.notes.join(' / ')}</p>}
       <div className="encounter-traits">

@@ -19,24 +19,24 @@ test('a fight keeps round actions and opens target-specific tactics from one pla
   await page.getByRole('navigation', { name: '플레이 단계' }).getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await choose(combat, '조우 방식', 'search');
-  await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Fangvine');
-  await combat.getByRole('button', { name: 'Fangvine', exact: true }).click();
+  await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('송곳니 덩굴');
+  await combat.getByRole('button', { name: '송곳니 덩굴', exact: true }).click();
   const summary = combat.getByRole('region', { name: '현재 전투 턴', exact: true });
   const status = summary.getByRole('status');
   await expect(status).toContainText('1라운드');
   await expect(summary.getByRole('link', { name: '다음 반응 0' })).toBeVisible();
   await expect(summary).toContainText('Botanical Exterminator 6/50 · 처치 시 +1');
   const fire = summary.getByRole('button', { name: /^Fire Bolt/ });
-  await expect(fire).toContainText('Fangvine 취약 · 피해 ×2');
+  await expect(fire).toContainText('송곳니 덩굴 취약 · 피해 ×2');
   await expect(summary.getByRole('button', { name: /^Flame Spray/ })).toHaveCount(0);
   await fire.click();
   await expect(combat.getByRole('region', { name: 'PC Mastery 능력' }).getByRole('button', { name: 'Fire Bolt', exact: true }))
     .toHaveAttribute('aria-pressed', 'true');
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   const spellTarget = combat.getByRole('combobox', { name: '능력 대상', exact: true });
-  await spellTarget.selectOption({ label: 'Fangvine 1' });
+  await spellTarget.selectOption({ label: '송곳니 덩굴 1' });
   await fire.click();
-  await expect(spellTarget.locator('option:checked')).toHaveText('Fangvine 2');
+  await expect(spellTarget.locator('option:checked')).toHaveText('송곳니 덩굴 2');
 
   await summary.getByRole('button', { name: 'PC 공격 입력' }).click();
   await expect(combat.getByRole('textbox', { name: '공격자 D100', exact: true })).toBeFocused();
@@ -56,9 +56,9 @@ test('a fight keeps round actions and opens target-specific tactics from one pla
   await expect(summary.getByRole('link', { name: '다음 반응 −20' })).toBeVisible();
   await summary.getByRole('button', { name: '턴·라운드 열기' }).click();
   const rounds = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
-  await rounds.getByRole('combobox', { name: '턴을 확인할 대상' }).selectOption({ label: 'Fangvine 2' });
+  await rounds.getByRole('combobox', { name: '턴을 확인할 대상' }).selectOption({ label: '송곳니 덩굴 2' });
   await rounds.getByRole('button', { name: '턴 시작', exact: true }).click();
-  await expect(status).toContainText('Fangvine 2 턴 진행 중');
+  await expect(status).toContainText('송곳니 덩굴 2 턴 진행 중');
   await expect(summary.getByRole('button', { name: /^Magic Shell/ })).toBeVisible();
   await expect(fire).toHaveCount(0);
   await rounds.getByRole('button', { name: '다음 라운드', exact: true }).click();

@@ -13,20 +13,20 @@ test('compares one damage type across the current lineup and remembers the selec
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, 'Umbra Fiend');
+  await selectCreature(combat, '암영 마귀');
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   await combat.getByRole('button', { name: '다른 생물 추가' }).click();
-  await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('Infernal Tormentor');
-  await combat.getByRole('button', { name: 'Infernal Tormentor', exact: true }).click();
+  await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('지옥 고문관');
+  await combat.getByRole('button', { name: '지옥 고문관', exact: true }).click();
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   await openPane(combat, '피해 비교');
 
   const panel = combat.getByRole('region', { name: '조우 피해 유형 비교' });
   const type = panel.getByRole('combobox', { name: '비교할 피해 유형' });
-  const first = panel.getByRole('row', { name: /Umbra Fiend 1/ });
-  const duplicate = panel.getByRole('row', { name: /Umbra Fiend 2/ });
-  const tormentor = panel.getByRole('row', { name: /Infernal Tormentor 1/ });
-  const secondTormentor = panel.getByRole('row', { name: /Infernal Tormentor 2/ });
+  const first = panel.getByRole('row', { name: /암영 마귀 1/ });
+  const duplicate = panel.getByRole('row', { name: /암영 마귀 2/ });
+  const tormentor = panel.getByRole('row', { name: /지옥 고문관 1/ });
+  const secondTormentor = panel.getByRole('row', { name: /지옥 고문관 2/ });
   await expect(first).toContainText('저항');
   await expect(duplicate).toContainText('저항');
   await panel.getByRole('checkbox', { name: '마법 피해' }).check();
@@ -62,7 +62,7 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
   await page.goto('/play');
   await page.getByRole('button', { name: '조우·전투', exact: true }).click();
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
-  await selectCreature(combat, 'Necropede');
+  await selectCreature(combat, '시체지네');
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
   await openPane(combat, '라운드');
 
@@ -79,26 +79,26 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
   const bleed = board.getByRole('checkbox', { name: '확인 · 출혈' });
   await bleed.check();
 
-  await actorForEffect.selectOption({ label: 'Necropede 2' });
+  await actorForEffect.selectOption({ label: '시체지네 2' });
   await effect.selectOption('custom');
   await timing.selectOption('end');
   await board.getByRole('textbox', { name: '효과 이름' }).fill('장벽 해제 확인');
   await board.getByRole('button', { name: '효과 추가' }).click();
   const barrier = board.getByRole('checkbox', { name: '확인 · 장벽 해제 확인' });
-  await actor.selectOption({ label: 'Necropede 1' });
+  await actor.selectOption({ label: '시체지네 1' });
   await board.getByRole('button', { name: '턴 종료' }).click();
-  await expect(position).toContainText('Necropede 1 턴 종료');
+  await expect(position).toContainText('시체지네 1 턴 종료');
   await expect(barrier).toHaveCount(0);
 
-  await actor.selectOption({ label: 'Necropede 2' });
+  await actor.selectOption({ label: '시체지네 2' });
   await board.getByRole('button', { name: '턴 시작' }).click();
-  await expect(position).toContainText('Necropede 2 턴 시작');
+  await expect(position).toContainText('시체지네 2 턴 시작');
   await expect(barrier).toHaveCount(0);
   await board.getByRole('button', { name: '턴 종료' }).click();
   await barrier.check();
   await expect(barrier).toBeChecked();
   await page.reload();
-  await expect(position).toContainText('Necropede 2 턴 종료');
+  await expect(position).toContainText('시체지네 2 턴 종료');
   await expect(barrier).toBeChecked();
 
   await board.getByRole('button', { name: '다음 라운드' }).click();
@@ -108,7 +108,7 @@ test('checks chosen targets and timings by hand and starts a fresh board for a n
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 
   await combat.getByRole('button', { name: '조우 다시 선택' }).click();
-  await selectCreature(combat, 'Necropede');
+  await selectCreature(combat, '시체지네');
   await openPane(combat, '라운드');
   await expect(position).toContainText('1라운드');
   await expect(board.getByRole('list', { name: '등록한 효과' })).toHaveCount(0);

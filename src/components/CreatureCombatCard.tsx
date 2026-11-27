@@ -2,7 +2,7 @@ import { useContext, useId, useImperativeHandle, useLayoutEffect, useRef, type R
 import { tableById, titleOf } from '../content';
 import { creatureActionRule } from '../content/creature-action-rules';
 import { creatureDefenses } from '../content/creature-defenses';
-import { armorKo, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
+import { armorKo, creatureName, TYPE_KO, type CreatureRecord } from '../content/entries/creatures';
 import type { Entry } from '../content/schema';
 import { isCombatDamageRecord } from '../lib/combat-damage-records';
 import { calculateCreatureAdaptation, readCreatureLevel } from '../lib/creature-adaptation';
@@ -98,7 +98,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const pcDamageKey = `incoming-${pcDamageSeed.attempt}-${pcImpact?.location ?? ''}`;
   const damageSlot = `${scope}damage-record:enemy:${damageSeed.exchangeId ?? damageSeed.attempt}`;
   const pcDamageSlot = `${scope}damage-record:pc:${pcDamageSeed.exchangeId ?? pcDamageSeed.attempt}`;
-  const combatName = targetName ?? creature.name;
+  const combatName = targetName ?? creatureName(creature);
   const recordHit = (roll: number | null, pc: boolean) => {
     const slot = pc ? pcDamageSlot : damageSlot;
     const previous = pc ? pcHitValue : hitValue;

@@ -29,7 +29,7 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     await combat.getByRole('button', { name: '확인', exact: true }).click();
     await combat.getByRole('textbox', { name: 'D20 결과', exact: true }).fill('2');
     await combat.getByRole('button', { name: '생물 선택', exact: true }).click();
-    await expect(combat.getByRole('heading', { name: 'Necropede' })).toBeVisible();
+    await expect(combat.getByRole('heading', { name: '시체지네' })).toBeVisible();
 
     const card = combat.getByRole('region', { name: '전투 카드' });
     await card.getByRole('button', { name: '공격 판정', exact: true }).click();
@@ -74,7 +74,7 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     const journal = page.getByRole('region', { name: '이번 장소 기록', exact: true });
     await journal.getByRole('textbox', { name: '장소 이름 (선택)' }).fill('지하 묘실');
     await expect(journal).toContainText('지하 묘실 · 방');
-    await expect(journal).toContainText('Necropede · 승리');
+    await expect(journal).toContainText('시체지네 · 승리');
     await expect(journal).toContainText('전투 후 Toughness +3');
     await expect(journal).toContainText('Crafting Supplies 1');
     await expect(journal).toContainText('다음 긴장 주사위 D4');
@@ -101,7 +101,7 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
       await expect(recoveryInput).toHaveValue('2');
       await wrap.getByRole('button', { name: '전리품', exact: true }).click();
       await expect(wrap.getByRole('combobox', { name: '전리품 표' })).toBeVisible();
-      await expect(wrap.getByRole('combobox', { name: '전리품 표' }).getByRole('option', { name: 'Necropede 처치 보상' })).toHaveCount(0);
+      await expect(wrap.getByRole('combobox', { name: '전리품 표' }).getByRole('option', { name: '시체지네 처치 보상' })).toHaveCount(0);
       await stages.getByRole('button', { name: '조우·전투', exact: true }).click();
       await combat.getByRole('button', { name: '전투 결과 수정', exact: true }).click();
       await combat.getByRole('button', { name: '결과 수정 확정', exact: true }).click();
