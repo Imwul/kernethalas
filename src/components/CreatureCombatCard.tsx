@@ -14,6 +14,7 @@ import { creatureActionSource } from '../lib/overlay';
 import { usePlayCharacter } from '../lib/play-character';
 import { PlayDraftScope, useClearPlayDraftScope, usePlayDraftState } from '../lib/play-draft';
 import type { PhysicalAttackResult } from '../lib/attack-defense';
+import { attackWeapon, type PcWeapon } from '../lib/play-weapons';
 import { OracleBody } from '../views/Oracle';
 import { TogglePanel } from './TogglePanel';
 import { AttackFollowUpRoll } from './AttackFollowUps';
@@ -38,8 +39,12 @@ type CombatSide = 'pc' | 'enemy';
 
 export type CreatureCombatHandle = { openPcAttack: () => void; openEnemyAction: () => void };
 
-export function CreatureCombatCard({ creature, entry, targetName, summons, showEncounterStart = true, showAftermath = true, allowApplyingConditions = true, ref }: {
+const NO_WEAPONS: readonly PcWeapon[] = [];
+
+export function CreatureCombatCard({ creature, entry, targetName, summons, showEncounterStart = true, showAftermath = true, allowApplyingConditions = true, weapons = NO_WEAPONS, ref }: {
   creature: CreatureRecord;
+  /** Weapons the PC carries (gear ledger): the PC's attack takes damage type, Speed and traits from one of them. */
+  weapons?: readonly PcWeapon[];
   entry: Entry;
   targetName?: string;
   summons?: CombatSummonControls;
@@ -63,6 +68,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
   const [actionValue, setActionValue] = usePlayDraftState<number | null>('creature-action', null);
   const [actionRevision, setActionRevision] = usePlayDraftState('creature-action-revision', 0);
   const [attackChoice, setAttackChoice] = usePlayDraftState('creature-attack-choice', 0);
+  const [weaponName, setWeaponName] = usePlayDraftState('pc-weapon', '');
   const clearScope = useClearPlayDraftScope();
   const pcPanel = useRef<HTMLDivElement>(null);
   const enemyPanel = useRef<HTMLDivElement>(null);
@@ -90,6 +96,13 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
     name: selectedAction.name, when: chosenAttack.when, armorIgnore: penetration,
     ...creatureAttackPool(chosenAttack, adjustment.damageBonuses),
   };
+  // The PC's attack: the weapon carried for the main weapon Skill, or bare hands for Unarmed Combat (Core p.81).
+  const weapon = attackWeapon(weapons, weaponName, player?.character.weapon);
+  const outgoing: IncomingAttack | undefined = weapon ? {
+    name: weapon.name, when: weapon.damageNotes.join(' · ') || undefined, armorIgnore: 0, bonuses: [],
+    dice: weapon.damageBonus ? `D6+${weapon.damageBonus}` : 'D6', mod: weapon.damageBonus, type: weapon.type,
+  } : player?.character.weapon === 'Unarmed Combat & Fist Weapons'
+    ? { name: '맨손', armorIgnore: 0, bonuses: [], dice: 'D4', mod: 0, type: 'Bludgeoning' } : undefined;
   const hitTable = creatureHitTable(creature, entry, adjustment.armorBonuses);
   const unlocatedArmor = creatureHitImpact(creature, null, adjustment.armorBonuses).armor;
   const combatName = targetName ?? creature.name;
@@ -102,7 +115,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
       <AttackOutcome result={result} exchangeId={exchangeId} enemyAttacks={enemyAttacks} targetName={combatName}
         hitTable={enemyAttacks ? PC_HIT_TABLE : hitTable} fixedHit={entry.stats?.['Hit Location']}
         hitImpact={(label) => creatureHitImpact(creature, label, adjustment.armorBonuses)}
-        unlocatedArmor={unlocatedArmor} defenses={defenses} incoming={enemyAttacks ? incoming : undefined} />
+        unlocatedArmor={unlocatedArmor} defenses={defenses} attack={enemyAttacks ? incoming : outgoing} />
     </PlayDraftScope>
   );
   const attacker = { name: combatName, combatSkill: unknownCS ? null : combatSkill };
@@ -134,7 +147,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
           <button type="button" aria-controls={pcPane} aria-pressed={side === 'pc'} data-play-attack-side="pc-attack"
             onClick={() => setSide('pc')}>PC 공격</button>
         </div>
-        <div id={enemyPane} ref={enemyPanel} hidden={side !== 'enemy'}>
+        <div id={enemyPane} ref={enemyPanel} className="creature-flow" hidden={side !== 'enemy'}>
           {discovery && <div className="creature-action-discovery">
             {!actionsRevealed && <p>주사위를 굴리면 해당 행동과 필요한 판정이 열립니다.</p>}
             <button className="btn ghost" type="button" aria-expanded={actionsRevealed}
@@ -169,13 +182,19 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
             </PlayDraftScope>
           )}
         </div>
-        <div id={pcPane} ref={pcPanel} hidden={side !== 'pc'}>
+        <div id={pcPane} ref={pcPanel} className="creature-flow" hidden={side !== 'pc'}>
+          {weapons.length > 1 && <ChoiceButtons label="무기" value={weapon?.name} onChange={setWeaponName}
+            options={weapons.map(({ name }) => ({ value: name, label: name }))} />}
+          {outgoing && <p className="creature-attack-line"><span>공격</span> <b lang="en">{outgoing.name}</b> · {formatAttackDamage(outgoing)}
+            {outgoing.when && ` · ${outgoing.when}`}{weapon?.speed ? ` · Speed ${weapon.speed}` : ''}</p>}
           <PlayDraftScope name="pc-attack">
-            <CheckCalculator attackOnly creature={{ ...attacker, attacking: false, renderOutcome: outcome(false) }} />
+            <CheckCalculator attackOnly creature={{ ...attacker, attacking: false, renderOutcome: outcome(false),
+              weapon: weapon && { name: weapon.name, speed: weapon.speed, attackBonus: weapon.attackBonus, skill: weapon.skill } }} />
           </PlayDraftScope>
         </div>
       </div>
-      <section className="creature-reactions" aria-label="방어 동작과 펌블">
+      {/* In play the defensive move and fumble rolls open under the attack itself; the reference page keeps the links. */}
+      {showAftermath && <section className="creature-reactions" aria-label="방어 동작과 펌블">
         <h3>방어 동작과 펌블</h3>
         <div className="creature-reaction-links">
           <XRef id="t-defensive-move-pc">PC 방어 동작</XRef>
@@ -183,7 +202,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
           <XRef id="t-fumble-pc">PC 공격자 펌블</XRef>
           <XRef id="t-fumble-npc">적 공격자 펌블</XRef>
         </div>
-      </section>
+      </section>}
       {showAftermath && <CreatureAftermath creature={creature} spoils={spoils} />}
       <TogglePanel className="creature-other-stats" label="기타 능력치와 레벨 적응">
         <dl className="creature-combat-meta">
@@ -207,7 +226,7 @@ export function CreatureCombatCard({ creature, entry, targetName, summons, showE
 type HitImpact = { armor: number | null; weak: boolean };
 
 /** What follows one attack exchange, right under its result: hit location and damage, or the defense/fumble roll. */
-function AttackOutcome({ result, exchangeId, enemyAttacks, targetName, hitTable, fixedHit, hitImpact, unlocatedArmor, defenses, incoming }: {
+function AttackOutcome({ result, exchangeId, enemyAttacks, targetName, hitTable, fixedHit, hitImpact, unlocatedArmor, defenses, attack }: {
   result: PhysicalAttackResult;
   exchangeId: string;
   enemyAttacks: boolean;
@@ -217,7 +236,8 @@ function AttackOutcome({ result, exchangeId, enemyAttacks, targetName, hitTable,
   hitImpact: (label: string) => HitImpact;
   unlocatedArmor: number | null;
   defenses: ReturnType<typeof creatureDefenses>;
-  incoming?: IncomingAttack;
+  /** The attack that landed: the creature's action, or the PC's weapon. */
+  attack?: IncomingAttack;
 }) {
   const [hitValue, setHitValue] = usePlayDraftState<number | null>('hit', null);
   const landed = result.outcome === 'hit' || result.outcome === 'critical-hit';
@@ -236,7 +256,7 @@ function AttackOutcome({ result, exchangeId, enemyAttacks, targetName, hitTable,
             : <p className="creature-fixed-hit">{fixedHit}</p>}
         </section>
         <DamageCalculator impact={impact} unlocatedArmor={enemyAttacks ? null : unlocatedArmor} defenses={enemyAttacks ? undefined : defenses}
-          initialCritical={result.outcome === 'critical-hit'} pc={enemyAttacks} attack={incoming} />
+          initialCritical={result.outcome === 'critical-hit'} pc={enemyAttacks} attack={attack} />
       </>}
       {result.outcome === 'both-failed' && (
         <DamageCalculator unlocatedArmor={null} defenses={enemyAttacks ? undefined : defenses} initialCritical={false}

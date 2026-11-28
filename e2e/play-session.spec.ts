@@ -17,6 +17,13 @@ async function prepareOffline(page: Page) {
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 }
 
+
+/** Phones keep "오늘 여기까지" in the header's "⋯" menu. */
+async function openSession(page: Page) {
+  await page.getByRole('button', { name: '그 밖의 동작', exact: true }).click();
+  await page.getByRole('button', { name: '오늘 여기까지', exact: true }).click();
+}
+
 test('the session card reopens a suspended door and focuses its roll offline', async ({ page, context }) => {
   await prepareOffline(page);
 
@@ -41,7 +48,7 @@ test('the session card reopens a suspended door and focuses its roll offline', a
   await pick.getByRole('textbox', { name: 'Thievery 수치', exact: true }).fill('55');
   await pick.getByRole('textbox', { name: '직접 굴린 D100', exact: true }).focus();
 
-  await page.getByRole('button', { name: '오늘 여기까지', exact: true }).click();
+  await openSession(page);
   const editor = page.getByRole('region', { name: '오늘 여기까지', exact: true });
   await editor.getByRole('textbox', { name: '다음에 할 일 (선택)' }).fill('북쪽 철문의 자물쇠를 딴다');
   await editor.getByRole('button', { name: '이 지점에서 멈추기', exact: true }).click();
@@ -88,7 +95,7 @@ test('typed Breather dice survive an offline pause without applying recovery bef
   await input(page).fill('7');
   await expect(breather(page).getByRole('status')).toHaveCount(0);
 
-  await page.getByRole('button', { name: '오늘 여기까지', exact: true }).click();
+  await openSession(page);
   await page.getByRole('button', { name: '이 지점에서 멈추기', exact: true }).click();
   await page.close();
   await context.setOffline(true);
@@ -139,7 +146,7 @@ test('resuming a forced door offline keeps the pending die and finishes required
   await expect(resultInput(page)).toBeFocused();
   await expect(resultInput(page)).toHaveValue('3');
 
-  await page.getByRole('button', { name: '오늘 여기까지', exact: true }).click();
+  await openSession(page);
   await page.getByRole('button', { name: '이 지점에서 멈추기', exact: true }).click();
   await page.close();
   await context.setOffline(true);

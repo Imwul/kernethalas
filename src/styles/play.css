@@ -122,6 +122,18 @@
   cursor: pointer;
 }
 .play-menu-item:hover { background: var(--oxblood-wash); }
+.play-menu-item.play-session-item { color: var(--ink); border-block-end: 1px solid var(--rule-soft); }
+.play-menu-item.play-session-item:hover { background: var(--bone-2); }
+.play-session-item { display: none; }
+/* phones: one header row (campaign, view settings, "⋯"); the title stays for screen readers */
+@media (max-width: 559px) {
+  .play-header { flex-wrap: nowrap; padding-bottom: var(--s2); }
+  .play-header h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .play-header .play-session-open { display: none; }
+  .play-session-item { display: flex; }
+  .play-header > .play-header-actions { flex-wrap: nowrap; }
+  .play-header .play-popover:first-of-type { min-inline-size: 0; }
+}
 .play-menu-item:focus-visible { outline-offset: -2px; }
 .play-view-menu .play-popover-body { padding: 0; }
 
@@ -330,6 +342,7 @@ details.play-domain { margin-block: 0 var(--s3); }
 }
 .play-sheet { min-width: 0; margin: 0; border: 1px solid var(--rule); padding: var(--s1) var(--s2); }
 .play-sheet legend { padding-inline: var(--s1); font: 700 14px/1.4 var(--f-ui); }
+.play-sheet-all.btn { min-height: 40px; margin-block: var(--s1); }
 .play-sheet label { display: flex; align-items: center; gap: var(--s2); min-height: 44px; padding-block: var(--s1); overflow-wrap: anywhere; }
 .play-sheet label + label { border-top: 1px solid var(--rule-soft); }
 .play-sheet input { flex: none; inline-size: 17px; block-size: 17px; }

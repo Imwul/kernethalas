@@ -11,6 +11,7 @@ import { PlayDraftScope, usePlayDraftState, usePlayRoll, usePlayRollField, usePl
 import { USE_ABILITY_EVENT } from './PlayCharacter';
 import { CombatLingeringAlert } from './PlayLingering';
 import type { GearItem, PaperChange } from '../../lib/play-inventory';
+import type { PcWeapon } from '../../lib/play-weapons';
 import { AttackFollowUpProvider } from '../AttackFollowUps';
 import { CreatureCombatCard, type CreatureCombatHandle } from '../CreatureCombatCard';
 import { EncounterStart } from '../EncounterStart';
@@ -175,6 +176,8 @@ interface PlayCombatProps {
   onMasteryJournalChange?: (line: string) => void;
   belt?: readonly GearItem[];
   onOpenBelt?: () => void;
+  /** Weapons in the gear ledger: the PC's attack takes its damage type, Speed and traits from one of them. */
+  weapons?: readonly PcWeapon[];
 }
 
 export type EncounterSeed = { creatureIds: string[]; description: string };
@@ -188,7 +191,7 @@ function restoredLineup(seed: EncounterSeed | undefined) {
 
 export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOverseerKnown, onRevealDomainOverseer, onCreatureChange, onTargetsChange, onBattleEnd, onFlee, fled, finished,
   seed, bestiaryCreatureId, onCloseBestiaryRequest, customSets, customSetId, onCustomSetSelect, onCustomSetsChange, onMasterySheetChange,
-  onMasteryJournalChange, currentOutcome, onPreviewBattleEnd, onNewEncounter, belt = [], onOpenBelt }: PlayCombatProps) {
+  onMasteryJournalChange, currentOutcome, onPreviewBattleEnd, onNewEncounter, belt = [], onOpenBelt, weapons = [] }: PlayCombatProps) {
   const discovery = useContext(PlayDiscoveryMode);
   const addTargetId = useId();
   const [method, setMethod] = usePlayDraftState<EncounterMethod>('method', initialKind === 'overseer' ? 't-overseer' : 'encounter');
@@ -469,7 +472,8 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
         {selected && profile && <>
           <PlayStripPane prefix={toolStrip} id="start" open={tool === 'start'}>
             <PlayDraftScope key={`encounter-start-${lineup.encounterId}`} name={`encounter-start-${lineup.encounterId}`}>
-              <section className="creature-encounter" aria-label="조우 시작"><EncounterStart creature={profile} onResolved={settleStart} /></section>
+              <section className="creature-encounter" aria-label="조우 시작"><EncounterStart creature={profile} onResolved={settleStart}
+                quickWeapon={weapons.some(({ quick }) => quick)} /></section>
             </PlayDraftScope>
           </PlayStripPane>
           <PlayStripPane prefix={toolStrip} id="allocation" open={tool === 'allocation'}>
@@ -493,7 +497,7 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
       {selected && <AttackFollowUpProvider encounterId={lineup.encounterId} targetId={selected.id} readOnly={!fighting || !!selected.status}>
         <PlayDraftScope key={`target-${selected.id}`} name={`target-${selected.id}`}>
           <CreatureCombatCard ref={selectedCard} creature={selected.creature} targetName={selected.label}
-            entry={entryById.get(selected.creature.id)!} summons={summons} showEncounterStart={false} showAftermath={false}
+            entry={entryById.get(selected.creature.id)!} summons={summons} showEncounterStart={false} showAftermath={false} weapons={weapons}
             allowApplyingConditions={fighting && !selected.status} />
         </PlayDraftScope>
       </AttackFollowUpProvider>}

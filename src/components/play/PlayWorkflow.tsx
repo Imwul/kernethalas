@@ -158,6 +158,13 @@ function enterIntoField(field: HTMLInputElement, text: string, done: () => void)
   });
 }
 
+/** What the tray's box accepts: a single die's range, or the dice to type in order. */
+function entryHint(die?: string) {
+  const single = die && /^D(\d+)$/i.exec(die);
+  if (single) return `1–${single[1]}`;
+  return die ? `${die} · 공백으로 구분` : '결과';
+}
+
 type DockTarget = { label: string; die?: string; kind: 'roll' | 'step'; key: string };
 
 export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: () => void }) {
@@ -319,7 +326,7 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
         <label className="sr-only" htmlFor={entryId}>다음 굴림 결과 입력</label>
         <input id={entryId} ref={entryRef} value={entry} onChange={(event) => { setEntry(event.target.value); setNote(''); }}
           inputMode={target.die && /^D\d+$/i.test(target.die) ? 'numeric' : 'text'}
-          autoComplete="off" placeholder={target.die ?? '결과'} aria-describedby={note ? `${entryId}-note` : undefined} />
+          autoComplete="off" placeholder={entryHint(target.die)} aria-describedby={note ? `${entryId}-note` : undefined} />
         <button className="btn" type="submit" aria-label="다음 굴림 결과 확인" disabled={!entry.trim()}>확인</button>
         <RollButton className="play-dock-roll" aria-label="다음 굴림 자동 굴리기" onClick={rollForMe}>
           <span className="play-dock-roll-text">굴리기</span></RollButton>

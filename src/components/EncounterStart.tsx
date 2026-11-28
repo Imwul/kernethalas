@@ -26,13 +26,15 @@ function changeCriticalRoll<T extends RollDraft>(draft: T, roll: string): T {
   return { ...draft, roll, growthRecorded: sameRoll && draft.growthRecorded };
 }
 
-function CheckField({ label, value, set, roll = false, nonnegative = false }: {
+function CheckField({ label, value, set, roll = false, nonnegative = false, scored = true }: {
   label: string; value: string; set: (value: string) => void; roll?: boolean; nonnegative?: boolean;
+  /** A roll counts as done only once the score it is checked against can be read. */
+  scored?: boolean;
 }) {
   const id = useId();
   const parsed = roll ? readOracleValue(value.trim(), 100) : encounterInteger(value);
   const invalid = value.trim() !== '' && (parsed === null || (nonnegative && parsed < 0));
-  const field = usePlayRollField(`encounter:${label}`, label.replace(/ D100$/, ''), 'D100', parsed !== null, true);
+  const field = usePlayRollField(`encounter:${label}`, label.replace(/ D100$/, ''), 'D100', parsed !== null && scored, true);
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
@@ -76,8 +78,10 @@ function EncounterCriticalRecord({ skill, check, recorded, onRecord }: {
   );
 }
 
-export function EncounterStart({ creature, onResolved }: {
+export function EncounterStart({ creature, onResolved, quickWeapon = false }: {
   creature?: Pick<CreatureRecord, 'name' | 'mind' | 'traits'>;
+  /** The PC carries a Quick weapon: Initiative +10 starts on. */
+  quickWeapon?: boolean;
   /** Called with the turn order once it is settled (and any fear check is done), or null while it is open. */
   onResolved?: (summary: string | null, fold: boolean) => void;
 }) {
@@ -96,7 +100,7 @@ export function EncounterStart({ creature, onResolved }: {
   const [surpriseEnemy, setSurpriseEnemy] = usePlayDraftState('start-enemy-surprise', emptyRoll);
   const [initiativeEnemy, setInitiativeEnemy] = usePlayDraftState('start-enemy-initiative', emptyRoll);
   const [followers, setFollowers] = usePlayDraftState('start-followers', '');
-  const [quick, setQuick] = usePlayDraftState('start-quick', false);
+  const [quick, setQuick] = usePlayDraftState('start-quick', quickWeapon);
 
   const mind = mindOverride ?? creature?.mind ?? '';
   const alertActive = knownAlert || alert;
@@ -178,7 +182,8 @@ export function EncounterStart({ creature, onResolved }: {
           <p className="encounter-note">실패하면 Sanity {fearLoss} 손실. 공포 특성이 여럿이면 가장 큰 손실을 적용합니다.</p>
           <div className="encounter-grid">
             <CheckField label="PC Resolve" value={resolve.skill} set={(skill) => setResolve({ ...resolve, skill })} />
-            <CheckField label="Resolve D100" value={resolve.roll} roll set={(roll) => setResolve(changeCriticalRoll(resolve, roll))} />
+            <CheckField label="Resolve D100" value={resolve.roll} roll scored={resolveTarget !== null}
+              set={(roll) => setResolve(changeCriticalRoll(resolve, roll))} />
             <EdgeField label="Resolve 유불리" value={resolveEdge} set={(edge) => setResolve({ ...resolve, edge })} />
           </div>
           {resolveRules.fixed.length > 0 && <p className="encounter-note">광기 적용 후 Resolve {resolveTarget ?? '—'}.</p>}
@@ -213,8 +218,10 @@ export function EncounterStart({ creature, onResolved }: {
           <div className="encounter-grid">
             <CheckField label="PC 최저 Stealth" value={stealth.skill} set={(skill) => setStealth({ ...stealth, skill })} />
             <CheckField label="솔로 동료 수" value={followers} set={setFollowers} nonnegative />
-            <CheckField label="PC 기습 D100" value={stealth.roll} roll set={(roll) => setStealth(changeCriticalRoll(stealth, roll))} />
-            <CheckField label="적 기습 D100" value={surpriseEnemy.roll} roll set={(roll) => setSurpriseEnemy({ ...surpriseEnemy, roll })} />
+            <CheckField label="PC 기습 D100" value={stealth.roll} roll scored={stealthTarget !== null}
+              set={(roll) => setStealth(changeCriticalRoll(stealth, roll))} />
+            <CheckField label="적 기습 D100" value={surpriseEnemy.roll} roll scored={enemyMind !== null}
+              set={(roll) => setSurpriseEnemy({ ...surpriseEnemy, roll })} />
             <EdgeField label="PC 기습 유불리" value={stealthEdge} set={(edge) => setStealth({ ...stealth, edge })} />
             <EdgeField label="적 기습 유불리" value={surpriseEnemy.edge ?? 'none'} set={(edge) => setSurpriseEnemy({ ...surpriseEnemy, edge })} />
           </div>
@@ -240,8 +247,10 @@ export function EncounterStart({ creature, onResolved }: {
           <legend>Initiative · Perception 대 Mind</legend>
           <div className="encounter-grid">
             <CheckField label="PC 최고 Perception" value={perception.skill} set={(skill) => setPerception({ ...perception, skill })} />
-            <CheckField label="PC Initiative D100" value={perception.roll} roll set={(roll) => setPerception(changeCriticalRoll(perception, roll))} />
-            <CheckField label="적 Initiative D100" value={initiativeEnemy.roll} roll set={(roll) => setInitiativeEnemy({ ...initiativeEnemy, roll })} />
+            <CheckField label="PC Initiative D100" value={perception.roll} roll scored={initiativeTarget !== null}
+              set={(roll) => setPerception(changeCriticalRoll(perception, roll))} />
+            <CheckField label="적 Initiative D100" value={initiativeEnemy.roll} roll scored={enemyMind !== null}
+              set={(roll) => setInitiativeEnemy({ ...initiativeEnemy, roll })} />
             <EdgeField label="PC Initiative 유불리" value={initiativeEdge} set={(edge) => setPerception({ ...perception, edge })} />
             <EdgeField label="적 Initiative 유불리" value={initiativeEnemy.edge ?? 'none'} set={(edge) => setInitiativeEnemy({ ...initiativeEnemy, edge })} />
           </div>

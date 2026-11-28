@@ -95,7 +95,9 @@
 .creature-action-discovery .btn,
 .creature-combat-head > .xref { min-block-size: 44px; }
 .creature-combat-head > .xref { display: inline-flex; align-items: center; }
-.creature-enemy-attack { display: grid; gap: var(--s2); min-width: 0; margin-top: var(--s3); }
+.creature-flow:not([hidden]) { display: grid; gap: var(--s3); min-width: 0; margin-top: var(--s3); }
+.creature-flow > * { min-width: 0; margin-block: 0; }
+.creature-enemy-attack { display: grid; gap: var(--s2); min-width: 0; }
 .creature-attack-line { margin: 0; font: 14px/1.6 var(--f-ui); overflow-wrap: anywhere; }
 .creature-attack-line > span { margin-inline-end: var(--s1); color: var(--ink-2); font-size: 13px; }
 .creature-attack-outcome { display: grid; gap: var(--s3); min-width: 0; margin-top: var(--s3); }

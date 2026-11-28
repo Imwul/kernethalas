@@ -38,6 +38,10 @@ test('a PC base attack gets one +10 and a pre-update manually adjusted score sta
   await textbox(check, '공격자 D100').fill('61');
   await textbox(check, '방어자 D100').fill('91');
   await expect(result).toContainText('공격자 명중');
+  // The checkbox appears once the score is typed by hand.
+  await expect(adjusted).toHaveCount(0);
+  await skill.fill('56');
+  await skill.fill('55');
   await adjusted.check();
   await expect(result).toContainText('양쪽 실패');
   await skill.fill('54');

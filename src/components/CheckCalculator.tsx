@@ -36,6 +36,8 @@ interface CreatureAttack {
    * whenever the dice or the outcome change, so entering new rolls starts a new exchange.
    */
   renderOutcome: (outcome: { result: PhysicalAttackResult; exchangeId: string }) => ReactNode;
+  /** The PC's weapon: its Speed lowers the defender's Combat Skill, Simple adds +10 (Core pp.79, 209). */
+  weapon?: { name: string; speed: number; attackBonus: number; skill: string };
 }
 
 type SideId = 'a' | 'b' | 'pc-attack' | 'pc-defense' | 'enemy-attack' | 'enemy-defense';
@@ -140,14 +142,15 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const aKey = creature ? (enemyAttacks ? 'enemy-attack' : 'pc-attack') : 'a';
   const bKey = creature ? (enemyAttacks ? 'pc-defense' : 'enemy-defense') : 'b';
   const enemySkill = creature?.combatSkill;
-  const importedSkill = enemySkill == null ? '' : String(enemySkill + (enemyAttacks ? 10 : 0));
+  const speed = !enemyAttacks ? creature?.weapon?.speed ?? 0 : 0;
+  const importedSkill = enemySkill == null ? '' : String(enemySkill + (enemyAttacks ? 10 : -speed));
   const noRoll = { rollv: '', edge: 'none' as const };
   const pcSheet = creature ? pcCharacter : null;
-  const aSkillName = inputs[aKey]?.growthSkill ?? pcSheet?.character.weapon;
+  const aSkillName = inputs[aKey]?.growthSkill ?? (!enemyAttacks ? creature?.weapon?.skill : undefined) ?? pcSheet?.character.weapon;
   const bSkillName = inputs[bKey]?.growthSkill ?? pcSheet?.character.defense;
   const aRules = pcCheckModifiers(enemyAttacks ? null : pcSheet, aSkillName || '무기 Skill');
   const bRules = pcCheckModifiers(enemyAttacks ? pcSheet : null, bSkillName || 'Dodge');
-  const a = { ...noRoll, skill: creature && enemyAttacks ? importedSkill : pcSheet ? pcSheet.attackSkill : attackOnly ? '' : '60',
+  const a = { ...noRoll, skill: creature && enemyAttacks ? importedSkill : pcSheet ? pcSheet.skill(aSkillName) : attackOnly ? '' : '60',
     ...(pcSheet && !enemyAttacks && aSkillName ? { growthSkill: aSkillName } : {}), ...inputs[aKey], edge: inputs[aKey]?.edge ?? aRules.edge };
   const b = { ...noRoll, skill: creature && !enemyAttacks ? importedSkill : pcSheet ? pcSheet.defenseSkill : attackOnly ? '' : '50',
     ...(pcSheet && enemyAttacks && bSkillName ? { growthSkill: bSkillName } : {}), ...inputs[bKey], edge: inputs[bKey]?.edge ?? bRules.edge };
@@ -160,7 +163,8 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     ? { ...patch, attackSkillKind: scoreKind } : patch);
   const aRoll = readOracleValue(a.rollv.trim(), 100);
   const bRoll = readOracleValue(b.rollv.trim(), 100);
-  const aFixed = pcAttack && scoreKind === 'base' ? [{ label: '공격 기본', value: 10 }] : [];
+  const simple = pcAttack && creature?.weapon?.attackBonus ? [{ label: `${creature.weapon.name} Simple`, value: creature.weapon.attackBonus }] : [];
+  const aFixed = [...(pcAttack && scoreKind === 'base' ? [{ label: '공격 기본', value: 10 }] : []), ...simple];
   const aAdjustments = trackExchange ? skillBreakdown(a.skill, enemyAttacks ? [] : a.modifiers, aFixed) : null;
   const bAdjustments = trackExchange ? skillBreakdown(b.skill, enemyAttacks ? b.modifiers : [], []) : null;
   const aSkill = trackExchange ? aAdjustments?.total ?? null : readAdjustedSkill(a.skill);
@@ -218,9 +222,11 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
         {defenseMode === 'automatic' && <p className="checkcalc-note"><XRef id="unconscious-target">의식 없음·수면·마비</XRef>라면 공격과 방어 굴림 없이 명중합니다.</p>}
       </div>}
       {creature && importedSkill && attackingRolls && (enemyAttacks || defendingRolls) && (
-        <p className="checkcalc-note">적 기본 입력값 {importedSkill}{enemyAttacks && ` (CS ${enemySkill} + 공격 기본 10)`}. 추가 보정은 직접 반영하세요.</p>
+        <p className="checkcalc-note">적 기본 입력값 {importedSkill}{enemyAttacks ? ` (CS ${enemySkill} + 공격 기본 10)`
+          : speed ? ` (CS ${enemySkill} − ${creature.weapon?.name} Speed ${speed})` : ''}. 추가 보정은 직접 반영하세요.</p>
       )}
-      {pcAttack && <label className="checkcalc-score-kind">
+      {/* Only a hand-typed score can already include the +10; the sheet's base value always gets it added. */}
+      {pcAttack && (inputs[aKey]?.skill !== undefined || scoreKind === 'adjusted') && <label className="checkcalc-score-kind">
         <input type="checkbox" checked={scoreKind === 'adjusted'}
           onChange={(event) => setSide(aKey, { attackSkillKind: event.target.checked ? 'adjusted' : 'base' })} />
         공격 기본 +10이 이미 포함된 수치

@@ -30,6 +30,7 @@ import { useKeepAwakePreference, useScreenWakeLock, wakeLockSupported } from '..
 import { focusNextPlayAction, focusPlayRoll, PlayActionBar, PlayRollHistory, readPlaySessionPoint, usePhysicalFirst, usePlayPreference } from '../components/play/PlayWorkflow';
 import { BESTIARY_CREATURE_PARAM } from '../lib/bestiary-encounter';
 import { formatCombatDamage, readCombatDamageRecords } from '../lib/combat-damage-records';
+import { carriedWeapons } from '../lib/play-weapons';
 import { creatureSpoilsTables } from '../lib/creature-combat';
 import { readEncounterLibrary, storeEncounterLibrary, type EncounterSet } from '../lib/custom-encounters';
 import type { RequiredExplorationRoll } from '../lib/exploration-follow-up';
@@ -200,6 +201,12 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
   const [sessionEditing, setSessionEditing] = useState(false);
   const sessionId = useId();
   const sessionButton = useRef<HTMLButtonElement>(null);
+  // On phones the session button lives in the "⋯" menu, so focus returns to that menu's trigger.
+  const focusSessionEntry = () => {
+    const button = sessionButton.current;
+    const target = button?.getClientRects().length ? button : document.querySelector<HTMLElement>('.play-more-menu .play-popover-trigger');
+    target?.focus({ preventScroll: true });
+  };
   const lastRollField = useRef<Partial<Record<StageId, string>>>({});
   const [revision, setRevision] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -891,11 +898,15 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                 onClick={toggleKeepAwake}>화면 켜 두기</button>}
             </div>
           </PlayPopover>
-          {!showWorkspace && <button className="btn ghost" type="button" ref={sessionButton} aria-expanded={sessionEditing || !!pause}
+          {!showWorkspace && <button className="btn ghost play-session-open" type="button" ref={sessionButton} aria-expanded={sessionEditing || !!pause}
             aria-controls={sessionVisible ? sessionId : undefined} onClick={() => setSessionEditing(true)}>오늘 여기까지</button>}
           {/* Discarding the place is rare and destructive, so it sits behind the "⋯" menu instead of beside the session button. */}
           {!showWorkspace && <PlayPopover className="play-more-menu" label="그 밖의 동작" align="end" open={moreOpen} onOpenChange={setMoreOpen}
             trigger={<span aria-hidden="true">⋯</span>}>
+            {/* Phones keep the header to one row: ending the session moves into this menu there. */}
+            <button className="play-menu-item play-session-item" type="button" aria-expanded={sessionEditing || !!pause}
+              aria-controls={sessionVisible ? sessionId : undefined}
+              onClick={() => { setMoreOpen(false); setSessionEditing(true); }}>오늘 여기까지</button>
             <button className="play-menu-item" type="button" aria-expanded={confirmReset} aria-controls="play-reset"
               onClick={() => { setMoreOpen(false); setConfirmReset(true); }}>이번 장소 지우기…</button>
           </PlayPopover>}
@@ -903,8 +914,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
       </header>
       {sessionVisible && <PlaySessionPanel id={sessionId} editing={sessionEditing} pause={pause} nextIntent={session.nextIntent} place={sessionPlace} facts={sessionFacts}
         onPause={savePause} onResume={resumeSession} onEdit={() => setSessionEditing(true)}
-        onComplete={() => { setSession(EMPTY_SESSION); requestAnimationFrame(() => sessionButton.current?.focus({ preventScroll: true })); }}
-        onClose={() => { setSessionEditing(false); sessionButton.current?.focus({ preventScroll: true }); }} />}
+        onComplete={() => { setSession(EMPTY_SESSION); requestAnimationFrame(focusSessionEntry); }}
+        onClose={() => { setSessionEditing(false); focusSessionEntry(); }} />}
       {showCharacterWorkspace && <PlayCharacterWorkspace onboarding={needsCharacterSetup} view={characterView}
         onView={setCharacterView} onBack={backFromCharacterWorkspace} onFinish={finishCharacterWorkspace} onApplyGear={applyStartingGear} onUndoGear={undoGearGrant} />}
       {!showCharacterWorkspace && domainSetup && <PlayDomainSetup onStart={() => {
@@ -1013,6 +1024,7 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
                   onNewEncounter={() => startCombat('encounter', `manual-${crypto.randomUUID()}`)}
                   bestiaryCreatureId={bestiaryCreature} onCloseBestiaryRequest={closeBestiaryRequest}
                   belt={gear.ledger.items.filter(({ count, location }) => location === 'belt' && count > 0)} onOpenBelt={openInventory}
+                  weapons={carriedWeapons(gear.ledger.items)}
                   onMasterySheetChange={reportMasterySheet} onMasteryJournalChange={reportMasteryLine}
                   onCreatureChange={chooseCreature} onTargetsChange={reportTargets} onBattleEnd={endBattle} />
               </PlayDraftScope>
@@ -1084,6 +1096,12 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
               {sheet.length > 0 && (
                 <fieldset className="play-sheet">
                   <legend>종이 시트에 반영</legend>
+                  {sheet.length > 1 && sheet.some(({ id, text }) => !appliedKeys.includes(`${id}:${text}`)) && (
+                    <button className="btn ghost play-sheet-all" type="button" onClick={() => setApplied((old) => [
+                      ...old, ...sheet.filter((item) => !old.some((done) => paperReceiptKey(done) === `${item.id}:${item.text}`))
+                        .map(({ id, text }) => ({ id, text })),
+                    ])}>모두 반영함</button>
+                  )}
                   {sheet.map(({ id, text }) => {
                     const key = `${id}:${text}`;
                     return <label key={key}><input type="checkbox" checked={appliedKeys.includes(key)}
