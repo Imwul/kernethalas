@@ -160,13 +160,14 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
     ? { ...patch, attackSkillKind: scoreKind } : patch);
   const aRoll = readOracleValue(a.rollv.trim(), 100);
   const bRoll = readOracleValue(b.rollv.trim(), 100);
-  const attackField = usePlayRollField(`attack:${aKey}`, attack ? '공격자' : 'A', 'D100', aRoll !== null, true);
-  const defenseField = usePlayRollField(`attack:${bKey}`, attack ? '방어자' : 'B', 'D100', bRoll !== null, true);
   const aFixed = pcAttack && scoreKind === 'base' ? [{ label: '공격 기본', value: 10 }] : [];
   const aAdjustments = trackExchange ? skillBreakdown(a.skill, enemyAttacks ? [] : a.modifiers, aFixed) : null;
   const bAdjustments = trackExchange ? skillBreakdown(b.skill, enemyAttacks ? b.modifiers : [], []) : null;
   const aSkill = trackExchange ? aAdjustments?.total ?? null : readAdjustedSkill(a.skill);
   const bSkill = trackExchange ? bAdjustments?.total ?? null : readAdjustedSkill(b.skill);
+  // A die counts as done only once its check can be read, so the dice tray keeps pointing here while a score is missing.
+  const attackField = usePlayRollField(`attack:${aKey}`, attack ? '공격자' : 'A', 'D100', aRoll !== null && aSkill !== null, true);
+  const defenseField = usePlayRollField(`attack:${bKey}`, attack ? '방어자' : 'B', 'D100', bRoll !== null && bSkill !== null, true);
   const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, a.edge);
   const cb = bRoll === null || bSkill === null ? null : resolveCheck(d100FromValue(bRoll), bSkill, b.edge);
   const result = attack ? resolvePhysicalAttack(defenseMode, ca, cb) : null;

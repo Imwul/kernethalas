@@ -50,6 +50,7 @@
 }
 
 .play-desk {
+  --play-dock-h: 74px;
   --play-sticky-top: calc(var(--header-h) + 1px);
   --play-stage-top: calc(var(--play-sticky-top) + var(--play-bar-h, 46px));
   container: play-desk / inline-size;
@@ -350,11 +351,11 @@ details.play-domain { margin-block: 0 var(--s3); }
   .play-context {
     position: sticky;
     top: calc(var(--play-stage-top) + var(--s3));
-    max-height: calc(100dvh - var(--play-stage-top) - var(--s5));
+    /* stops above the dice tray, so the end of a docked drawer can still be reached */
+    max-height: calc(100dvh - var(--play-stage-top) - var(--s5) - var(--play-dock-h));
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .play-context > .play-action-bar { position: sticky; inset-block-start: 0; z-index: 2; }
   .play-desk[data-drawer] .play-context > :is(.play-context-facts, .play-context-refs) { display: none; }
 }
 @container play-desk (width >= 1040px) {

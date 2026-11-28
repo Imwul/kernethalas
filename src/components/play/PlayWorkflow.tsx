@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { parseDice, rollDie } from '../../lib/dice';
 import { usePlayDraft } from '../../lib/play-draft';
 import { planRollCorrection, type PlayRollEntry } from '../../lib/play-roll-history';
 import { shortSessionText, type SessionPoint } from '../../lib/play-session';
 import { PLAY_DRAWER_EVENT, PLAY_DRAWER_ID } from './PlayDrawer';
+import { RollButton } from '../RollButton';
 
 const FIELD = 'input[data-play-roll-field]';
 const ACTION = '[data-play-next]';
@@ -122,9 +124,50 @@ export function focusNextPlayAction(stage: Stage) {
   else focusPlayRoll(stage);
 }
 
+/** Faces for a die expression such as 'D100', '2D6' or 'D6+D6+2', in the order a typed entry lists them. */
+function rollFaces(die: string) {
+  const terms = die.split(/\+(?=\s*\d*d)/i).map(parseDice);
+  if (!terms.length || terms.some((term) => term === null)) return null;
+  const faces = terms.flatMap((term) => Array.from({ length: term!.count }, () => rollDie(term!.sides)));
+  return faces.map(String);
+}
+
+/** The roll button that belongs to this field: the nearest one around it, if only one is there. */
+function ownRollButton(field: HTMLElement) {
+  for (let node = field.parentElement; node && !node.matches('.play-stage, .play-drawer'); node = node.parentElement) {
+    const buttons = Array.from(node.querySelectorAll<HTMLButtonElement>('button.roll')).filter(canReach);
+    if (buttons.length === 1) return buttons[0];
+    if (buttons.length > 1) return null;
+  }
+  return null;
+}
+
+/**
+ * Types a result into a tool's own field and submits it the way that tool expects: the tool's state takes the typed
+ * value first, then its form is submitted a frame later, exactly as if the player had typed there and pressed Enter.
+ */
+function enterIntoField(field: HTMLInputElement, text: string, done: () => void) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, text);
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  requestAnimationFrame(() => {
+    if (field.isConnected) {
+      if (field.form) field.form.requestSubmit();
+      else field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    }
+    requestAnimationFrame(() => requestAnimationFrame(done));
+  });
+}
+
+type DockTarget = { label: string; die?: string; kind: 'roll' | 'step'; key: string };
+
 export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: () => void }) {
   const draft = usePlayDraft()!;
-  const [target, setTarget] = useState<{ label: string; die?: string } | null>(null);
+  const [target, setTarget] = useState<DockTarget | null>(null);
+  const [entry, setEntry] = useState('');
+  const [note, setNote] = useState('');
+  const entryId = useId();
+  const entryRef = useRef<HTMLInputElement>(null);
+  const element = useRef<HTMLElement | null>(null);
   const barRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const bar = barRef.current;
@@ -170,9 +213,14 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const action = nextAction(section);
+        element.current = action ?? null;
         const label = action?.dataset.playRollLabel ?? action?.textContent?.trim();
         const die = action?.dataset.playRollDie;
-        setTarget(label ? { label, die: die || undefined } : null);
+        const kind = action instanceof HTMLInputElement ? 'roll' : 'step';
+        const key = `${kind}:${action?.dataset.playRollField ?? label ?? ''}`;
+        setTarget((previous) => !label ? null
+          : previous && previous.key === key && previous.label === label && previous.die === (die || undefined) ? previous
+            : { label, die: die || undefined, kind, key });
       });
     };
     const observer = new MutationObserver(update);
@@ -188,10 +236,55 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
   }, [stage]);
 
   const jump = () => focusNextPlayAction(stage);
+  useEffect(() => { setNote(''); }, [target?.key]);
+
+  // The dock takes the result for whichever tool asks next, so the player never hunts for the field.
+  const submitEntry = (event: FormEvent) => {
+    event.preventDefault();
+    const field = element.current;
+    const text = entry.trim();
+    if (!(field instanceof HTMLInputElement) || !field.isConnected || !text) return;
+    const keepTyping = document.activeElement === entryRef.current;
+    const anchor = field.closest<HTMLElement>('form, fieldset, section') ?? field;
+    const fieldKey = field.dataset.playRollField;
+    setEntry('');
+    enterIntoField(field, text, () => {
+      const stuck = field.isConnected && (field.getAttribute('aria-invalid') === 'true'
+        || (field.dataset.playRollField === fieldKey && field.matches('[data-play-roll-pending]') && field.value.trim() !== ''));
+      if (stuck) {
+        // Usually a score the check needs (Spellward 수치, 공격자 수치): point at that field, not the die.
+        const missing = Array.from(anchor.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"]):not([type="radio"])'))
+          .find((input) => input !== field && canReach(input) && input.value.trim() === '');
+        const name = missing?.labels?.[0]?.textContent?.trim() || missing?.getAttribute('aria-label');
+        setNote(name ? `먼저 입력할 값 · ${name}` : '이 판정에 필요한 값을 도구에서 확인하세요.');
+        focusControl(missing ?? field);
+        return;
+      }
+      if (anchor.isConnected) anchor.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (keepTyping) entryRef.current?.focus({ preventScroll: true });
+    });
+  };
+  const rollForMe = () => {
+    const field = element.current;
+    if (!(field instanceof HTMLInputElement) || !field.isConnected) return;
+    const button = ownRollButton(field);
+    if (button) {
+      const anchor = field.closest<HTMLElement>('form, fieldset, section') ?? field;
+      button.click();
+      requestAnimationFrame(() => requestAnimationFrame(() => anchor.isConnected && anchor.scrollIntoView({ block: 'center', behavior: 'smooth' })));
+      return;
+    }
+    const faces = target?.die ? rollFaces(target.die) : null;
+    if (faces) setEntry(faces.join(' '));
+  };
+  const runStep = () => {
+    const step = element.current;
+    if (step && step.isConnected && !(step instanceof HTMLInputElement)) step.click();
+  };
 
   // Hardware keyboards (iPad, laptop): N jumps to the next action, U undoes the last roll.
-  const shortcuts = useRef({ jump, undo: draft.undoRoll, canUndo: draft.canUndo });
-  shortcuts.current = { jump, undo: draft.undoRoll, canUndo: draft.canUndo };
+  const shortcuts = useRef({ jump, undo: draft.undoRoll, canUndo: draft.canUndo, rolling: false });
+  shortcuts.current = { jump, undo: draft.undoRoll, canUndo: draft.canUndo, rolling: target?.kind === 'roll' };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -199,6 +292,12 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
       if (target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog:modal')) return;
       const key = event.key.toLowerCase();
       if (key === 'n') { event.preventDefault(); shortcuts.current.jump(); }
+      // Typing a number anywhere on the desk starts the next roll's entry in the tray.
+      else if (/^[0-9]$/.test(key) && shortcuts.current.rolling && entryRef.current) {
+        event.preventDefault();
+        setEntry(key);
+        entryRef.current.focus({ preventScroll: true });
+      }
       else if (key === 'u' && shortcuts.current.canUndo) { event.preventDefault(); shortcuts.current.undo(); }
     };
     window.addEventListener('keydown', onKey);
@@ -206,21 +305,33 @@ export function PlayActionBar({ stage, onHistory }: { stage: Stage; onHistory: (
   }, []);
 
   return (
-    <section className="play-action-bar" aria-label="다음 행동 바로가기" ref={barRef}>
-      <button className="btn play-jump-roll" aria-label={target ? '다음 행동' : '현재 단계로 이동'}
+    <section className="play-action-bar play-dock" aria-label="다음 행동 바로가기" ref={barRef} data-kind={target?.kind ?? 'idle'}>
+      <button className="play-jump-roll" aria-label={target ? '다음 행동' : '현재 단계로 이동'}
         aria-keyshortcuts="N" title="단축키 N"
         aria-describedby="play-jump-roll-target" type="button" onClick={jump}>
-        <span>{target ? '다음 행동' : '현재 단계'}</span>
+        <span>{target?.kind === 'step' ? '다음 단계' : '다음 굴림'}</span>
         <strong id="play-jump-roll-target">
-          {target ? target.label : '단계 맨 위로'}
+          {target ? target.label : '남은 굴림 없음'}
           {target?.die && <> <span className="play-jump-die"><span className="sr-only">· </span>{target.die}</span></>}
         </strong>
       </button>
+      {target?.kind === 'roll' && <form className="play-dock-entry" onSubmit={submitEntry} noValidate>
+        <label className="sr-only" htmlFor={entryId}>다음 굴림 결과 입력</label>
+        <input id={entryId} ref={entryRef} value={entry} onChange={(event) => { setEntry(event.target.value); setNote(''); }}
+          inputMode={target.die && /^D\d+$/i.test(target.die) ? 'numeric' : 'text'}
+          autoComplete="off" placeholder={target.die ?? '결과'} aria-describedby={note ? `${entryId}-note` : undefined} />
+        <button className="btn" type="submit" aria-label="다음 굴림 결과 확인" disabled={!entry.trim()}>확인</button>
+        <RollButton className="play-dock-roll" aria-label="다음 굴림 자동 굴리기" onClick={rollForMe}>
+          <span className="play-dock-roll-text">굴리기</span></RollButton>
+      </form>}
+      {target?.kind === 'step' && <button className="btn primary play-dock-step" type="button" aria-label="다음 단계 진행"
+        aria-describedby="play-jump-roll-target" onClick={runStep}>진행</button>}
       <div className="play-action-bar-tools">
         <button className="btn ghost" type="button" aria-label="직전 굴림 되돌리기" aria-keyshortcuts="U" title="단축키 U"
-          disabled={!draft.canUndo} onClick={draft.undoRoll}>되돌리기</button>
-        <button className="btn ghost" type="button" aria-label="이번 장소 굴림 이력으로 이동" onClick={onHistory}>굴림 이력</button>
+          disabled={!draft.canUndo} onClick={draft.undoRoll}><span aria-hidden="true">↶</span><span className="play-dock-tool-text">되돌리기</span></button>
+        <button className="btn ghost play-dock-history" type="button" aria-label="이번 장소 굴림 이력으로 이동" onClick={onHistory}>굴림 이력</button>
       </div>
+      {note && <p className="play-dock-note" id={`${entryId}-note`} role="status">{note}</p>}
     </section>
   );
 }

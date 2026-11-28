@@ -150,6 +150,8 @@ html:has(.play-desk[data-character-workspace]) { overflow-anchor: none; }
 }
 @container play-desk (width >= 1040px) {
   .play-character-tabs { inset-block-start: var(--play-stage-top, 0px); }
+  /* docked in the side column, which scrolls on its own: the tabs stick to its top */
+  .play-context .play-character-tabs { inset-block-start: 0; }
 }
 .play-character-tabs button {
   display: grid;

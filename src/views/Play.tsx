@@ -1117,7 +1117,6 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           </section>
         </div>
         <aside className="play-context" aria-label="플레이 중 참고">
-          <PlayActionBar stage={active} onHistory={goToRollHistory} />
           <PlayDrawer tabs={drawerTabs} active={showWorkspace ? null : drawer} modal={drawerModal} onSelect={(id) => openDrawer(id)} onClose={() => {
             const opener = drawer && document.querySelector<HTMLElement>(`.play-tray-item[aria-expanded="true"]`);
             setDrawer(null);
@@ -1137,6 +1136,8 @@ function PlayDesk({ focusMode, toggleFocusMode }: { focusMode: boolean; toggleFo
           </section>}
         </aside>
       </div>
+      {/* The dice tray: the next roll any tool asks for is entered here, at the same place on every stage. */}
+      {!showWorkspace && <PlayActionBar stage={active} onHistory={goToRollHistory} />}
     </div>
     </PlayDiscoveryMode.Provider>
     </CharacterRoomContext.Provider>
