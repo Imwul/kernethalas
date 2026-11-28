@@ -23,63 +23,27 @@ async function necropede(page: Page) {
   return combat;
 }
 
-test('manual damage keeps its target and location through another attack and lets a paper receipt be corrected', async ({ page }) => {
+test('combat damage is calculated in place and never written to the journal', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 880 });
   await page.goto('/play');
   const combat = await necropede(page);
   const card = combat.getByRole('region', { name: '전투 카드' });
+  await button(card, 'PC 공격').click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
-  await button(card, '공격 판정').click();
   await input(attack, '공격자 수치').fill('55');
   await input(attack, '공격자 D100').fill('12');
   await input(attack, '방어자 D100').fill('90');
-  await button(attack, '적 명중 부위 보기').click();
-  const hit = card.getByRole('region', { name: '표 굴리기', exact: true });
-  await roll(hit, '4');
-  await button(card, '이 부위로 피해 계산').click();
+  await roll(card.getByRole('region', { name: '적 명중 부위' }), '4');
   const damage = card.getByRole('region', { name: '피해 계산기', exact: true });
   await input(damage, '선택 주사위').fill('6');
   await damage.getByRole('combobox', { name: '피해 유형' }).selectOption('Piercing');
-  await button(damage, '피해 기록').click();
-  await expect(button(damage, '피해 기록됨')).toBeDisabled();
+  await expect(damage.getByRole('status')).toContainText('Piercing');
+  await expect(damage.getByRole('button', { name: /피해 기록/ })).toHaveCount(0);
+
+  await stage(page, '저널');
   const journal = page.getByRole('region', { name: '이번 장소 기록' });
-  await stage(page, '저널');
-  const paper = journal.getByRole('group', { name: '종이 시트에 반영' });
-  const first = paper.getByRole('checkbox', { name: /^Necropede · .+ · 피해 6 Piercing$/ });
-  await expect(first).toBeVisible();
-  await first.check();
-
-  await stage(page, '조우·전투');
-  await input(damage, '선택 주사위').fill('7');
-  await button(damage, '피해 기록 수정').click();
-  await stage(page, '저널');
-  const correction = journal.getByRole('region', { name: '종이 시트 정정표' });
-  await expect(correction).toContainText('피해 6 Piercing');
-  await expect(correction).toContainText('피해 7 Piercing');
-  await button(page, '직전 굴림 되돌리기').click();
-  await expect(first).toBeChecked();
-  await expect(correction).toHaveCount(0);
-
-  await stage(page, '조우·전투');
-  await button(card, '공격 판정').click();
-  await button(attack, '적 명중 부위 보기').click();
-  await expect(button(card, '이 부위로 피해 계산')).toBeVisible();
-  await button(card, '공격 판정').click();
-  await button(attack, '다음 공격').click();
-  await button(card, '피해 계산').click();
-  await button(card.getByRole('group', { name: '피해를 받는 쪽' }), 'PC').click();
-  const incoming = card.getByRole('region', { name: 'PC 받는 피해 계산기' });
-  await button(incoming, '확정 피해').click();
-  await input(incoming, '확정 피해량').fill('5');
-  await incoming.getByRole('combobox', { name: '피해 유형 (선택)' }).selectOption('Poison');
-  await input(incoming, '현재 Toughness').fill('3');
-  await button(incoming, '피해 기록').click();
-  await stage(page, '저널');
-  await expect(first).toBeChecked();
-  await expect(paper.getByRole('checkbox', { name: 'Necropede → PC · 피해 5 Poison · Toughness −3 · Health −2' })).toBeVisible();
-  await page.reload();
-  await expect(journal).toContainText('Toughness −3 · Health −2');
-  await expect(first).toBeChecked();
+  await expect(journal).not.toContainText('피해 12 Piercing');
+  await expect(journal.getByRole('checkbox', { name: /Necropede · .* · 피해/ })).toHaveCount(0);
 });
 
 test('a completed fight shows exactly which rewards change before saving the correction', async ({ page }) => {

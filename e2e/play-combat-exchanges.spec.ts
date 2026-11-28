@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openDrawer, openPane } from './helpers/play-desk';
+import { openPane } from './helpers/play-desk';
 import { choose } from './helpers/choice';
 
 async function go(page: Page, stage: string) {
@@ -24,69 +24,61 @@ async function roll(scope: Locator, label: string, value: string) {
   await field.press('Enter');
 }
 
-test('an attack exchange records the pair once and keeps skills for the next attack', async ({ page }) => {
+test('an attack needs no confirmation and keeps skills while new dice start the next exchange', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await selectCreature(combat, 'Necropede');
-  await combat.getByRole('button', { name: '공격 판정', exact: true }).click();
-  const attack = combat.getByRole('region', { name: '공격 판정 해석기' });
+  const card = combat.getByRole('region', { name: '전투 카드' });
+  await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
+  const attack = card.getByRole('region', { name: '공격 판정 해석기' });
   const input = (name: string) => attack.getByRole('textbox', { name, exact: true });
-  const confirm = attack.getByRole('button', { name: '공격 교환 확정' });
+  const result = attack.getByRole('status', { name: '공격 판정 결과' });
   await input('공격자 수치').fill('61');
   await input('공격자 D100').fill('00');
   await input('방어자 수치').fill('42');
-  await expect(confirm).toBeDisabled();
   await input('방어자 D100').fill('31');
-  await confirm.click();
-  await expect(input('공격자 D100')).toBeDisabled();
-  await attack.getByRole('button', { name: '적이 공격', exact: true }).click();
+  await expect(result).toContainText('방어 성공');
+  await expect(attack.getByRole('group', { name: '적 방어 동작 D10', exact: true })).toBeVisible();
+  await expect(attack.getByRole('button', { name: /공격 교환 확정|다음 공격/ })).toHaveCount(0);
+
+  await input('공격자 D100').fill('12');
+  await input('방어자 D100').fill('90');
+  await expect(result).toContainText('공격자 명중');
+  await expect(attack.getByRole('group', { name: '적 방어 동작 D10', exact: true })).toHaveCount(0);
+  await expect(card.getByRole('region', { name: '적 명중 부위' })).toBeVisible();
+
   await combat.getByRole('button', { name: '같은 생물 추가' }).click();
-  await openDrawer(page, '이력');
-  const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  const record = history.getByRole('button', { name: /공격 교환 · PC → Necropede(?: 1)? D100 × 2 공격 00 \/ 방어 31.*수정 미리보기$/ });
-  await expect(record).toHaveCount(1);
-  await record.click();
-  await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
-  await expect(combat.getByRole('heading', { name: 'Necropede 1', exact: true })).toBeVisible();
-  await expect(attack.getByRole('button', { name: 'PC가 공격', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(input('공격자 D100')).toBeFocused();
-  await expect(input('공격자 D100')).toBeEditable();
-  await confirm.click();
+  await expect(input('공격자 D100')).toHaveCount(0);
   await page.reload();
-  await attack.getByRole('button', { name: '다음 공격', exact: true }).click();
-  await expect(input('공격자 D100')).toBeFocused();
-  await expect(input('공격자 D100')).toHaveValue('');
-  await expect(input('방어자 D100')).toHaveValue('');
+  await go(page, '조우·전투');
+  await combat.getByRole('group', { name: '전투 대상', exact: true }).getByRole('button', { name: 'Necropede 1', exact: true }).click();
   await expect(input('공격자 수치')).toHaveValue('61');
   await expect(input('방어자 수치')).toHaveValue('42');
-  await openDrawer(page, '이력');
-  await expect(record).toHaveCount(1);
+  await expect(input('공격자 D100')).toHaveValue('12');
 });
 
-test('correcting a confirmed pair also rewinds its dependent hit-location roll', async ({ page }) => {
+test('changing the attack dice clears its hit location, and the same dice bring it back', async ({ page }) => {
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = page.getByRole('region', { name: '조우와 전투 도구' });
   await selectCreature(combat, 'Necropede');
   const card = combat.getByRole('region', { name: '전투 카드' });
-  await card.getByRole('button', { name: '공격 판정', exact: true }).click();
+  await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
+  const attacker = attack.getByRole('textbox', { name: '공격자 D100', exact: true });
   await attack.getByRole('textbox', { name: '공격자 수치' }).fill('61');
-  await attack.getByRole('textbox', { name: '공격자 D100', exact: true }).fill('12');
+  await attacker.fill('13');
   await attack.getByRole('textbox', { name: '방어자 D100', exact: true }).fill('90');
-  await attack.getByRole('button', { name: '적 명중 부위 보기' }).click();
-  await roll(card.getByRole('region', { name: '표 굴리기', exact: true }), '직접 굴린 값', '1');
+  const location = card.getByRole('region', { name: '적 명중 부위' });
+  await roll(location, '직접 굴린 값', '20');
+  await expect(location.getByRole('status')).toContainText('머리');
 
-  await openDrawer(page, '이력');
-  const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  await history.getByRole('button', { name: /공격 교환 · PC → Necropede D100 × 2 공격 12 \/ 방어 90.*수정 미리보기$/ }).click();
-  await expect(history.getByRole('group', { name: '굴림 수정 미리보기' })).toContainText('D20 1 다시 확인');
-  await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
-  await expect(attack.getByRole('textbox', { name: '공격자 D100', exact: true })).toBeFocused();
-  await openDrawer(page, '이력');
-  await expect(history.getByRole('button', { name: /D20 1 수정 미리보기/ })).toHaveCount(0);
+  await attacker.fill('14');
+  await expect(location.getByRole('status')).not.toContainText('머리');
+  await attacker.fill('13');
+  await expect(location.getByRole('status')).toContainText('머리');
 });
 
 test('marked defeats drive creature spoils and unmarked targets can still be fought', async ({ page }) => {

@@ -206,7 +206,7 @@ test('an imported checkpoint previews the difference and opens a separate campai
   await expect(page.getByRole('region', { name: '현재 장비와 소모 내역' })).toContainText('Torch');
 });
 
-test('a later checkpoint retains map edits, resolved search rewards and battle round reminders', async ({ page }) => {
+test('a later checkpoint retains map edits, resolved search rewards and the enemy attack in progress', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/play');
   const explore = page.getByRole('region', { name: '장소 탐험' });
@@ -235,24 +235,22 @@ test('a later checkpoint retains map edits, resolved search rewards and battle r
   await choose(combat, '조우 방식', 'search');
   await combat.getByRole('searchbox', { name: '생물 이름', exact: true }).fill('Necropede');
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
-  await openPane(combat, '라운드');
-  const board = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
-  await board.getByRole('button', { name: '다음 라운드' }).click();
-  await board.getByText('확인 항목 추가', { exact: true }).click();
-  await board.getByRole('button', { name: '효과 추가' }).click();
-  await board.getByRole('checkbox', { name: '확인 · 출혈' }).check();
+  const card = combat.getByRole('region', { name: '전투 카드' });
+  await enter(card, '직접 굴린 값', '1');
+  const attackRoll = card.getByRole('region', { name: '적 공격' }).getByRole('textbox', { name: '공격자 D100', exact: true });
+  await attackRoll.fill('31');
 
   const panel = page.locator('.play-checkpoints');
   await openDrawer(page, '저장');
   await panel.getByRole('button', { name: '저장 지점 만들기', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('B-07 저장 완료');
-  await board.getByRole('button', { name: '다음 라운드' }).click();
+  await attackRoll.fill('55');
   await panel.getByRole('button', { name: 'B-07 이어서 하기', exact: true }).click();
   const review = reviewFor(panel);
   await expect(review).toContainText('B-07 · 조우·전투');
   await review.getByRole('button', { name: '복원하고 이어하기', exact: true }).click();
-  await expect(board.getByRole('status')).toContainText('2라운드');
-  await expect(board.getByRole('checkbox', { name: '확인 · 출혈' })).toBeChecked();
+  await expect(card.locator('.creature-attack-line')).toContainText('Bone Slam');
+  await expect(attackRoll).toHaveValue('31');
   await page.getByRole('button', { name: '탐험', exact: true }).click();
   await expect(explore.getByRole('img', { name: '29번 방 모양 예시 · 출입구 8개' }).locator('g[transform^=rotate]')).toHaveCount(1);
   await expect(search.getByRole('group', { name: 'Cooking Ingredients 수량 D4' })).toBeVisible();

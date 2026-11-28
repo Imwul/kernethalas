@@ -86,23 +86,22 @@ export function LingeringEntryAlert() {
   );
 }
 
-/** In a fight: each round's Bleeding/Poisoned damage and the PC's answers (Endurance against poison, putting out fire). */
-export function CombatLingeringAlert({ onOpenRound }: { onOpenRound: () => void }) {
+/**
+ * In a fight: each round's Bleeding/Poisoned damage and the PC's answers (Endurance against poison, putting out fire).
+ * Applying a round's damage moves on to the next round; there is no separate turn tracker.
+ */
+export function CombatLingeringAlert() {
   const play = usePlayDraft();
   const { current, setCondition, setLevel, addCondition } = usePlayOngoingEffects();
   const commit = usePlayRoll();
   const log = useCharacterLog();
-  const [position] = useCombatPosition();
-  const battleId = typeof play?.slots.combat === 'string' ? play.slots.combat : 'place';
-  const legacyRounds = play?.slots[`combat/${encodeURIComponent(battleId)}/lingering-rounds`];
-  const [rounds, setRounds] = usePlayDraftState<number[]>('lingering-rounds', Array.isArray(legacyRounds) ? legacyRounds : []);
+  const [position, setPosition] = useCombatPosition();
   const [withFire, setWithFire] = usePlayDraftState('lingering-round-fire', false);
   const [resisted, setResisted] = usePlayDraftState<number[]>('poison-resisted-rounds', []);
   if (!play) return null;
   const level = (id: LingeringCondition) => current.levels?.[id] ?? 1;
   const active = current.conditions;
   const { round } = position;
-  const pcTurn = position.actor === 'pc' && position.timing === 'start';
   const origin = current.poisonOrigin;
   const delayed = !!origin && origin.encounter === activeConditionOrigin(play.slots)?.encounter && round <= origin.round;
   const resistanceUsed = resisted.includes(round);
@@ -112,7 +111,6 @@ export function CombatLingeringAlert({ onOpenRound }: { onOpenRound: () => void 
     active.includes('bleeding') && `출혈 ${level('bleeding')}`, active.includes('poisoned') && `중독 ${level('poisoned')}`,
     withFire && active.includes('burning') && '화상 1',
   ].filter(Boolean);
-  const done = rounds.includes(round);
   const resist = (result: CheckResult) => {
     setResisted((previous) => [...previous, round]);
     if (!skillCheckSucceeded(result)) return;
@@ -130,9 +128,9 @@ export function CombatLingeringAlert({ onOpenRound }: { onOpenRound: () => void 
     );
   }
   return (
-    <section className={`play-alert${damage && !done ? ' is-danger' : ''}`} aria-label="전투 중 지속 피해">
-      <p className="play-alert-title" role={!done && damage > 0 ? 'alert' : undefined}>
-        {round}라운드 지속 피해{damage ? ` · ${damage} (Armor 무시)` : ''}{done ? ' · 기록함' : ''}</p>
+    <section className={`play-alert${damage ? ' is-danger' : ''}`} aria-label="전투 중 지속 피해">
+      <p className="play-alert-title" role={damage > 0 ? 'alert' : undefined}>
+        {round}라운드 지속 피해{damage ? ` · ${damage} (Armor 무시)` : ''}</p>
       <div className="play-lingering-levels">
         {active.map((id) => <div key={id} className="play-lingering-level">
           <span className="status-label"><StatusIcon kind={id} />{LABEL[id]}</span>
@@ -149,21 +147,20 @@ export function CombatLingeringAlert({ onOpenRound }: { onOpenRound: () => void 
       </div>
       {active.includes('burning') && <p className="play-exhaustion-note">화상의 피해 주기는 책에 적혀 있지 않습니다. 라운드마다 넣을지 직접 정하세요.</p>}
       <div className="play-character-node-actions">
-        <button type="button" className={done ? 'btn ghost' : 'btn primary'} disabled={!damage || done} onClick={() => commit(() => {
+        <button type="button" className="btn primary" disabled={!damage} onClick={() => commit(() => {
           log([`${round}라운드 지속 피해 ${damage} (${parts.join(' · ')} · Armor 무시)`]);
-          setRounds((previous) => [...previous, round]);
-        }, playAction(`${round}라운드 지속 피해`))}>{done ? `${round}라운드 기록함` : `${round}라운드 피해 기록 · ${damage}`}</button>
-        <button type="button" className="linkbtn" onClick={onOpenRound}>라운드·턴 열기</button>
-        {active.includes('burning') && pcTurn && <button type="button" className="btn ghost" onClick={() => commit(() => {
+          setPosition({ ...position, round: round + 1 });
+        }, playAction(`${round}라운드 지속 피해`))}>{round}라운드 피해 적용 · {damage}</button>
+        {active.includes('burning') && <button type="button" className="btn ghost" onClick={() => commit(() => {
           setCondition('burning', false);
           log(['화상 해제 (표준 행동 1)']);
         }, playAction('전투 중 화상 끄기'))}>표준 행동으로 화상 끄기</button>}
       </div>
-      {active.includes('poisoned') && (pcTurn && !delayed && !resistanceUsed
+      {active.includes('poisoned') && (!delayed && !resistanceUsed
         ? <PhysicalSkillRoll key={round} label="중독 저항 Endurance (자유 행동)" skill="Endurance"
           slot={`poison-resist-round-${round}`} onResult={resist} />
         : <p className="play-exhaustion-note">{resistanceUsed ? '이번 라운드의 중독 저항을 사용했습니다.'
-          : '중독된 다음 라운드부터 PC 턴에 자유 행동으로 저항할 수 있습니다.'}</p>)}
+          : '중독된 다음 라운드부터 자유 행동으로 저항할 수 있습니다.'}</p>)}
       <XRef id="conditions">상태 규칙</XRef>
     </section>
   );

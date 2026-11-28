@@ -1,4 +1,4 @@
-.play-combat :is(.play-combat-tools, .play-round-add) {
+.play-combat .play-combat-tools {
   min-width: 0;
   margin-block: 0;
 }
@@ -15,10 +15,7 @@
   font: 14px/1.5 var(--f-ui);
 }
 
-.play-combat-tool-controls,
-.play-round-buttons,
-.play-round-rules,
-.play-round-reminder-actions {
+.play-combat-tool-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -27,10 +24,6 @@
 
 .play-combat-tool-controls {
   align-items: end;
-}
-
-.play-round-buttons .btn {
-  padding-inline: var(--s2);
 }
 
 .play-combat-tool-controls > .field {
@@ -65,21 +58,6 @@
   height: 17px;
 }
 
-.play-round-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--s1) var(--s2);
-  border-inline-start: 2px solid var(--copper);
-  padding: var(--s1) var(--s2);
-  background: var(--bone-2);
-  overflow-wrap: anywhere;
-}
-
-.play-round-status > strong {
-  color: var(--copper-ink);
-  font-variant-numeric: tabular-nums;
-}
 
 .play-turn-summary {
   display: grid;
@@ -91,10 +69,7 @@
   font: 14px/1.5 var(--f-ui);
 }
 
-.play-turn-heading,
-.play-turn-shortcuts,
-.play-turn-usage,
-.play-turn-reactions {
+.play-turn-shortcuts {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -102,24 +77,8 @@
   min-inline-size: 0;
 }
 
-.play-turn-heading { justify-content: space-between; }
-.play-turn-heading > .play-round-status { min-block-size: 44px; align-content: center; }
 .play-turn-shortcuts { align-items: stretch; }
-.play-turn-shortcuts .btn, .play-turn-reactions .btn { max-inline-size: 100%; padding-inline: var(--s2); }
-.play-turn-usage {
-  padding-block: var(--s1);
-  border-block: 1px solid var(--rule-soft);
-}
-.play-turn-usage label {
-  display: inline-flex;
-  gap: var(--s1);
-  align-items: center;
-  min-block-size: 44px;
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-.play-turn-usage input { flex: none; inline-size: 17px; block-size: 17px; }
-.play-turn-reactions .xref { align-items: center; min-block-size: 44px; font-variant-numeric: tabular-nums; }
+.play-turn-shortcuts .btn { max-inline-size: 100%; padding-inline: var(--s2); }
 .play-turn-belt, .play-turn-context ul { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
 .play-turn-context {
   display: grid;
@@ -132,57 +91,6 @@
 .play-turn-context .btn { display: grid; justify-items: start; gap: 0; text-align: start; overflow-wrap: anywhere; }
 .play-turn-context .btn small { color: var(--ink-2); font: 12px/1.4 var(--f-ui); }
 
-.play-round-rules {
-  color: var(--ink-2);
-}
-
-.play-round-rules p,
-.play-round-reminder-text p {
-  margin: 0;
-}
-
-.play-round-reminders {
-  margin: 0;
-  padding: 0;
-  border-block-start: 1px solid var(--rule-soft);
-  list-style: none;
-}
-
-.play-round-reminders > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s1) var(--s2);
-  padding: var(--s1) var(--s2);
-  border-block-end: 1px solid var(--rule-soft);
-}
-
-.play-round-reminders > li[data-due] {
-  background: var(--copper-wash);
-}
-
-.play-round-reminder-text {
-  display: grid;
-  flex: 1 1 min(100%, 12rem);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.play-round-reminder-text > span {
-  color: var(--ink-2);
-}
-
-.play-round-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-  gap: var(--s2);
-  align-items: end;
-  padding-block: var(--s1) var(--s2);
-}
-
-.play-round-form > .btn {
-  justify-self: start;
-}
 
 .play-damage-comparison {
   width: min(100%, 52rem);

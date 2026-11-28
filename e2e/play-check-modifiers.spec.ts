@@ -67,7 +67,7 @@ test('Exhaustion defaults apply to PC checks and repeat attacks, while Madness c
   await expect(start.getByRole('status', { name: 'Resolve 결과' })).toHaveText('실패 · Sanity 4 손실');
 
   const card = combat.getByRole('region', { name: '전투 카드' });
-  await button(card, '공격 판정').click();
+  await button(card, 'PC 공격').click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
   const edge = disadvantage(attack, '공격자 유불리');
   await expect(edge).toHaveAttribute('aria-pressed', 'true');
@@ -76,9 +76,7 @@ test('Exhaustion defaults apply to PC checks and repeat attacks, while Madness c
   await textbox(attack, '공격자 수치').fill('61');
   await textbox(attack, '공격자 D100').fill('12');
   await textbox(attack, '방어자 D100').fill('90');
-  await button(attack, '공격 교환 확정').click();
-  await button(attack, '다음 공격').click();
-  await expect(edge).toHaveAttribute('aria-pressed', 'true');
+  await expect(attack.getByRole('status', { name: '공격 판정 결과' })).toContainText('공격자 명중');
 
   await go(page, '휴식·정리');
   await button(page, '치료·성장').click();

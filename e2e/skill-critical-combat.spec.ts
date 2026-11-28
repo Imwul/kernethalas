@@ -34,9 +34,8 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
   await expect(start.getByRole('button', { name: 'Perception 야영 성장 표시됨', exact: true })).toBeDisabled();
 
   const card = combat.getByRole('region', { name: '전투 카드' });
-  await card.getByRole('button', { name: '공격 판정', exact: true }).click();
+  await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
   const attack = card.getByRole('region', { name: '공격 판정 해석기' });
-  await attack.getByRole('button', { name: 'PC가 공격', exact: true }).click();
   await attack.getByRole('textbox', { name: '공격자 수치' }).fill('40');
   await attack.getByRole('textbox', { name: '공격자 D100' }).fill('77');
   await attack.getByRole('textbox', { name: '방어자 D100' }).fill('31');
@@ -45,15 +44,18 @@ test('confirmed PC encounter and attack doubles reach camp with the correct skil
   await attack.getByRole('combobox', { name: 'PC 공격에 사용한 기술' }).selectOption('Bladed Weapons');
   await attack.getByRole('button', { name: '야영 성장 표시', exact: true }).click();
 
-  await attack.getByRole('button', { name: '적이 공격', exact: true }).click();
-  await attack.getByRole('textbox', { name: '공격자 D100' }).fill('11');
-  await attack.getByRole('textbox', { name: '방어자 수치' }).fill('50');
-  await attack.getByRole('textbox', { name: '방어자 D100' }).fill('25');
-  await expect(attack.getByRole('combobox', { name: 'PC 방어에 사용한 기술' })).toHaveCount(0);
-  await attack.getByRole('textbox', { name: '방어자 D100' }).fill('44');
-  await attack.getByRole('combobox', { name: 'PC 방어에 사용한 기술' }).selectOption('Dodge');
-  await attack.getByRole('button', { name: '야영 성장 표시', exact: true }).click();
-  await expect(attack.getByRole('button', { name: '야영 성장 표시됨', exact: true })).toBeDisabled();
+  await card.getByRole('button', { name: '적 행동 D6', exact: true }).click();
+  await card.getByRole('textbox', { name: '직접 굴린 값' }).fill('1');
+  await card.getByRole('textbox', { name: '직접 굴린 값' }).press('Enter');
+  const enemy = card.getByRole('region', { name: '적 공격' }).getByRole('region', { name: '공격 판정 해석기' });
+  await enemy.getByRole('textbox', { name: '공격자 D100' }).fill('11');
+  await enemy.getByRole('textbox', { name: '방어자 수치' }).fill('50');
+  await enemy.getByRole('textbox', { name: '방어자 D100' }).fill('25');
+  await expect(enemy.getByRole('combobox', { name: 'PC 방어에 사용한 기술' })).toHaveCount(0);
+  await enemy.getByRole('textbox', { name: '방어자 D100' }).fill('44');
+  await enemy.getByRole('combobox', { name: 'PC 방어에 사용한 기술' }).selectOption('Dodge');
+  await enemy.getByRole('button', { name: '야영 성장 표시', exact: true }).click();
+  await expect(enemy.getByRole('button', { name: '야영 성장 표시됨', exact: true })).toBeDisabled();
 
   await page.getByRole('button', { name: '저널', exact: true }).click();
   const journal = page.getByRole('region', { name: '이번 장소 기록' });

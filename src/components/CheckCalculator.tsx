@@ -1,18 +1,16 @@
-import { useId, useRef, useState, type Ref } from 'react';
+import { useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import { EdgeToggle } from './EdgeToggle';
-import { AttackFollowUpRoll, AttackPendingEffects, useAttackFollowUps, type PendingAttackEffect } from './AttackFollowUps';
 import { pcCheckModifiers } from '../lib/play-check-modifiers';
 import { procById } from '../content';
 import { d100FromValue, resolveCheck, resolveOpposed, type Edge } from '../lib/dice';
 import { resolvePhysicalAttack, type AttackDefenseMode, type PhysicalAttackResult } from '../lib/attack-defense';
-import { attackFollowUpModifier } from '../lib/attack-follow-ups';
 import { readOracleValue } from '../lib/oracle';
 import { usePlayCharacter } from '../lib/play-character';
 import { usePlayDraft, usePlayDraftState, usePlayRoll, usePlayRollField } from '../lib/play-draft';
 import { isSkillDouble } from '../lib/skill-criticals';
 import { isGrowthSkill, useRecordSkillCritical } from '../lib/skill-growth';
 import { formatSkillBreakdown, skillBreakdown, type SkillModifier, type SkillTerm } from '../lib/play-skill';
-import { CopyButton, XRef } from './bits';
+import { XRef } from './bits';
 import { PlayDieHint, PlayZeroKey } from './play/PlayDieHints';
 import { SkillAdjustments } from './play/SkillAdjustments';
 import { TogglePanel } from './TogglePanel';
@@ -31,16 +29,16 @@ interface SideState {
 interface CreatureAttack {
   name: string;
   combatSkill: number | null;
+  /** Which side attacks is set by the combat card (PC attack or the enemy's action), not here. */
   attacking: boolean;
-  onChangeAttacker: (attacking: boolean) => void;
-  onHitLocation: (critical: boolean, pc: boolean, exchangeId?: string) => void;
-  /** Both sides failed: the defender takes 1 damage that nothing reduces. `pc` is true when the PC defends. */
-  onBothFailed?: (pc: boolean, exchangeId?: string) => void;
-  onNextAttack: (enemyAttacks: boolean) => void;
+  /**
+   * What follows the result in the same view: hit location, damage, defense and fumble rolls. `exchangeId` changes
+   * whenever the dice or the outcome change, so entering new rolls starts a new exchange.
+   */
+  renderOutcome: (outcome: { result: PhysicalAttackResult; exchangeId: string }) => ReactNode;
 }
 
 type SideId = 'a' | 'b' | 'pc-attack' | 'pc-defense' | 'enemy-attack' | 'enemy-defense';
-type ConfirmedExchange = { id: string; attacker: string; defender: string; result?: PhysicalAttackResult; breakdown?: string };
 
 const CHECK_LABELS = { critical: '대성공', success: '성공', failure: '실패', fumble: '대실패(펌블)' } as const;
 const WEAPON_SKILLS = ['Bladed Weapons', 'Bludgeoning Weapons', 'Shafted Weapons', 'Unarmed Combat & Fist Weapons'] as const;
@@ -108,10 +106,7 @@ function Side({ label, s, set, disabled, rollRef, field, editableSkill, fixed, o
   );
 }
 
-function HitLocation({ enemyAttacks, onHitLocation }: { enemyAttacks: boolean; onHitLocation?: () => void }) {
-  if (onHitLocation) return (
-    <button type="button" className="btn primary" data-checkcalc-forward="" onClick={onHitLocation}>{enemyAttacks ? 'PC 명중 부위 D20' : '적 명중 부위 보기'}</button>
-  );
+function HitLocation({ enemyAttacks }: { enemyAttacks: boolean }) {
   if (enemyAttacks) return (
     <><XRef id="t-hit-humanoid">PC 명중 부위 D20</XRef><XRef id="damage-to-pc">PC 받는 피해 계산</XRef></>
   );
@@ -131,19 +126,12 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const [mode, setMode] = useState<'single' | 'attack' | 'opposed'>('attack');
   const [enemy, setEnemy] = useState(false);
   const [inputs, setInputs] = usePlayDraftState<Partial<Record<SideId, Partial<SideState>>>>('attack-inputs', {});
-  const [pcConfirmed, setPcConfirmed] = usePlayDraftState<ConfirmedExchange | null>('attack-confirmed-pc', null);
-  const [enemyConfirmed, setEnemyConfirmed] = usePlayDraftState<ConfirmedExchange | null>('attack-confirmed-enemy', null);
   const [pcDefenseMode, setPcDefenseMode] = usePlayDraftState<AttackDefenseMode>('attack-defense-mode-pc', 'opposed');
   const [enemyDefenseMode, setEnemyDefenseMode] = usePlayDraftState<AttackDefenseMode>('attack-defense-mode-enemy', 'opposed');
-  const followUps = useAttackFollowUps();
-  const [selectedEffects, setSelectedEffects] = useState<string[]>([]);
   const attackerRoll = useRef<HTMLInputElement>(null);
-  const section = useRef<HTMLElement>(null);
   const defenseModeSelect = useRef<HTMLButtonElement>(null);
   const enemyAttacks = creature?.attacking ?? enemy;
   const trackExchange = !!play && !!creature;
-  const confirmed = trackExchange ? (enemyAttacks ? enemyConfirmed : pcConfirmed) : null;
-  const setConfirmed = enemyAttacks ? setEnemyConfirmed : setPcConfirmed;
   const attack = mode === 'attack';
   const defenseMode = attack ? enemyAttacks ? enemyDefenseMode : pcDefenseMode : 'opposed';
   const setDefenseMode = enemyAttacks ? setEnemyDefenseMode : setPcDefenseMode;
@@ -166,7 +154,7 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const setSide = (key: SideId, patch: Partial<SideState>) =>
     setInputs((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
   // Before this marker was introduced, manually entered attack scores were already adjusted.
-  const scoreKind = inputs[aKey]?.attackSkillKind ?? (inputs[aKey]?.skill !== undefined || confirmed ? 'adjusted' : 'base');
+  const scoreKind = inputs[aKey]?.attackSkillKind ?? (inputs[aKey]?.skill !== undefined ? 'adjusted' : 'base');
   const pcAttack = trackExchange && !enemyAttacks && attackingRolls;
   const setAttacker = (patch: Partial<SideState>) => setSide(aKey, pcAttack && patch.skill !== undefined
     ? { ...patch, attackSkillKind: scoreKind } : patch);
@@ -174,104 +162,30 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
   const bRoll = readOracleValue(b.rollv.trim(), 100);
   const attackField = usePlayRollField(`attack:${aKey}`, attack ? '공격자' : 'A', 'D100', aRoll !== null, true);
   const defenseField = usePlayRollField(`attack:${bKey}`, attack ? '방어자' : 'B', 'D100', bRoll !== null, true);
-  const pending: PendingAttackEffect[] = (followUps?.readOnly ? [] : followUps?.effects ?? []).flatMap((effect) => {
-    if (effect.status) return [];
-    const modifier = attackFollowUpModifier(effect);
-    // The PC's modifiers travel with the PC. A creature's modifiers belong to that specific creature.
-    const sameFighter = modifier?.actor === 'pc' || effect.targetId === followUps?.targetId;
-    if (!sameFighter && modifier) return [];
-    const side = !confirmed && modifier
-      ? modifier.check === 'attack' && attackingRolls && (modifier.actor === 'enemy') === enemyAttacks ? 'attacker'
-        : modifier.check === 'defense' && defendingRolls && (modifier.actor === 'pc') === enemyAttacks ? 'defender'
-          : undefined
-      : undefined;
-    const edge = side === 'attacker' ? a.edge : b.edge;
-    const blocked = !!side && !!modifier && 'advantage' in modifier && edge === 'disadvantage';
-    return [{ effect, side, blocked, selected: !!side && !blocked && selectedEffects.includes(effect.slot) }];
-  });
-  const selected = pending.filter(({ selected }) => selected);
-  const appliedModifier = (side: PendingAttackEffect['side']) => selected.filter((entry) => entry.side === side)
-    .flatMap(({ effect }) => {
-      const modifier = attackFollowUpModifier(effect);
-      return modifier ? [{ table: effect.kind.endsWith('fumble') ? '펌블' : '방어 동작', modifier }] : [];
-    });
-  const aApplied = appliedModifier('attacker');
-  const bApplied = appliedModifier('defender');
-  const effectTerms = (applied: typeof aApplied) => applied.flatMap(({ table, modifier }) =>
-    'skill' in modifier ? [{ label: table, value: modifier.skill }] : []);
-  const aFixed = [...(pcAttack && scoreKind === 'base' ? [{ label: '공격 기본', value: 10 }] : []), ...effectTerms(aApplied)];
-  const bFixed = effectTerms(bApplied);
+  const aFixed = pcAttack && scoreKind === 'base' ? [{ label: '공격 기본', value: 10 }] : [];
   const aAdjustments = trackExchange ? skillBreakdown(a.skill, enemyAttacks ? [] : a.modifiers, aFixed) : null;
-  const bAdjustments = trackExchange ? skillBreakdown(b.skill, enemyAttacks ? b.modifiers : [], bFixed) : null;
+  const bAdjustments = trackExchange ? skillBreakdown(b.skill, enemyAttacks ? b.modifiers : [], []) : null;
   const aSkill = trackExchange ? aAdjustments?.total ?? null : readAdjustedSkill(a.skill);
   const bSkill = trackExchange ? bAdjustments?.total ?? null : readAdjustedSkill(b.skill);
-  const aEdge = aApplied.some(({ modifier }) => 'advantage' in modifier) ? 'advantage' : a.edge;
-  const bEdge = bApplied.some(({ modifier }) => 'advantage' in modifier) ? 'advantage' : b.edge;
-  const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, aEdge);
-  const cb = bRoll === null || bSkill === null ? null : resolveCheck(d100FromValue(bRoll), bSkill, bEdge);
-  const result = attack ? confirmed?.result ?? resolvePhysicalAttack(defenseMode, ca, cb) : null;
+  const ca = aRoll === null || aSkill === null ? null : resolveCheck(d100FromValue(aRoll), aSkill, a.edge);
+  const cb = bRoll === null || bSkill === null ? null : resolveCheck(d100FromValue(bRoll), bSkill, b.edge);
+  const result = attack ? resolvePhysicalAttack(defenseMode, ca, cb) : null;
   const pc = enemyAttacks ? b : a;
   const pcKey = enemyAttacks ? bKey : aKey;
   const pcCheck = enemyAttacks ? defendingRolls ? cb : null : attackingRolls ? ca : null;
   const pcDouble = result && pcCheck && isSkillDouble(pcCheck.outcome) ? pcCheck.outcome : null;
   const growthSkill = pc.growthSkill ?? '';
+  // New dice (or a different outcome) make a new exchange; what follows it starts over.
+  const exchangeId = result && [enemyAttacks ? 'enemy' : 'pc', defenseMode, attackingRolls ? aRoll : '', defendingRolls ? bRoll : '', result.outcome].join(':');
   let verdict: { t: string; d: string } | null = null;
   if (mode === 'single' && ca) verdict = { t: CHECK_LABELS[ca.outcome], d: `읽은 값 ${ca.read.value}${ca.flippedRead ? ' (뒤집음)' : ''} / Skill ${ca.skill}` };
-  if (result) verdict = { t: ATTACK_LABELS[result.outcome], d: result.reason };
+  if (result) verdict = { t: `${ATTACK_LABELS[result.outcome]}${result.attackerFumble ? ' · 공격자 펌블' : ''}`, d: result.reason };
   if (mode === 'opposed' && ca && cb) {
     const r = resolveOpposed(ca, cb);
     verdict = { t: r.winner === 'A' ? 'A 승리' : r.winner === 'B' ? 'B 승리' : r.winner === 'reroll' ? '다시 굴림' : '규칙 미정', d: r.reason };
   }
-  const matchup = creature && (enemyAttacks ? `${creature.name} → PC` : `PC → ${creature.name}`);
-  const exchangeOutcome = result && `${ATTACK_LABELS[result.outcome]}${result.attackerFumble ? ' · 공격자 펌블' : ''}`;
-  const dice = !attackingRolls ? '판정 없음' : defendingRolls ? 'D100 × 2' : 'D100';
-  const summarizeRolls = (attacker: string, defender: string) => !attacker ? '자동 명중'
-    : defender ? `공격 ${attacker} / 방어 ${defender}` : `공격 ${attacker} · 능동 방어 불가`;
-  const adjustments = [
-    ...(attackingRolls && aAdjustments && (!enemyAttacks || aApplied.length) ? [`공격자 ${formatSkillBreakdown(aAdjustments)}${aEdge !== a.edge ? ' · 유리' : ''}`] : []),
-    ...(defendingRolls && bAdjustments && (enemyAttacks || bApplied.length) ? [`방어자 ${formatSkillBreakdown(bAdjustments)}${bEdge !== b.edge ? ' · 유리' : ''}`] : []),
-  ].join(' / ');
-  const confirm = (continueAttack?: (exchangeId?: string) => void) => {
-    if (confirmed || !trackExchange || !result) {
-      continueAttack?.(confirmed?.id);
-      return;
-    }
-    const attacker = attackingRolls ? a.rollv.trim() : '';
-    const defender = defendingRolls ? b.rollv.trim() : '';
-    const exchangeId = crypto.randomUUID();
-    commit(() => {
-      if (attackingRolls) setSide(aKey, { edge: aEdge, ...(pcAttack && { attackSkillKind: scoreKind }) });
-      if (defendingRolls) setSide(bKey, { edge: bEdge });
-      selected.forEach(({ effect }) => followUps?.settle(effect, 'used'));
-      setConfirmed({ id: exchangeId, attacker, defender, result, breakdown: adjustments || undefined });
-      continueAttack?.(exchangeId);
-      // Move on to the next step (hit location), never onto "다음 공격", which would clear this exchange.
-      if (!continueAttack) requestAnimationFrame(() => section.current?.querySelector<HTMLElement>(
-        '[data-checkcalc-forward], input[data-play-roll-field*="attack-follow-up:"]',
-      )?.focus());
-    }, {
-      label: `공격 교환 · ${matchup}`,
-      dice,
-      value: attacker ? `${summarizeRolls(attacker, defender)} · ${exchangeOutcome}` : summarizeRolls(attacker, defender),
-      source: 'manual',
-      field: attackField['data-play-roll-field'],
-      breakdown: adjustments || undefined,
-    });
-    setSelectedEffects([]);
-  };
-  const nextAttack = () => {
-    const clearRoll = (side: Partial<SideState> | undefined): Partial<SideState> => ({
-      ...side, rollv: '', edge: undefined, growthRecorded: false, modifiers: [],
-    });
-    setInputs((previous) => ({ ...previous, [aKey]: clearRoll(previous[aKey]), [bKey]: clearRoll(previous[bKey]) }));
-    setConfirmed(null);
-    setDefenseMode('opposed');
-    setSelectedEffects([]);
-    creature?.onNextAttack(enemyAttacks);
-    requestAnimationFrame(() => (attackerRoll.current ?? defenseModeSelect.current)?.focus());
-  };
   return (
-    <section className="roller checkcalc" ref={section} aria-label={attackOnly ? '공격 판정 해석기' : '판정 해석기'}>
+    <section className="roller checkcalc" aria-label={attackOnly ? '공격 판정 해석기' : '판정 해석기'}>
       {!attackOnly && <span className="kicker">판정 해석기</span>}
       {!attackOnly && <div className="seg" role="group" aria-label="판정 종류">
         {(
@@ -286,16 +200,14 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
           </button>
         ))}
       </div>}
-      {attack && (
+      {attack && !creature && (
         <div className="seg" role="group" aria-label="공격하는 쪽">
-          <button type="button" aria-pressed={!enemyAttacks} data-play-attack-side={creature ? 'pc-attack' : undefined}
-            onClick={() => (creature?.onChangeAttacker ?? setEnemy)(false)}>PC가 공격</button>
-          <button type="button" aria-pressed={enemyAttacks} data-play-attack-side={creature ? 'enemy-attack' : undefined}
-            onClick={() => (creature?.onChangeAttacker ?? setEnemy)(true)}>적이 공격</button>
+          <button type="button" aria-pressed={!enemyAttacks} onClick={() => setEnemy(false)}>PC가 공격</button>
+          <button type="button" aria-pressed={enemyAttacks} onClick={() => setEnemy(true)}>적이 공격</button>
         </div>
       )}
       {attack && <div className="checkcalc-defense-mode">
-        <ChoiceButtons label="방어 방식" value={defenseMode} disabled={!!confirmed} focusRef={defenseModeSelect}
+        <ChoiceButtons label="방어 방식" value={defenseMode} focusRef={defenseModeSelect}
           groupData={{ 'data-play-attack-field': attackField['data-play-roll-field'] }} onChange={setDefenseMode} options={[
             { value: 'opposed', label: '공격·방어 대항' },
             { value: 'unopposed', label: '능동 방어 불가 · 공격만 굴림' },
@@ -308,20 +220,18 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
         <p className="checkcalc-note">적 기본 입력값 {importedSkill}{enemyAttacks && ` (CS ${enemySkill} + 공격 기본 10)`}. 추가 보정은 직접 반영하세요.</p>
       )}
       {pcAttack && <label className="checkcalc-score-kind">
-        <input type="checkbox" checked={scoreKind === 'adjusted'} disabled={!!confirmed}
+        <input type="checkbox" checked={scoreKind === 'adjusted'}
           onChange={(event) => setSide(aKey, { attackSkillKind: event.target.checked ? 'adjusted' : 'base' })} />
         공격 기본 +10이 이미 포함된 수치
       </label>}
       {attackingRolls && <Side label={attack ? '공격자' : 'A'} s={a} set={setAttacker}
-        disabled={!!confirmed} rollRef={attackerRoll} field={attackField} editableSkill={trackExchange && !enemyAttacks} fixed={aFixed}
+        disabled={false} rollRef={attackerRoll} field={attackField} editableSkill={trackExchange && !enemyAttacks} fixed={aFixed}
         onLoadPreset={pcAttack ? (skill) => setSide(aKey, { skill, attackSkillKind: 'base' }) : undefined}
         canSavePreset={!pcAttack || scoreKind === 'base'} />}
       {mode !== 'single' && defendingRolls && <Side label={attack ? '방어자' : 'B'} s={b} set={(patch) => setSide(bKey, patch)}
-        disabled={!!confirmed} field={defenseField} editableSkill={trackExchange && enemyAttacks} fixed={bFixed} />}
-      {!confirmed && attackingRolls && aAdjustments && (aFixed.length > 0 || aEdge !== a.edge) &&
-        <p className="checkcalc-note" aria-label="공격자 계산 수치">공격자 {formatSkillBreakdown(aAdjustments)}{aEdge !== a.edge && ' · 유리'}</p>}
-      {!confirmed && defendingRolls && bAdjustments && (bFixed.length > 0 || bEdge !== b.edge) &&
-        <p className="checkcalc-note" aria-label="방어자 계산 수치">방어자 {formatSkillBreakdown(bAdjustments)}{bEdge !== b.edge && ' · 유리'}</p>}
+        disabled={false} field={defenseField} editableSkill={trackExchange && enemyAttacks} />}
+      {attackingRolls && aAdjustments && aFixed.length > 0 &&
+        <p className="checkcalc-note" aria-label="공격자 계산 수치">공격자 {formatSkillBreakdown(aAdjustments)}</p>}
       <div className="verdict" role="status" aria-label={attack ? '공격 판정 결과' : '판정 결과'}>
         {verdict ? (
           <>
@@ -333,21 +243,9 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
             : '직접 굴린 D100을 입력하세요. 공격 기본 +10, Speed와 그 밖의 보정을 확인하세요.'}</span>
         )}
       </div>
-      {trackExchange && (<div className="checkcalc-exchange">
-        {confirmed && verdict && <p className="checkcalc-note">확정 · {dice} · {summarizeRolls(confirmed.attacker, confirmed.defender)}
-          {confirmed.breakdown && <><br />{confirmed.breakdown}</>}</p>}
-        <div className="checkcalc-follow-ups">
-          {confirmed ? <>
-            <button key="next" type="button" className="btn ghost" onClick={nextAttack}>다음 공격</button>
-            {exchangeOutcome && <CopyButton text={`${matchup} · ${dice} · ${summarizeRolls(confirmed.attacker, confirmed.defender)} · ${exchangeOutcome}`}
-              label="공격 결과 복사" />}
-          </> : <button key="confirm" type="button" className="btn primary" disabled={!result} data-play-next={result ? '' : undefined}
-            onClick={() => confirm()}>공격 교환 확정</button>}
-        </div>
-      </div>)}
-      {pcDouble && <p className="checkcalc-note">PC {enemyAttacks ? '방어' : '공격'} · {pcDouble === 'critical' ? '대성공' : '대실패'}</p>}
       {play && pcDouble && pcCheck && (
         <div className="checkcalc-follow-ups" style={{ alignItems: 'end' }}>
+          <p className="checkcalc-note">PC {enemyAttacks ? '방어' : '공격'} · {pcDouble === 'critical' ? '대성공' : '대실패'}</p>
           <label className="field"><span>PC {enemyAttacks ? '방어' : '공격'}에 사용한 기술</span>
             <select value={growthSkill} disabled={pc.growthRecorded}
               onChange={(event) => setSide(pcKey, { growthSkill: event.target.value })}>
@@ -366,36 +264,19 @@ export function CheckCalculator({ attackOnly = false, creature }: { attackOnly?:
           </button>
         </div>
       )}
-      {result && (result.outcome === 'hit' || result.outcome === 'critical-hit' || result.outcome === 'defended' || result.attackerFumble
-        || (result.outcome === 'both-failed' && creature?.onBothFailed)) && (
-        <div className="checkcalc-follow-ups">
-          {result.outcome === 'both-failed' && creature?.onBothFailed && (
-            <button type="button" className="btn primary" data-checkcalc-forward=""
-              onClick={() => confirm((exchangeId) => creature.onBothFailed?.(enemyAttacks, exchangeId))}>
-              {enemyAttacks ? 'PC' : '적'} 1 피해 적용
-            </button>
-          )}
-          {(result.outcome === 'hit' || result.outcome === 'critical-hit') && (
-            <HitLocation enemyAttacks={enemyAttacks}
-              onHitLocation={creature && (() => confirm((exchangeId) => creature.onHitLocation(result.outcome === 'critical-hit', enemyAttacks, exchangeId)))} />
-          )}
-          {result.outcome === 'critical-hit' && <XRef id="critical-strike">치명타 피해</XRef>}
-          {result.outcome === 'defended' && (!confirmed || !followUps) && (
-            <XRef id={enemyAttacks ? 't-defensive-move-pc' : 't-defensive-move-npc'}>{enemyAttacks ? 'PC' : '적'} 방어 동작</XRef>
-          )}
-          {result.attackerFumble && (!confirmed || !followUps) && (
-            <XRef id={enemyAttacks ? 't-fumble-npc' : 't-fumble-pc'}>{enemyAttacks ? '적' : 'PC'} 공격자 펌블</XRef>
-          )}
-        </div>
-      )}
-      {confirmed && creature && result?.outcome === 'defended' &&
-        <AttackFollowUpRoll kind={enemyAttacks ? 'pc-defense' : 'enemy-defense'} exchangeId={confirmed.id}
-          side={enemyAttacks ? 'enemy' : 'pc'} targetName={creature.name} />}
-      {confirmed && creature && result?.attackerFumble &&
-        <AttackFollowUpRoll kind={enemyAttacks ? 'enemy-fumble' : 'pc-fumble'} exchangeId={confirmed.id}
-          side={enemyAttacks ? 'enemy' : 'pc'} targetName={creature.name} />}
-      <AttackPendingEffects entries={pending} onToggle={(slot) => setSelectedEffects((previous) =>
-        previous.includes(slot) ? previous.filter((id) => id !== slot) : [...previous, slot])} />
+      {creature && result && exchangeId ? creature.renderOutcome({ result, exchangeId })
+        : result && (result.outcome === 'hit' || result.outcome === 'critical-hit' || result.outcome === 'defended' || result.attackerFumble) && (
+          <div className="checkcalc-follow-ups">
+            {(result.outcome === 'hit' || result.outcome === 'critical-hit') && <HitLocation enemyAttacks={enemyAttacks} />}
+            {result.outcome === 'critical-hit' && <XRef id="critical-strike">치명타 피해</XRef>}
+            {result.outcome === 'defended' && (
+              <XRef id={enemyAttacks ? 't-defensive-move-pc' : 't-defensive-move-npc'}>{enemyAttacks ? 'PC' : '적'} 방어 동작</XRef>
+            )}
+            {result.attackerFumble && (
+              <XRef id={enemyAttacks ? 't-fumble-npc' : 't-fumble-pc'}>{enemyAttacks ? '적' : 'PC'} 공격자 펌블</XRef>
+            )}
+          </div>
+        )}
     </section>
   );
 }

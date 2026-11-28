@@ -72,19 +72,24 @@ function ActionTargetResolution({ rule, damage, target, shared, role = 'pc', sum
   elementRevision?: [number, Dispatch<SetStateAction<number>>];
 }) {
   const [resisted, setResisted] = usePlayDraftState<boolean | null>('resisted', null);
+  const [fumbled, setFumbled] = usePlayDraftState('resist-fumble', false);
   const [extraResisted, setExtraResisted] = usePlayDraftState<boolean | null>('extra-resisted', null);
   const revisionState = usePlayDraftState('resistance-run', 0);
   const [revision, setRevision] = elementRevision ?? revisionState;
   const clear = useClearPlayDraftScope();
-  const onResistance = (pass: boolean | null) => {
+  const onResistance = (pass: boolean | null, fumble = false) => {
     clear(`extra-${revision}`);
     clear(`rolls-${revision}`);
     setRevision((version) => version + 1);
     setExtraResisted(null);
     setResisted(pass);
+    setFumbled(fumble);
   };
   const susceptible = !rule.resistance || resisted === false;
-  const halfDamage = resisted === true && rule.success === 'half';
+  // Core pp.72–73: a Spellward or Dodge critical failure doubles the damage from what the PC tried to resist.
+  const doubled = resisted === false && fumbled && role === 'pc' && (rule.resistance === 'Spellward' || rule.resistance === 'Dodge');
+  const scale: DamageScale = doubled ? 'double' : resisted === true && rule.success === 'half' ? 'half' : 'normal';
+  const halfDamage = scale === 'half';
   const additional = !!rule.after && susceptible;
   const withTarget = (label: string) => target ? `${label} · ${target}` : label;
   const context = role === 'pc' ? 'skill' : 'npc';
@@ -93,11 +98,12 @@ function ActionTargetResolution({ rule, damage, target, shared, role = 'pc', sum
     <div className="creature-target-resolution">
         {rule.resistance && (
           <PhysicalSkillRoll label={withTarget(`${rule.resistance} 판정`)} skill={rule.resistance} context={context}
-            onResult={(result) => onResistance(skillCheckSucceeded(result))} onClear={() => onResistance(null)} />
+            onResult={(result) => onResistance(skillCheckSucceeded(result), result.outcome === 'fumble')} onClear={() => onResistance(null)} />
         )}
         {resisted !== null && (
           <p className="creature-resistance-outcome">
-            {susceptible ? '행동표의 실패 효과를 적용합니다.' : halfDamage ? '피해 절반 · 올림' : '저항 성공 · 이 판정의 실패 효과를 피했습니다.'}
+            {doubled ? `대실패 · 피해 2배${rule.resistance === 'Spellward' ? ' (피해가 없으면 지속 시간 2배)' : ''}`
+              : susceptible ? '행동표의 실패 효과를 적용합니다.' : halfDamage ? '피해 절반 · 올림' : '저항 성공 · 이 판정의 실패 효과를 피했습니다.'}
           </p>
         )}
         {additional && (
@@ -114,7 +120,7 @@ function ActionTargetResolution({ rule, damage, target, shared, role = 'pc', sum
         </PlayDraftScope>}
         {(susceptible || halfDamage) && (
           <PlayDraftScope name={`rolls-${revision}`} key={`rolls-${revision}`}>
-            <ActionOutcomeRolls damage={damage} duration={susceptible ? rule.duration : undefined} halfDamage={halfDamage}
+            <ActionOutcomeRolls damage={damage} duration={susceptible ? rule.duration : undefined} scale={scale}
               target={target} shared={shared} />
           </PlayDraftScope>
         )}
@@ -122,10 +128,12 @@ function ActionTargetResolution({ rule, damage, target, shared, role = 'pc', sum
   );
 }
 
-function ActionOutcomeRolls({ damage, duration, halfDamage, target, shared }: {
+type DamageScale = 'half' | 'normal' | 'double';
+
+function ActionOutcomeRolls({ damage, duration, scale, target, shared }: {
   damage: readonly ActionDamage[];
   duration?: string;
-  halfDamage: boolean;
+  scale: DamageScale;
   target?: string;
   shared?: SharedActionDamage;
 }) {
@@ -134,11 +142,11 @@ function ActionOutcomeRolls({ damage, duration, halfDamage, target, shared }: {
   return (
     <>
       {fixed.map(([type, amount], index) => <div className="creature-action-damage" key={index}>
-        <p>{damageText(type, amount, halfDamage)}</p>
+        <p>{damageText(type, amount, scale)}</p>
         <DamageTypeGuide type={type} />
       </div>)}
       {pool && <PlayDraftScope name="damage-pool">
-        <ActionDamageRoll pool={pool} halfDamage={halfDamage} target={target} shared={shared ? shared[0] ?? null : undefined} />
+        <ActionDamageRoll pool={pool} scale={scale} target={target} shared={shared ? shared[0] ?? null : undefined} />
       </PlayDraftScope>}
       {duration && <PhysicalDiceRoll label={target ? `지속 라운드 · ${target}` : '지속 라운드'} dice={duration} value={durationRoll}
         onValue={setDurationRoll} resultText={({ total }) => `${total}라운드`} />}
@@ -146,13 +154,14 @@ function ActionOutcomeRolls({ damage, duration, halfDamage, target, shared }: {
   );
 }
 
-const damageText = (type: DamageType, amount: number, halfDamage: boolean) =>
-  `${type} 피해 ${halfDamage ? `${Math.ceil(amount / 2)} (절반 · 올림)` : amount}`;
+const scaled = (amount: number, scale: DamageScale) => scale === 'half' ? Math.ceil(amount / 2) : scale === 'double' ? amount * 2 : amount;
+const damageText = (type: DamageType, amount: number, scale: DamageScale) =>
+  `${type} 피해 ${scale === 'half' ? `${scaled(amount, scale)} (절반 · 올림)` : scale === 'double' ? `${scaled(amount, scale)} (대실패 2배)` : amount}`;
 
 /** Core p.81: a creature uses one die from its Damage Pool. With mixed damage types the player picks the die. */
-function ActionDamageRoll({ pool, halfDamage, target, shared }: {
+function ActionDamageRoll({ pool, scale, target, shared }: {
   pool: ActionDamagePool;
-  halfDamage: boolean;
+  scale: DamageScale;
   target?: string;
   shared?: RollResult | null;
 }) {
@@ -161,7 +170,7 @@ function ActionDamageRoll({ pool, halfDamage, target, shared }: {
   const outcome = (roll: RollResult) => {
     const { index, amount } = pooledDie(roll);
     const note = pool.types.length > 1 && !pool.mixed ? ' · 가장 높은 눈' : '';
-    return damageText(pool.types[index], amount, halfDamage) + note;
+    return damageText(pool.types[index], amount, scale) + note;
   };
   return (
     <div className="creature-action-damage">
@@ -169,7 +178,7 @@ function ActionDamageRoll({ pool, halfDamage, target, shared }: {
         ? <PhysicalDiceRoll label={target ? `${typeLabel} 피해 · ${target}` : `${typeLabel} 피해`} dice={pool.dice}
             value={rolled} onValue={setRolled} resultText={outcome} pool={{
               choose: pool.mixed, labels: pool.types,
-              preview: halfDamage ? (amount) => `→ 절반 ${Math.ceil(amount / 2)}` : undefined,
+              preview: scale === 'normal' ? undefined : (amount) => `→ ${scale === 'half' ? '절반' : '2배'} ${scaled(amount, scale)}`,
             }} />
         : <p>{shared?.expr === pool.dice ? outcome(shared) : `공유 ${typeLabel} 피해 굴림 대기`}</p>}
       {[...new Set(pool.types)].map((type) => <DamageTypeGuide key={type} type={type} />)}

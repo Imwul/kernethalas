@@ -25,8 +25,9 @@ async function roll(scope: Locator, label: string, value: string) {
 test('only real D100 rolls appear for undefended and automatic physical hits', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   const combat = await selectCreature(page, 'Necropede');
-  await combat.getByRole('button', { name: '공격 판정', exact: true }).click();
-  const attack = combat.getByRole('region', { name: '공격 판정 해석기' });
+  const card = combat.getByRole('region', { name: '전투 카드' });
+  await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
+  const attack = card.getByRole('region', { name: '공격 판정 해석기' });
   const verdict = attack.getByRole('status', { name: '공격 판정 결과' });
   await choose(attack, '방어 방식', 'unopposed');
   await expect(attack.getByRole('link', { name: '기절' })).toBeVisible();
@@ -42,27 +43,17 @@ test('only real D100 rolls appear for undefended and automatic physical hits', a
   await expect(verdict).toContainText('빗나감');
   await expect(attack.getByRole('textbox', { name: '방어자 D100' })).toHaveCount(0);
   await expect(attack.getByRole('link', { name: /방어 동작/ })).toHaveCount(0);
+  await expect(card.getByRole('region', { name: '적 명중 부위' })).toHaveCount(0);
   await attack.getByRole('textbox', { name: '공격자 D100' }).fill('33');
   await expect(verdict).toContainText('Critical Strike');
-  await attack.getByRole('button', { name: '공격 교환 확정' }).click();
-  await attack.getByRole('button', { name: '다음 공격', exact: true }).click();
-  await expect(chosen(attack, '방어 방식')).toHaveAttribute('data-value', 'opposed');
-  await expect(attack.getByRole('textbox', { name: '공격자 수치' })).toHaveValue('60');
-  await expect(attack.getByRole('textbox', { name: '보정값 1' })).toHaveCount(0);
+  await expect(card.getByRole('region', { name: '적 명중 부위' })).toBeVisible();
 
   await choose(attack, '방어 방식', 'automatic');
   await expect(attack.getByRole('link', { name: '의식 없음·수면·마비' })).toBeVisible();
   await expect(attack.getByRole('textbox', { name: /D100/ })).toHaveCount(0);
   await expect(verdict).toContainText('굴림 없이 명중');
-  await attack.getByRole('button', { name: '적 명중 부위 보기' }).click();
-  await openDrawer(page, '이력');
-  const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
-  await expect(history.getByRole('button', { name: /D100 공격 33 · 능동 방어 불가.*수정 미리보기$/ })).toBeVisible();
-  await expect(history).toContainText('기본 60 · 공격 기본 +10 · 상태·어둠 −5 = 65');
-  await history.getByRole('button', { name: /판정 없음 자동 명중 수정 미리보기$/ }).click();
-  await history.getByRole('button', { name: '이 굴림부터 다시 입력' }).click();
-  await expect(chosen(attack, '방어 방식')).toBeFocused();
-  await expect(chosen(attack, '방어 방식')).toHaveAttribute('data-value', 'automatic');
+  await expect(card.getByRole('region', { name: '적 명중 부위' })).toBeVisible();
+  await expect(chosen(card.getByRole('region', { name: '피해 계산기' }), '공격 판정')).toHaveAttribute('data-value', '1');
 });
 
 test('area saves stay separate and apply full or rounded half damage to named targets', async ({ page }) => {
@@ -92,7 +83,7 @@ test('area saves stay separate and apply full or rounded half damage to named ta
   await choose(card, '피해 주사위', 'individual');
   await roll(pc, '직접 굴린 값', '5');
   await roll(ally, '직접 굴린 값', '6');
-  await card.getByRole('button', { name: '공격 판정', exact: true }).click();
+  await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
   await openDrawer(page, '이력');
   const history = page.getByRole('region', { name: '이번 장소 굴림 이력' });
   await history.getByRole('button', { name: /Spellward 판정 · PC D100 19 수정 미리보기/ }).click();

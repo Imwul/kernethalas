@@ -35,37 +35,24 @@ test('a creature poison reaches the PC, each round asks for its damage, and Endu
   const lingering = combat.getByRole('region', { name: '전투 중 지속 피해' });
   const resistance = lingering.getByRole('group', { name: '중독 저항 Endurance (자유 행동)' });
   await expect(lingering).toContainText('1라운드 지속 피해 · 1');
-  await lingering.getByRole('button', { name: '라운드·턴 열기' }).click();
-  const board = combat.getByRole('region', { name: '전투 턴·라운드 체크판' });
-  await board.getByRole('button', { name: '턴 시작', exact: true }).click();
+  // Poison can be resisted from the round after it took hold.
   await expect(resistance).toHaveCount(0);
   await lingering.getByRole('button', { name: '중독 1 올리기' }).click();
-  const tick = lingering.getByRole('button', { name: '1라운드 피해 기록 · 2' });
+  // Applying a round's damage moves on to the next round; there is no separate turn tracker.
+  const tick = lingering.getByRole('button', { name: '1라운드 피해 적용 · 2' });
   await tick.click();
-  await expect(lingering.getByRole('button', { name: '1라운드 기록함' })).toBeDisabled();
+  await expect(lingering).toContainText('2라운드 지속 피해 · 2');
   await page.getByRole('button', { name: '직전 굴림 되돌리기' }).click();
   await expect(tick).toBeEnabled();
   await tick.click();
-  await board.getByRole('button', { name: '다음 라운드', exact: true }).click();
   await expect(lingering).toContainText('2라운드 지속 피해 · 2');
-  const actor = board.getByRole('combobox', { name: '턴을 확인할 대상' });
-  await actor.selectOption({ index: 1 });
-  await board.getByRole('button', { name: '턴 시작', exact: true }).click();
   await page.reload();
-  await expect(board.getByRole('status')).toContainText('2라운드');
-  await expect(board.getByRole('status')).toContainText('Giant Spider 턴 시작');
   await expect(lingering).toContainText('2라운드 지속 피해 · 2');
   await expect(card.getByRole('button', { name: '중독 적용함' })).toBeDisabled();
-  await expect(resistance).toHaveCount(0);
 
-  await actor.selectOption('pc');
-  await board.getByRole('button', { name: '턴 시작', exact: true }).click();
   await check(resistance, 'Endurance', '92');
   await expect(lingering).toContainText('이번 라운드의 중독 저항을 사용했습니다.');
-  await board.getByRole('button', { name: '턴 시작', exact: true }).click();
-  await expect(resistance).toHaveCount(0);
-  await board.getByRole('button', { name: '다음 라운드', exact: true }).click();
-  await board.getByRole('button', { name: '턴 시작', exact: true }).click();
+  await lingering.getByRole('button', { name: '2라운드 피해 적용 · 2' }).click();
 
   await check(resistance, 'Endurance', '12');
   await expect(warnings).toHaveCount(0);
@@ -174,7 +161,7 @@ test('rewinding a creature action also rewinds its applied condition and round d
   await apply.click();
   const effects = by(combat, 'region', '전투 중 지속 피해');
   await by(effects, 'button', '중독 1 올리기').click();
-  await by(effects, 'button', '1라운드 피해 기록 · 2').click();
+  await by(effects, 'button', '1라운드 피해 적용 · 2').click();
   const history = await openDrawer(page, '이력');
   await by(history, 'button', '행동 D6 1 수정 미리보기').click();
   await expect(history.getByRole('group', { name: '굴림 수정 미리보기' })).toContainText('1라운드 지속 피해');
@@ -183,10 +170,10 @@ test('rewinding a creature action also rewinds its applied condition and round d
   await roll.fill('1');
   await roll.press('Enter');
   await apply.click();
-  await expect(by(effects, 'button', '1라운드 피해 기록 · 1')).toBeEnabled();
+  await expect(by(effects, 'button', '1라운드 피해 적용 · 1')).toBeEnabled();
 });
 
-test('the incoming hit handoff focuses its D20 input at 320px', async ({ page }) => {
+test('an enemy hit opens its PC hit-location roll right under the attack at 320px', async ({ page }) => {
   await page.goto('/play');
   await go(page, '조우·전투');
   const combat = by(page, 'region', '조우와 전투 도구');
@@ -194,19 +181,18 @@ test('the incoming hit handoff focuses its D20 input at 320px', async ({ page })
   await by(combat, 'searchbox', '생물 이름').fill('Giant Spider');
   await by(combat, 'button', 'Giant Spider').click();
   const card = by(combat, 'region', '전투 카드');
-  await by(card, 'button', '공격 판정').click();
-  const attack = by(card, 'region', '공격 판정 해석기');
-  await by(attack, 'button', '적이 공격').click();
+  const action = by(card, 'textbox', '직접 굴린 값');
+  await action.fill('1');
+  await action.press('Enter');
+  const attack = by(by(card, 'region', '적 공격'), 'region', '공격 판정 해석기');
   await by(attack, 'textbox', '공격자 D100').fill('31');
   await by(attack, 'textbox', '방어자 수치').fill('50');
-  await by(attack, 'textbox', '방어자 D100').fill('92');
   await page.setViewportSize({ width: 320, height: 760 });
-  const handoff = by(attack, 'button', 'PC 명중 부위 D20');
-  await handoff.scrollIntoViewIfNeeded();
-  await handoff.click();
-  const hit = by(card, 'textbox', '직접 굴린 값');
-  await expect(hit).toBeFocused();
+  await by(attack, 'textbox', '방어자 D100').fill('92');
+  const hit = by(by(card, 'region', 'PC 명중 부위'), 'textbox', '직접 굴린 값');
+  await hit.scrollIntoViewIfNeeded();
   await expect(hit).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
 test('Madness at Sanity 0 restores Sanity, and death is recorded with an undo', async ({ page }) => {

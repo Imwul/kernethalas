@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { openPane } from './helpers/play-desk';
 import { choose, chosen } from './helpers/choice';
 
 test('play combat accepts a physical Overseer roll and supports Korean creature search', async ({ page }) => {
@@ -50,10 +49,13 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   await combat.getByRole('button', { name: 'Necropede', exact: true }).click();
 
   const card = combat.getByRole('region', { name: '전투 카드' });
+  const actionResult = card.locator('.oracle-result').first();
   await card.getByRole('textbox', { name: '직접 굴린 값' }).fill('1');
   await card.getByRole('textbox', { name: '직접 굴린 값' }).press('Enter');
-  await expect(card.getByRole('status')).toContainText('Bone Slam');
-  await card.getByRole('button', { name: '피해 계산', exact: true }).click();
+  await expect(actionResult).toContainText('Bone Slam');
+  await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
+  const attack = card.getByRole('region', { name: '공격 판정 해석기' });
+  await attack.getByRole('group', { name: '방어 방식' }).getByRole('button', { name: '자동 명중 · 굴림 없음' }).click();
   const damage = card.getByRole('region', { name: '피해 계산기', exact: true });
   await damage.getByRole('textbox', { name: '대상 부위 Armor' }).fill('0');
   await damage.getByRole('textbox', { name: '선택 주사위' }).fill('6');
@@ -65,10 +67,10 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   const first = lineup.getByRole('button', { name: 'Necropede 1', exact: true });
   const second = lineup.getByRole('button', { name: 'Necropede 2', exact: true });
   await expect(second).toHaveAttribute('aria-pressed', 'true');
-  await expect(card.getByRole('status')).not.toContainText('Bone Slam');
+  await expect(card.getByText('Bone Slam')).toHaveCount(0);
   await card.getByRole('textbox', { name: '직접 굴린 값' }).fill('3');
   await card.getByRole('textbox', { name: '직접 굴린 값' }).press('Enter');
-  await expect(card.getByRole('status')).toContainText('Soul Drain');
+  await expect(actionResult).toContainText('Soul Drain');
   await first.click();
   await expect(damage.getByRole('status')).toHaveText('최종 피해 6 Piercing');
 
@@ -77,15 +79,12 @@ test('duplicate combat targets keep separate action and damage rolls through swi
   await expect(first).toHaveAttribute('aria-pressed', 'true');
   await expect(damage.getByRole('status')).toHaveText('최종 피해 6 Piercing');
   await second.click();
-  await expect(card.getByRole('status')).toContainText('Soul Drain');
+  await expect(actionResult).toContainText('Soul Drain');
 
   await combat.getByRole('button', { name: '다른 생물 추가' }).click();
   await combat.getByRole('searchbox', { name: '추가할 생물 이름' }).fill('Infernal Archon');
   await combat.getByRole('button', { name: 'Infernal Archon', exact: true }).last().click();
   await expect(combat.getByRole('textbox', { name: '적 최고 Mind' })).toHaveValue('50');
-  await openPane(combat, '라운드');
-  await expect(page.getByRole('link', { name: '지속 피해와 상태', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '연속 방어 페널티', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 

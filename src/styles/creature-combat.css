@@ -95,26 +95,15 @@
 .creature-action-discovery .btn,
 .creature-combat-head > .xref { min-block-size: 44px; }
 .creature-combat-head > .xref { display: inline-flex; align-items: center; }
-.creature-action-check { min-height: 44px; margin-top: var(--s2); }
-.creature-attack-pick { display: grid; justify-items: start; gap: var(--s2); margin-top: var(--s2); }
-.creature-attack-pick .creature-action-check { margin-top: 0; }
-.creature-attack-context {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s1) var(--s3);
-  margin-block-end: var(--s2);
-  padding: var(--s2) var(--s3);
-  border: 1px solid var(--rule-soft);
-  background: var(--paper);
-  font: 14px/1.6 var(--f-ui);
-}
-.creature-attack-context p { flex: 1 1 14rem; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.creature-attack-context p > span { margin-inline-end: var(--s1); color: var(--ink-2); font-size: 13px; }
-.creature-attack-context .btn { min-height: 44px; }
+.creature-enemy-attack { display: grid; gap: var(--s2); min-width: 0; margin-top: var(--s3); }
+.creature-attack-line { margin: 0; font: 14px/1.6 var(--f-ui); overflow-wrap: anywhere; }
+.creature-attack-line > span { margin-inline-end: var(--s1); color: var(--ink-2); font-size: 13px; }
+.creature-attack-outcome { display: grid; gap: var(--s3); min-width: 0; margin-top: var(--s3); }
+.creature-attack-outcome:empty { display: none; }
+.creature-hit-location h4 { margin: 0 0 var(--s1); font: 700 14px/1.4 var(--f-ui); }
+.creature-attack-follow-up { display: grid; justify-items: start; gap: var(--s2); }
+.creature-attack-follow-up > .xref { display: inline-flex; align-items: center; min-height: 44px; }
 .creature-fixed-hit { margin: 0; padding: var(--s3); background: var(--paper); }
-.creature-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); }
-.creature-target > span { color: var(--ink-2); font: 13px/1.4 var(--f-ui); }
 
 .creature-combat :is(.creature-damage-guide, .creature-action-resolution) { margin-block: 0; min-width: 0; }
 .creature-combat .creature-action-resolution { margin-block-start: var(--s2); }

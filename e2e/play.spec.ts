@@ -32,14 +32,13 @@ for (const { width, height } of [{ width: 320, height: 800 }, { width: 3440, hei
     await expect(combat.getByRole('heading', { name: 'Necropede' })).toBeVisible();
 
     const card = combat.getByRole('region', { name: '전투 카드' });
-    await card.getByRole('button', { name: '공격 판정', exact: true }).click();
+    // The PC's attack runs top to bottom in one view: check, hit location, damage.
+    await card.getByRole('button', { name: 'PC 공격', exact: true }).click();
     const attack = card.getByRole('region', { name: '공격 판정 해석기' });
     await attack.getByRole('textbox', { name: '공격자 수치' }).fill('55');
     await attack.getByRole('textbox', { name: '공격자 D100' }).fill('31');
     await attack.getByRole('textbox', { name: '방어자 D100' }).fill('79');
-    await attack.getByRole('button', { name: '적 명중 부위 보기' }).click();
-    await manualRoll(card, '20');
-    await card.getByRole('button', { name: '이 부위로 피해 계산' }).click();
+    await manualRoll(card.getByRole('region', { name: '적 명중 부위' }), '20');
     const damage = card.getByRole('region', { name: '피해 계산기', exact: true });
     await damage.getByRole('textbox', { name: '선택 주사위' }).fill('4');
     await damage.getByRole('combobox', { name: '피해 유형' }).selectOption('Piercing');

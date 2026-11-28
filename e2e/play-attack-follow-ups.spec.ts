@@ -28,7 +28,7 @@ test('a PC base attack gets one +10 and a pre-update manually adjusted score sta
   await textbox(sheet, 'Bladed Weapons 수치').fill('55');
   await closeDrawer(page);
   const { card } = await selectCreature(page, 'Astral Beast');
-  await button(card, '공격 판정').click();
+  await button(card, 'PC 공격').click();
   const check = card.getByRole('region', { name: '공격 판정 해석기' });
   const skill = textbox(check, '공격자 수치');
   const adjusted = check.getByRole('checkbox', { name: '공격 기본 +10이 이미 포함된 수치' });
@@ -55,22 +55,18 @@ test('a PC base attack gets one +10 and a pre-update manually adjusted score sta
   await expect(result).toContainText('양쪽 실패');
   await adjusted.uncheck();
   await expect(result).toContainText('공격자 명중');
-  await button(check, '적이 공격').click();
-  await expect(skill).toHaveValue('50');
-  await expect(check).toContainText('CS 40 + 공격 기본 10');
 });
 
-test('a confirmed defense and fumble each get one D10, and a PC bonus carries to another target', async ({ page }) => {
+test('a defense and a fumble each get one D10 right under the attack, with undo', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/play');
-  const { combat, card } = await selectCreature(page, 'Necropede');
-  await button(card, '공격 판정').click();
-  const check = card.getByRole('region', { name: '공격 판정 해석기' });
-  await button(check, '적이 공격').click();
+  const { card } = await selectCreature(page, 'Necropede');
+  await physical(card, '1');
+  const check = card.getByRole('region', { name: '적 공격' }).getByRole('region', { name: '공격 판정 해석기' });
+  await expect(check).toContainText('CS 50 + 공격 기본 10');
   await textbox(check, '공격자 D100').fill('77');
   await textbox(check, '방어자 수치').fill('42');
   await textbox(check, '방어자 D100').fill('12');
-  await button(check, '공격 교환 확정').click();
   const defense = check.getByRole('group', { name: 'PC 방어 동작 D10', exact: true });
   const fumble = check.getByRole('group', { name: '적 공격자 펌블 D10', exact: true });
   await physical(defense, '1');
@@ -83,21 +79,8 @@ test('a confirmed defense and fumble each get one D10, and a PC bonus carries to
   await button(fumble, 'D10 굴리기').click();
   await expect(fumble.getByRole('status')).toBeVisible();
   await expect(textbox(fumble, '직접 굴린 값')).toHaveCount(0);
-
-  await button(combat, '같은 생물 추가').click();
-  await button(card, '공격 판정').click();
-  const effects = check.getByRole('region', { name: '처리 대기 중인 전투 효과' });
-  const bonus = effects.getByRole('listitem').filter({ hasText: 'PC 방어 동작 1' });
-  await button(bonus, '공격에 적용').click();
-  await textbox(check, '공격자 수치').fill('55');
-  await textbox(check, '공격자 D100').fill('72');
-  await textbox(check, '방어자 D100').fill('91');
-  await expect(check.getByLabel('공격자 계산 수치')).toContainText('기본 55 · 공격 기본 +10 · 방어 동작 +10 = 75');
-  await expect(check.getByRole('status', { name: '공격 판정 결과' })).toContainText('공격자 명중');
-  await button(check, '공격 교환 확정').click();
-  await expect(bonus).toHaveCount(0);
-  await button(page, '직전 굴림 되돌리기').click();
-  await expect(bonus).toBeVisible();
+  // Nothing waits in a ledger: the D10 result is applied at the table.
+  await expect(card.getByRole('region', { name: '처리 대기 중인 전투 효과' })).toHaveCount(0);
   await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 

@@ -22,7 +22,6 @@ import { PlayDamageComparison } from './PlayDamageComparison';
 import { PlayDiscoveryMode } from './PlayDiscovery';
 import { PlayFlee } from './PlayFlee';
 import { PlayMastery } from './PlayMastery';
-import { PlayRoundBoard, PlayRoundNumber } from './PlayRoundBoard';
 import { PlayStrip, PlayStripPane, stripPaneId, type StripItem } from './PlayPanels';
 import { PlayTargetAllocation } from './PlayTargetAllocation';
 import { PlayTurnSummary } from './PlayTurnSummary';
@@ -33,7 +32,7 @@ import { ChoiceButtons, type Choice } from '../ChoiceButtons';
 type EncounterTable = 't-encounter-a' | 't-encounter-b' | 't-overseer';
 type EncounterMethod = 'encounter' | EncounterTable | 'search' | 'custom';
 type CombatTargetStatus = 'defeated' | 'left';
-type CombatTool = 'start' | 'round' | 'allocation' | 'compare' | 'flee' | 'mastery';
+type CombatTool = 'start' | 'allocation' | 'compare' | 'flee' | 'mastery';
 
 interface Target {
   id: string;
@@ -266,7 +265,6 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
   const fighting = !finished && !fled && activeTargets.length > 0;
   const toolItems: StripItem<CombatTool>[] = selected ? [
     { id: 'start', label: '조우 시작', badge: order },
-    { id: 'round', label: '라운드', badge: <PlayDraftScope name={roundScope}><PlayRoundNumber /></PlayDraftScope> },
     { id: 'allocation', label: '적 배분' },
     ...(activeTargets.length > 1 ? [{ id: 'compare' as const, label: '피해 비교' }] : []),
     { id: 'mastery', label: 'Mastery·마법' },
@@ -461,10 +459,10 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
         </div>
       )}
       {fighting && <PlayDraftScope key={roundScope} name={roundScope}>
-        <PlayTurnSummary targets={activeTargets} selected={selected?.status ? undefined : selected} belt={belt} initiative={order}
+        <PlayTurnSummary selected={selected?.status ? undefined : selected} belt={belt}
           onAttack={() => selectedCard.current?.openPcAttack()} onEnemyAction={() => selectedCard.current?.openEnemyAction()} onBelt={onOpenBelt}
-          onMastery={() => openTool('mastery')} onRound={() => openTool('round')} onFlee={() => openTool('flee')} />
-        <CombatLingeringAlert onOpenRound={() => setTool('round')} />
+          onMastery={() => openTool('mastery')} onFlee={() => openTool('flee')} />
+        <CombatLingeringAlert />
       </PlayDraftScope>}
       <div className="play-combat-toolbox">
         <PlayStrip label="전투 진행 도구" prefix={toolStrip} value={tool} onChange={setTool} items={toolItems} />
@@ -480,9 +478,6 @@ export function PlayCombat({ initialKind = 'encounter', domainOverseer, domainOv
             </PlayDraftScope>
           </PlayStripPane>
           <PlayDraftScope key={roundScope} name={roundScope}>
-            <PlayStripPane prefix={toolStrip} id="round" open={tool === 'round'}>
-              <PlayRoundBoard targets={activeTargets} />
-            </PlayStripPane>
             {activeTargets.length > 1 && <PlayStripPane prefix={toolStrip} id="compare" open={tool === 'compare'}>
               <PlayDamageComparison targets={activeTargets} />
             </PlayStripPane>}
